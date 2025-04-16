@@ -1,3 +1,5 @@
+/server/workspaces/*
+
 # Logs
 logs
 *.log
