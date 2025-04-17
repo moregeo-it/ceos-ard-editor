@@ -71,31 +71,121 @@
         No files found
       </div>
       <div v-else>
-        <div v-for="file in sortedFiles" :key="file.path" class="file-item">
+        <div v-for="file in sortedFiles" :key="file.path" class="file-item" :data-file-path="file.path">
           <div 
             class="file-entry"
             :class="{ 
               'is-directory': file.isDirectory,
-              'is-changed': !file.isDirectory && isFileChanged(file.path)
+              'is-changed': !file.isDirectory && file.gitStatus && file.gitStatus !== 'A',
+              'is-deleted': file.isDeleted,
+              'is-added': !file.isDirectory && file.gitStatus === 'A'
             }"
             @click="handleFileClick(file)"
+            :data-file-path="file.path"
           >
             <span class="icon">{{ file.isDirectory ? '📁' : getFileIcon(file.name) }}</span>
-            <span class="name">{{ file.name }}</span>
+            <span class="name" 
+              :class="{ 
+                'deleted-file': file.isDeleted, 
+                'added-file': !file.isDirectory && file.gitStatus === 'A'
+              }"
+            >{{ file.name }}</span>
             
             <div class="file-actions">
-              <span v-if="!file.isDirectory && isFileChanged(file.path)" class="change-indicator" :title="`File changed (${getFileChangeStatus(file.path)})`">*</span>
-              <button @click.stop="showFileOptions(file)" class="action-button">⋮</button>
+              <span v-if="!file.isDirectory && file.gitStatus" 
+                class="change-indicator" 
+                :title="getGitStatusLabel(file.gitStatus)"
+                :class="{ 'added-indicator': file.gitStatus === 'A' }"
+              >{{ file.gitStatus }}</span>
+              <button @click.stop="showFileOptions(file, $event)" class="action-button">⋮</button>
             </div>
           </div>
           
           <div v-if="file.isDirectory && expandedDirs[file.path]" class="subdirectory">
             <file-tree-directory
               :path="file.path"
+              :currentOpenFile="currentOpenFile"
               @select-file="$emit('select-file', $event)"
               @refresh="refreshDirectory"
+              @update-current-file="$emit('update-current-file', $event)"
+              @file-operation-loading="$emit('file-operation-loading', $event)"
+              @file-operation-complete="$emit('file-operation-complete')"
             />
           </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- File options menu modal -->
+    <div v-if="showFileMenu" class="file-menu-modal" @click.self="showFileMenu = false">
+      <div class="file-menu" :style="fileMenuPosition">
+        <button v-if="selectedFile && selectedFile.gitStatus" @click="revertFileChanges" class="menu-item">Revert Changes</button>
+        <button @click="renameFile" class="menu-item">Rename</button>
+        <button @click="deleteFile" class="menu-item">Delete</button>
+        <button @click="copyFile" class="menu-item">Copy</button>
+        <button @click="moveFile" class="menu-item">Move</button>
+      </div>
+    </div>
+    
+    <!-- Rename File Dialog -->
+    <div class="modal" v-if="showRenameDialog">
+      <div class="modal-content">
+        <h3>Rename {{ selectedFile ? selectedFile.name : '' }}</h3>
+        <div class="form-group">
+          <label>New name:</label>
+          <input 
+            type="text" 
+            v-model="newFileName" 
+            placeholder="Enter new name" 
+            ref="renameInput"
+            @keyup.enter="confirmRename"
+          />
+        </div>
+        <div class="form-actions">
+          <button @click="cancelRename" class="secondary-button">Cancel</button>
+          <button @click="confirmRename" class="primary-button">Rename</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Move File Dialog -->
+    <div class="modal" v-if="showMoveDialog">
+      <div class="modal-content">
+        <h3>Move {{ selectedFile ? selectedFile.name : '' }}</h3>
+        <div class="form-group">
+          <label>Destination path:</label>
+          <input 
+            type="text" 
+            v-model="destinationPath" 
+            placeholder="e.g., folder/" 
+            ref="moveInput"
+            @keyup.enter="confirmMove"
+          />
+        </div>
+        <div class="form-actions">
+          <button @click="cancelMove" class="secondary-button">Cancel</button>
+          <button @click="confirmMove" class="primary-button">Move</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Copy File Dialog -->
+    <div class="modal" v-if="showCopyDialog">
+      <div class="modal-content">
+        <h3>Copy {{ selectedFile ? selectedFile.name : '' }}</h3>
+        <div class="form-group">
+          <label>Destination path:</label>
+          <input 
+            type="text" 
+            v-model="destinationPath" 
+            placeholder="e.g., folder/newname.yml" 
+            ref="copyInput"
+            @keyup.enter="confirmCopy"
+          />
+        </div>
+        <div class="form-actions">
+          <button @click="cancelCopy" class="secondary-button">Cancel</button>
+          <button @click="confirmCopy" class="primary-button">Copy</button>
         </div>
       </div>
     </div>
@@ -106,7 +196,13 @@
         <h3>Create New File</h3>
         <div class="form-group">
           <label>File Path:</label>
-          <input type="text" v-model="newFilePath" placeholder="e.g., filename.yml" />
+          <input 
+            type="text" 
+            v-model="newFilePath" 
+            placeholder="e.g., filename.yml" 
+            ref="newFileInput"
+            @keyup.enter="confirmNewFile"
+          />
         </div>
         <div class="form-actions">
           <button @click="cancelNewFile" class="secondary-button">Cancel</button>
@@ -121,7 +217,13 @@
         <h3>Upload File</h3>
         <div class="form-group">
           <label>Destination Path:</label>
-          <input type="text" v-model="uploadPath" placeholder="e.g., images/file.jpg" />
+          <input 
+            type="text" 
+            v-model="uploadPath" 
+            placeholder="e.g., images/file.jpg" 
+            ref="uploadPathInput"
+            @keyup.enter="confirmUpload"
+          />
         </div>
         <div class="form-group">
           <label>Select File:</label>
@@ -137,7 +239,7 @@
 </template>
 
 <script>
-import { ref, computed, inject, onMounted, nextTick } from 'vue';
+import { ref, computed, inject, onMounted, nextTick, watch } from 'vue';
 
 const API_URL = 'http://localhost:3000/api';
 
@@ -147,9 +249,13 @@ export default {
     path: {
       type: String,
       required: true
+    },
+    currentOpenFile: {
+      type: String,
+      default: ''
     }
   },
-  emits: ['select-file', 'refresh', 'show-file-options'],
+  emits: ['select-file', 'refresh', 'update-current-file', 'file-operation-loading', 'file-operation-complete'],
   setup(props, { emit }) {
     const files = ref([]);
     const loading = ref(true);
@@ -159,18 +265,23 @@ export default {
     // Get changedFiles from parent App component
     const parentChangedFiles = inject('changedFiles', {});
     
-    // File operations state - keep minimal, let parent App handle most operations
+    // File operations state
     const selectedFile = ref(null);
     const showFileMenu = ref(false);
     const fileMenuPosition = ref({ top: '0px', left: '0px' });
     const showNewFileDialog = ref(false);
     const showUploadDialog = ref(false);
+    const showRenameDialog = ref(false);
+    const showMoveDialog = ref(false);
+    const showCopyDialog = ref(false);
     
-    // Form values - keep only what's needed for this component
+    // Form values
     const newFilePath = ref('');
     const uploadPath = ref('');
     const selectedFileToUpload = ref(null);
     const fileInput = ref(null);
+    const newFileName = ref('');
+    const destinationPath = ref('');
     
     // Search functionality
     const searchQuery = ref('');
@@ -183,7 +294,21 @@ export default {
     });
     
     const changedFiles = ref({});
+
+    // Loading state
+    const isLoading = ref(false);
     
+    const showLoading = (message = 'Processing...') => {
+      isLoading.value = true;
+      emit('file-operation-loading', message);
+    };
+
+    const hideLoading = () => {
+      isLoading.value = false;
+      emit('file-operation-complete');
+    };
+    
+    // Load directory data and include changed files information
     const loadDirectory = async () => {
       loading.value = true;
       error.value = false;
@@ -205,7 +330,12 @@ export default {
         
         if (data.success) {
           files.value = data.files;
-          changedFiles.value = data.changedFiles || parentChangedFiles;
+          changedFiles.value = data.changedFiles || {};
+          
+          // If we're at the root directory, emit a refresh to update parent components
+          if (!props.path) {
+            emit('refresh', { changedFiles: changedFiles.value });
+          }
         } else {
           error.value = true;
           console.error('Failed to load directory:', data.message);
@@ -221,6 +351,9 @@ export default {
     const refreshDirectory = () => {
       // Always reload the directory data
       loadDirectory();
+      
+      // Also emit refresh event to parent component to ensure the entire tree is updated
+      emit('refresh');
     };
     
     const sortedFiles = computed(() => {
@@ -270,9 +403,67 @@ export default {
     const getFileChangeStatus = (filePath) => {
       return changedFiles.value[filePath] || 'unknown';
     };
+
+    const getGitStatusLabel = (status) => {
+      if (status === 'M') return 'Modified';
+      if (status === 'A') return 'Added';
+      if (status === 'D') return 'Deleted';
+      if (status === 'R') return 'Renamed';
+      if (status === 'C') return 'Copied';
+      if (status === 'U') return 'Updated';
+      return status; // Return the status code if no specific label
+    };
+    
+    const revertFileChanges = async () => {
+      if (!selectedFile.value) return;
+      showFileMenu.value = false;
+      
+      if (!confirm(`Are you sure you want to revert changes to ${selectedFile.value.name}? This will discard all your changes.`)) {
+        return;
+      }
+      
+      try {
+        showLoading('Reverting file changes...');
+        const workspaceId = localStorage.getItem('workspaceId');
+        
+        const response = await fetch(`${API_URL}/file/revert`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'workspace-id': workspaceId
+          },
+          body: JSON.stringify({
+            filePath: selectedFile.value.path
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          // Refresh the file tree to reflect the reverted changes
+          refreshDirectory();
+          
+          // If the reverted file is currently open, reload it
+          if (props.currentOpenFile === selectedFile.value.path) {
+            emit('select-file', selectedFile.value.path);
+          }
+          
+          // Clear the selected file
+          selectedFile.value = null;
+        } else {
+          alert(`Failed to revert file changes: ${data.message}`);
+        }
+      } catch (error) {
+        console.error('Error reverting file changes:', error);
+        alert('Failed to revert file changes. Check console for details.');
+      } finally {
+        hideLoading();
+      }
+    };
     
     // Handle showing file options menu
-    const showFileOptions = (file) => {
+    const showFileOptions = (file, event) => {
+      event.stopPropagation();
       selectedFile.value = file;
       showFileMenu.value = true;
       
@@ -284,15 +475,18 @@ export default {
           left: `${rect.left + window.scrollX}px`
         };
       });
-      
-      // Emit event to parent so it can handle file operations
-      emit('show-file-options', file);
     };
     
-    // New file handlers - simplified
+    // New file handlers
+    const newFileInput = ref(null);
     const createNewFile = () => {
       showNewFileDialog.value = true;
-      newFilePath.value = '';
+      newFilePath.value = props.path ? props.path + '/' : '';
+      nextTick(() => {
+        if (newFileInput.value) {
+          newFileInput.value.focus();
+        }
+      });
     };
     
     const cancelNewFile = () => {
@@ -307,11 +501,12 @@ export default {
       }
       
       try {
+        showLoading('Creating file...');
         const workspaceId = localStorage.getItem('workspaceId');
         
         // Prepend current directory path to new file path if not an absolute path
         let fullPath = newFilePath.value;
-        if (!newFilePath.value.startsWith('/') && props.path) {
+        if (!newFilePath.value.startsWith('/') && props.path && !fullPath.includes('/')) {
           fullPath = `${props.path}/${newFilePath.value}`;
         }
         
@@ -340,14 +535,22 @@ export default {
       } catch (error) {
         console.error('Error creating file:', error);
         alert('Failed to create file. Check console for details.');
+      } finally {
+        hideLoading();
       }
     };
     
     // File upload handlers
+    const uploadPathInput = ref(null);
     const uploadFile = () => {
       showUploadDialog.value = true;
       uploadPath.value = props.path ? props.path + '/' : '';
       selectedFileToUpload.value = null;
+      nextTick(() => {
+        if (uploadPathInput.value) {
+          uploadPathInput.value.focus();
+        }
+      });
     };
     
     const cancelUpload = () => {
@@ -360,7 +563,7 @@ export default {
       const file = event.target.files[0];
       selectedFileToUpload.value = file || null;
       
-      // Auto-suggest path based on selected file name
+      // Auto-fill uploadPath with the filename if not provided
       if (file && uploadPath.value.endsWith('/')) {
         uploadPath.value += file.name;
       }
@@ -373,31 +576,303 @@ export default {
       }
       
       try {
+        showLoading('Uploading file...');
         const workspaceId = localStorage.getItem('workspaceId');
         
-        const formData = new FormData();
-        formData.append('file', selectedFileToUpload.value);
-        formData.append('filePath', uploadPath.value);
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const content = e.target.result;
+          
+          const response = await fetch(`${API_URL}/file/upload`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'workspace-id': workspaceId
+            },
+            body: JSON.stringify({
+              path: uploadPath.value,
+              content
+            })
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            showUploadDialog.value = false;
+            refreshDirectory();
+            
+            // Open the uploaded file
+            emit('select-file', uploadPath.value);
+          } else {
+            alert(`Failed to upload file: ${data.message}`);
+          }
+          hideLoading();
+        };
         
-        const response = await fetch(`${API_URL}/file/upload`, {
+        reader.readAsText(selectedFileToUpload.value);
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        alert('Failed to upload file. Check console for details.');
+        hideLoading();
+      }
+    };
+    
+    // Rename file handlers
+    const renameInput = ref(null);
+    const renameFile = () => {
+      if (!selectedFile.value) return;
+      
+      showFileMenu.value = false;
+      newFileName.value = selectedFile.value.name;
+      showRenameDialog.value = true;
+      nextTick(() => {
+        if (renameInput.value) {
+          renameInput.value.focus();
+        }
+      });
+    };
+    
+    const cancelRename = () => {
+      showRenameDialog.value = false;
+      newFileName.value = '';
+    };
+    
+    const confirmRename = async () => {
+      if (!selectedFile.value || !newFileName.value.trim()) return;
+      
+      try {
+        showLoading('Renaming file...');
+        const workspaceId = localStorage.getItem('workspaceId');
+        
+        // Get old file path and new file path
+        const oldPath = selectedFile.value.path;
+        const pathParts = oldPath.split('/');
+        pathParts.pop(); // Remove the old filename
+        const newPath = pathParts.length > 0 
+          ? `${pathParts.join('/')}/${newFileName.value}`
+          : newFileName.value;
+        
+        const response = await fetch(`${API_URL}/file/rename`, {
           method: 'POST',
           headers: {
+            'Content-Type': 'application/json',
             'workspace-id': workspaceId
           },
-          body: formData
+          body: JSON.stringify({
+            oldPath,
+            newPath
+          })
         });
         
         const data = await response.json();
         
         if (data.success) {
-          showUploadDialog.value = false;
+          // If the renamed file is currently open, update the current file path
+          if (props.currentOpenFile === oldPath) {
+            emit('update-current-file', { oldPath, newPath });
+          }
+          
+          // Update successful, refresh file tree
           refreshDirectory();
+          showRenameDialog.value = false;
+          newFileName.value = '';
         } else {
-          alert(`Failed to upload file: ${data.message}`);
+          alert(`Failed to rename file: ${data.message}`);
         }
       } catch (error) {
-        console.error('Error uploading file:', error);
-        alert('Failed to upload file. Check console for details.');
+        console.error('Error renaming file:', error);
+        alert('Failed to rename file. Check console for details.');
+      } finally {
+        hideLoading();
+      }
+    };
+    
+    // Delete file handlers
+    const deleteFile = async () => {
+      if (!selectedFile.value) return;
+      showFileMenu.value = false;
+      
+      if (!confirm(`Are you sure you want to delete ${selectedFile.value.name}?`)) {
+        return;
+      }
+      
+      try {
+        showLoading('Deleting file...');
+        const workspaceId = localStorage.getItem('workspaceId');
+        
+        const response = await fetch(`${API_URL}/file/delete`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'workspace-id': workspaceId
+          },
+          body: JSON.stringify({
+            filePath: selectedFile.value.path
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          // If the deleted file is currently open, close it
+          if (props.currentOpenFile === selectedFile.value.path) {
+            emit('update-current-file', { oldPath: selectedFile.value.path, newPath: '' });
+          }
+          
+          // Delete successful, refresh file tree
+          refreshDirectory();
+          
+          // Clear the selected file
+          selectedFile.value = null;
+        } else {
+          alert(`Failed to delete file: ${data.message}`);
+        }
+      } catch (error) {
+        console.error('Error deleting file:', error);
+        alert('Failed to delete file. Check console for details.');
+      } finally {
+        hideLoading();
+      }
+    };
+    
+    // Move file handlers
+    const moveInput = ref(null);
+    const moveFile = () => {
+      if (!selectedFile.value) return;
+      
+      showFileMenu.value = false;
+      destinationPath.value = '';
+      showMoveDialog.value = true;
+      nextTick(() => {
+        if (moveInput.value) {
+          moveInput.value.focus();
+        }
+      });
+    };
+    
+    const cancelMove = () => {
+      showMoveDialog.value = false;
+      destinationPath.value = '';
+    };
+    
+    const confirmMove = async () => {
+      if (!selectedFile.value || !destinationPath.value.trim()) return;
+      
+      try {
+        showLoading('Moving file...');
+        const workspaceId = localStorage.getItem('workspaceId');
+        
+        const sourcePath = selectedFile.value.path;
+        let destPath = destinationPath.value;
+        
+        // If destination is a directory path (ends with /) append the original filename
+        if (destPath.endsWith('/')) {
+          destPath += selectedFile.value.name;
+        }
+        
+        const response = await fetch(`${API_URL}/file/move`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'workspace-id': workspaceId
+          },
+          body: JSON.stringify({
+            sourcePath,
+            destPath
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          // If the moved file is currently open, update the current file path
+          if (props.currentOpenFile === sourcePath) {
+            emit('update-current-file', { oldPath: sourcePath, newPath: destPath });
+          }
+          
+          // Move successful, refresh file tree
+          refreshDirectory();
+          showMoveDialog.value = false;
+          destinationPath.value = '';
+        } else {
+          alert(`Failed to move file: ${data.message}`);
+        }
+      } catch (error) {
+        console.error('Error moving file:', error);
+        alert('Failed to move file. Check console for details.');
+      } finally {
+        hideLoading();
+      }
+    };
+    
+    // Copy file handlers
+    const copyInput = ref(null);
+    const copyFile = () => {
+      if (!selectedFile.value) return;
+      
+      showFileMenu.value = false;
+      destinationPath.value = '';
+      showCopyDialog.value = true;
+      nextTick(() => {
+        if (copyInput.value) {
+          copyInput.value.focus();
+        }
+      });
+    };
+    
+    const cancelCopy = () => {
+      showCopyDialog.value = false;
+      destinationPath.value = '';
+    };
+    
+    const confirmCopy = async () => {
+      if (!selectedFile.value || !destinationPath.value.trim()) return;
+      
+      try {
+        showLoading('Copying file...');
+        const workspaceId = localStorage.getItem('workspaceId');
+        
+        const sourcePath = selectedFile.value.path;
+        let destPath = destinationPath.value;
+        
+        // If destination is a directory path (ends with /) append the original filename
+        if (destPath.endsWith('/')) {
+          destPath += selectedFile.value.name;
+        }
+        
+        const response = await fetch(`${API_URL}/file/copy`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'workspace-id': workspaceId
+          },
+          body: JSON.stringify({
+            sourcePath,
+            destPath
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          // Copy successful, refresh file tree and changed files list
+          refreshDirectory();
+          
+          showCopyDialog.value = false;
+          destinationPath.value = '';
+          
+          // Open the newly copied file
+          if (data.newFilePath || destPath) {
+            const newFilePath = data.newFilePath || destPath;
+            emit('select-file', newFilePath);
+          }
+        } else {
+          alert(`Failed to copy file: ${data.message}`);
+        }
+      } catch (error) {
+        console.error('Error copying file:', error);
+        alert('Failed to copy file. Check console for details.');
+      } finally {
+        hideLoading();
       }
     };
     
@@ -484,8 +959,96 @@ export default {
         clearSearch();
       }
     };
+
+    // Expand the file tree to show a specific file path and scroll to it
+    const expandToShowFile = async (filePath) => {
+      if (!filePath) return;
+      
+      // Only process if this is the root directory or the path includes this directory
+      if (props.path && !filePath.startsWith(props.path + '/')) return;
+
+      // If we're currently loading, wait for data to be loaded first
+      if (loading.value) {
+        await new Promise(resolve => {
+          const unwatch = watch(loading, (newVal) => {
+            if (newVal === false) {
+              unwatch();
+              resolve();
+            }
+          });
+        });
+      }
+      
+      const pathParts = filePath.split('/');
+      let currentPath = '';
+      
+      // Expand each directory in the path
+      for (let i = 0; i < pathParts.length - 1; i++) {
+        if (pathParts[i]) {
+          if (currentPath) {
+            currentPath += '/';
+          }
+          currentPath += pathParts[i];
+          expandedDirs.value[currentPath] = true;
+        }
+      }
+      
+      // After expanding directories, wait for DOM update and then scroll to the file
+      await nextTick();
+      
+      // Try to find the file element in the DOM
+      let attempts = 0;
+      const maxAttempts = 5;
+      
+      const tryScroll = () => {
+        attempts++;
+        scrollToActiveFile(filePath);
+        
+        // If we couldn't find the element and haven't reached max attempts
+        // try again after a short delay
+        const fileElement = document.querySelector(`[data-file-path="${filePath}"]`);
+        if (!fileElement && attempts < maxAttempts) {
+          setTimeout(tryScroll, 100 * attempts); // Increase delay with each attempt
+        }
+      };
+      
+      tryScroll();
+    };
     
-    onMounted(loadDirectory);
+    // Scroll to the active file in the file tree
+    const scrollToActiveFile = (filePath) => {
+      if (!filePath) return;
+      
+      // Find the file element in the DOM
+      const fileElement = document.querySelector(`[data-file-path="${filePath}"]`);
+      if (fileElement) {
+        // Scroll the file element into view with smooth behavior
+        fileElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Briefly highlight the element to make it more visible to the user
+        fileElement.classList.add('highlight-file');
+        setTimeout(() => {
+          fileElement.classList.remove('highlight-file');
+        }, 2000); // Remove highlight after 2 seconds
+      }
+    };
+    
+    // Watch for changes in the currentOpenFile prop
+    watch(() => props.currentOpenFile, (newFilePath, oldFilePath) => {
+      if (newFilePath && newFilePath !== oldFilePath) {
+        // Expand the directories to make the file visible and scroll to it
+        expandToShowFile(newFilePath);
+      }
+    });
+    
+    onMounted(() => {
+      loadDirectory();
+      
+      // If there's already a current open file, make sure it's visible and scrolled into view
+      if (props.currentOpenFile) {
+        expandToShowFile(props.currentOpenFile);
+      }
+    });
     
     return {
       files,
@@ -506,6 +1069,7 @@ export default {
       // New file
       showNewFileDialog,
       newFilePath,
+      newFileInput,
       createNewFile,
       cancelNewFile,
       confirmNewFile,
@@ -515,14 +1079,43 @@ export default {
       uploadPath,
       selectedFileToUpload,
       fileInput,
+      uploadPathInput,
       uploadFile,
       cancelUpload,
       handleFileSelected,
       confirmUpload,
       
+      // Rename file
+      showRenameDialog,
+      newFileName,
+      renameInput,
+      renameFile,
+      cancelRename,
+      confirmRename,
+      
+      // Move file
+      showMoveDialog,
+      destinationPath,
+      moveInput,
+      moveFile,
+      cancelMove,
+      confirmMove,
+      
+      // Copy file
+      showCopyDialog,
+      copyInput,
+      copyFile,
+      cancelCopy,
+      confirmCopy,
+      
+      // Delete file
+      deleteFile,
+      
       // Changed files
       isFileChanged,
       getFileChangeStatus,
+      getGitStatusLabel,
+      revertFileChanges,
       
       // Search functionality
       searchQuery,
@@ -530,7 +1123,10 @@ export default {
       searchResults,
       performSearch,
       clearSearch,
-      handleResultClick
+      handleResultClick,
+      
+      // Expand file tree
+      expandToShowFile
     };
   }
 };
@@ -574,6 +1170,14 @@ export default {
   background-color: #fff3cd;
 }
 
+.file-entry.is-deleted {
+  background-color: #f8d7da;
+}
+
+.file-entry.is-added {
+  background-color: #d4edda;
+}
+
 .icon {
   margin-right: 0.4rem;
   font-size: 0.9rem;
@@ -584,6 +1188,16 @@ export default {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.name.deleted-file {
+  text-decoration: line-through;
+  color: #d9534f;
+}
+
+.name.added-file {
+  font-weight: bold;
+  color: #28a745;
 }
 
 .file-actions {
@@ -615,6 +1229,15 @@ export default {
   color: #d9534f;
   font-weight: bold;
   margin-right: 0.5rem;
+}
+
+.change-indicator.added-indicator {
+  color: #28a745;
+}
+
+/* Make sure file changes are always visible, even without hovering */
+.file-entry .file-actions .change-indicator {
+  visibility: visible;
 }
 
 .subdirectory {
@@ -884,5 +1507,9 @@ export default {
   word-break: break-word;
   max-height: 8rem;
   overflow-y: auto;
+}
+
+.highlight-file {
+  background-color: rgba(0,0,0, 0.25) !important;
 }
 </style>

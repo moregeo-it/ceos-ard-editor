@@ -19,6 +19,7 @@
       sandbox="allow-same-origin"
       title="HTML Preview"
       v-show="content"
+      :style="{'pointer-events': isResizing ? 'none' : 'auto'}"
     ></iframe>
     
     <div v-if="!content" class="no-preview">
@@ -44,6 +45,10 @@ export default {
     selectedPreviewName: {
       type: String,
       default: ''
+    },
+    isResizing: {
+      type: Boolean,
+      default: false
     }
   },
   emits: ['preview-change', 'build-started', 'build-completed', 'open-file'],
@@ -345,20 +350,6 @@ export default {
   flex-direction: column;
   overflow: hidden;
   position: relative;
-}
-
-.preview-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 1rem;
-  background-color: #f5f5f5;
-  border-bottom: 1px solid #ddd;
-}
-
-.preview-header h3 {
-  margin: 0;
-  font-size: 1rem;
 }
 
 .preview-controls {

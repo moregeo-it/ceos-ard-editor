@@ -33,18 +33,26 @@
             <h3>Files</h3>
           </div>
           <div class="file-list">
-            <file-tree-directory path="" @select-file="openFile" @refresh="loadFileTree" />
+            <file-tree-directory 
+              path="" 
+              :currentOpenFile="currentFile"
+              @select-file="openFile" 
+              @refresh="loadFileTree" 
+              @update-current-file="handleFilePathUpdate"
+              @file-operation-loading="showLoading"
+              @file-operation-complete="hideLoading"
+            />
           </div>
         </div>
         
         <!-- Resize handle for left panel -->
         <div 
           class="resize-handle"
-          @mousedown="startResizeLeft"
+          @mousedown="(e) => startResize('left', e)"
         ></div>
 
         <!-- Middle column: Code editor -->
-        <div class="column code-editor" :style="{ width: middlePanelWidth + 'px' }">
+        <div class="column code-editor">
           <code-editor 
             v-if="currentFile && isFileEditable"
             v-model="fileContent"
@@ -61,14 +69,14 @@
           </div>
         </div>
         
-        <!-- Resize handle for middle panel -->
+        <!-- Resize handle for right panel -->
         <div 
           class="resize-handle"
-          @mousedown="startResizeMiddle"
+          @mousedown="(e) => startResize('right', e)"
         ></div>
 
         <!-- Right column: Preview -->
-        <div class="column preview-pane">
+        <div class="column preview-pane" :style="{ width: rightPanelWidth + 'px' }">
           <div class="preview-header">
             <h3>Preview</h3>
             <div class="preview-selector">
@@ -88,6 +96,7 @@
             v-if="selectedPreview"
             :content="previewContent"
             :selected-preview-name="selectedPreview"
+            :is-resizing="resizeState && resizeState.active"
             @build-completed="handleBuildCompleted"
             @open-file="openFile"
             ref="previewPaneRef"
@@ -95,101 +104,11 @@
         </div>
       </div>
     </div>
-    
-    <!-- File operations modals -->
-    <!-- File options menu modal -->
-    <div v-if="showFileMenu" class="file-menu-modal" @click.self="showFileMenu = false">
-      <div class="file-menu" :style="fileMenuPosition">
-        <button @click="renameFile" class="menu-item">Rename</button>
-        <button @click="deleteFile" class="menu-item">Delete</button>
-        <button @click="copyFile" class="menu-item">Copy</button>
-        <button @click="moveFile" class="menu-item">Move</button>
-      </div>
-    </div>
-    
-    <!-- Rename File Dialog -->
-    <div class="modal" v-if="showRenameDialog">
-      <div class="modal-content">
-        <h3>Rename {{ selectedFile ? selectedFile.name : '' }}</h3>
-        <div class="form-group">
-          <label>New name:</label>
-          <input type="text" v-model="newFileName" placeholder="Enter new name" />
-        </div>
-        <div class="form-actions">
-          <button @click="cancelRename" class="secondary-button">Cancel</button>
-          <button @click="confirmRename" class="primary-button">Rename</button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Move File Dialog -->
-    <div class="modal" v-if="showMoveDialog">
-      <div class="modal-content">
-        <h3>Move {{ selectedFile ? selectedFile.name : '' }}</h3>
-        <div class="form-group">
-          <label>Destination path:</label>
-          <input type="text" v-model="destinationPath" placeholder="e.g., folder/" />
-        </div>
-        <div class="form-actions">
-          <button @click="cancelMove" class="secondary-button">Cancel</button>
-          <button @click="confirmMove" class="primary-button">Move</button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Copy File Dialog -->
-    <div class="modal" v-if="showCopyDialog">
-      <div class="modal-content">
-        <h3>Copy {{ selectedFile ? selectedFile.name : '' }}</h3>
-        <div class="form-group">
-          <label>Destination path:</label>
-          <input type="text" v-model="destinationPath" placeholder="e.g., folder/newname.yml" />
-        </div>
-        <div class="form-actions">
-          <button @click="cancelCopy" class="secondary-button">Cancel</button>
-          <button @click="confirmCopy" class="primary-button">Copy</button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- New File Dialog -->
-    <div class="modal" v-if="showNewFileDialog">
-      <div class="modal-content">
-        <h3>Create New File</h3>
-        <div class="form-group">
-          <label>File Path:</label>
-          <input type="text" v-model="newFilePath" placeholder="e.g., folder/filename.yml" />
-        </div>
-        <div class="form-actions">
-          <button @click="cancelNewFile" class="secondary-button">Cancel</button>
-          <button @click="confirmNewFile" class="primary-button">Create</button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- File Upload Dialog -->
-    <div class="modal" v-if="showUploadDialog">
-      <div class="modal-content">
-        <h3>Upload File</h3>
-        <div class="form-group">
-          <label>Destination Path:</label>
-          <input type="text" v-model="uploadPath" placeholder="e.g., images/file.jpg" />
-        </div>
-        <div class="form-group">
-          <label>Select File:</label>
-          <input type="file" @change="handleFileSelected" ref="fileInput" />
-        </div>
-        <div class="form-actions">
-          <button @click="cancelUpload" class="secondary-button">Cancel</button>
-          <button @click="confirmUpload" class="primary-button" :disabled="!selectedFileToUpload">Upload</button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick, provide } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick, provide } from 'vue';
 import FileTreeDirectory from './components/FileTreeDirectory.vue';
 import CodeEditor from './components/CodeEditor.vue';
 import PreviewPane from './components/PreviewPane.vue';
@@ -219,24 +138,6 @@ export default {
     const isFileEditable = ref(true);
     const changedFiles = ref({}); // Track changed files by path
 
-    // File operations state
-    const selectedFile = ref(null);
-    const showFileMenu = ref(false);
-    const fileMenuPosition = ref({ top: '0px', left: '0px' });
-    const showRenameDialog = ref(false);
-    const showMoveDialog = ref(false);
-    const showCopyDialog = ref(false);
-    const showNewFileDialog = ref(false);
-    const showUploadDialog = ref(false);
-    
-    // Form values
-    const newFileName = ref('');
-    const destinationPath = ref('');
-    const newFilePath = ref('');
-    const uploadPath = ref('');
-    const selectedFileToUpload = ref(null);
-    const fileInput = ref(null);
-
     // Preview state
     const previewFiles = ref([]);
     const selectedPreview = ref('');
@@ -244,10 +145,61 @@ export default {
     const previewPaneRef = ref(null);
     
     // Panel resize state
-    const leftPanelWidth = ref(250);
-    const middlePanelWidth = ref(window.innerWidth * 0.4);
-    const isResizingLeft = ref(false);
-    const isResizingMiddle = ref(false);
+    const leftPanelWidth = ref(window.innerWidth * 0.2);
+    const rightPanelWidth = ref(window.innerWidth * 0.4);
+    const resizeState = ref({
+      active: false,
+      panel: null, // 'left' or 'right'
+      startX: 0,
+      startWidth: 0
+    });
+
+    // Reusable resize handlers
+    const startResize = (panel, e) => {
+      // Store starting position and current width
+      resizeState.value = {
+        active: true,
+        panel: panel,
+        startX: e.clientX,
+        startWidth: panel === 'left' ? leftPanelWidth.value : rightPanelWidth.value
+      };
+      
+      // Add visual indicator to the resize handle
+      e.target.classList.add('resizing');
+      
+      // Add global event listeners
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', stopResize);
+      
+      // Prevent default browser behavior that might interfere
+      e.preventDefault();
+    };
+    
+    const handleMouseMove = (e) => {
+      if (!resizeState.value.active) return;
+      
+      const movementX = e.clientX - resizeState.value.startX;
+      
+      if (resizeState.value.panel === 'left') {
+        leftPanelWidth.value = resizeState.value.startWidth + movementX;
+      } else {
+        rightPanelWidth.value = resizeState.value.startWidth - movementX;
+      }
+    };
+    
+    const stopResize = () => {
+      // Reset resize state
+      resizeState.value.active = false;
+      
+      // Remove visual indicator from all resize handles
+      document.querySelectorAll('.resize-handle').forEach(el => {
+        el.classList.remove('resizing');
+      });
+      
+      // Remove global event listeners
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', stopResize);
+    };
 
     // Loading state
     const isLoading = ref(false);
@@ -353,7 +305,7 @@ export default {
       fileTreeError.value = false;
       
       try {
-        const response = await fetch(`${API_URL}/file/list?dir=`, {
+        const response = await fetch(`${API_URL}/file/list`, {
           headers: {
             'workspace-id': workspaceId.value
           }
@@ -363,8 +315,6 @@ export default {
         
         if (data.success) {
           files.value = data.files;
-          // Load changed files after loading the file tree
-          await loadChangedFiles();
         } else {
           fileTreeError.value = true;
           alert(`Failed to load file tree: ${data.message}`);
@@ -379,7 +329,6 @@ export default {
 
     // Open a file for editing
     const openFile = async (filePath) => {
-      console.log(filePath);
       try {
         showLoading('Loading file...');
         const response = await fetch(`${API_URL}/file/content?filePath=${encodeURIComponent(filePath)}`, {
@@ -425,8 +374,11 @@ export default {
         const data = await response.json();
         
         if (data.success) {
-          // Update changed files list after saving
-          await loadChangedFiles();
+          // Clear the changedFiles cache to ensure fresh data on next load
+          changedFiles.value = {};
+          
+          // Reload the entire file tree to update file statuses
+          await loadFileTree();
           
           // Rebuild only the current preview if one is selected
           if (selectedPreview.value && previewPaneRef.value) {
@@ -445,337 +397,7 @@ export default {
         hideLoading();
       }
     };
-    
-    // File operations
-    // Rename file handlers
-    const renameFile = () => {
-      if (!selectedFile.value) return;
-      
-      showFileMenu.value = false;
-      newFileName.value = selectedFile.value.name;
-      showRenameDialog.value = true;
-    };
-    
-    const cancelRename = () => {
-      showRenameDialog.value = false;
-      newFileName.value = '';
-    };
-    
-    const confirmRename = async () => {
-      if (!selectedFile.value || !newFileName.value.trim()) return;
-      
-      try {
-        showLoading('Renaming file...');
-        const workspaceId = localStorage.getItem('workspaceId');
-        
-        // Get old file path and new file path
-        const oldPath = selectedFile.value.path;
-        const pathParts = oldPath.split('/');
-        pathParts.pop(); // Remove the old filename
-        const newPath = pathParts.length > 0 
-          ? `${pathParts.join('/')}/${newFileName.value}`
-          : newFileName.value;
-        
-        const response = await fetch(`${API_URL}/file/rename`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'workspace-id': workspaceId
-          },
-          body: JSON.stringify({
-            oldPath,
-            newPath
-          })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          // Update successful, refresh file tree
-          loadFileTree();
-          showRenameDialog.value = false;
-          newFileName.value = '';
-        } else {
-          alert(`Failed to rename file: ${data.message}`);
-        }
-      } catch (error) {
-        console.error('Error renaming file:', error);
-        alert('Failed to rename file. Check console for details.');
-      } finally {
-        hideLoading();
-      }
-    };
-    
-    // Delete file handlers
-    const deleteFile = async () => {
-      if (!selectedFile.value) return;
-      showFileMenu.value = false;
-      
-      if (!confirm(`Are you sure you want to delete ${selectedFile.value.name}?`)) {
-        return;
-      }
-      
-      try {
-        showLoading('Deleting file...');
-        const workspaceId = localStorage.getItem('workspaceId');
-        
-        const response = await fetch(`${API_URL}/file/delete`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'workspace-id': workspaceId
-          },
-          body: JSON.stringify({
-            filePath: selectedFile.value.path
-          })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          // Delete successful, refresh file tree
-          loadFileTree();
-        } else {
-          alert(`Failed to delete file: ${data.message}`);
-        }
-      } catch (error) {
-        console.error('Error deleting file:', error);
-        alert('Failed to delete file. Check console for details.');
-      } finally {
-        hideLoading();
-      }
-    };
-    
-    // Move file handlers
-    const moveFile = () => {
-      if (!selectedFile.value) return;
-      
-      showFileMenu.value = false;
-      destinationPath.value = '';
-      showMoveDialog.value = true;
-    };
-    
-    const cancelMove = () => {
-      showMoveDialog.value = false;
-      destinationPath.value = '';
-    };
-    
-    const confirmMove = async () => {
-      if (!selectedFile.value || !destinationPath.value.trim()) return;
-      
-      try {
-        showLoading('Moving file...');
-        const workspaceId = localStorage.getItem('workspaceId');
-        
-        const sourcePath = selectedFile.value.path;
-        let destPath = destinationPath.value;
-        
-        // If destination is a directory path (ends with /) append the original filename
-        if (destPath.endsWith('/')) {
-          destPath += selectedFile.value.name;
-        }
-        
-        const response = await fetch(`${API_URL}/file/move`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'workspace-id': workspaceId
-          },
-          body: JSON.stringify({
-            sourcePath,
-            destPath
-          })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          // Move successful, refresh file tree
-          loadFileTree();
-          showMoveDialog.value = false;
-          destinationPath.value = '';
-        } else {
-          alert(`Failed to move file: ${data.message}`);
-        }
-      } catch (error) {
-        console.error('Error moving file:', error);
-        alert('Failed to move file. Check console for details.');
-      } finally {
-        hideLoading();
-      }
-    };
-    
-    // Copy file handlers
-    const copyFile = () => {
-      if (!selectedFile.value) return;
-      
-      showFileMenu.value = false;
-      destinationPath.value = '';
-      showCopyDialog.value = true;
-    };
-    
-    const cancelCopy = () => {
-      showCopyDialog.value = false;
-      destinationPath.value = '';
-    };
-    
-    const confirmCopy = async () => {
-      if (!selectedFile.value || !destinationPath.value.trim()) return;
-      
-      try {
-        showLoading('Copying file...');
-        const workspaceId = localStorage.getItem('workspaceId');
-        
-        const sourcePath = selectedFile.value.path;
-        let destPath = destinationPath.value;
-        
-        // If destination is a directory path (ends with /) append the original filename
-        if (destPath.endsWith('/')) {
-          destPath += selectedFile.value.name;
-        }
-        
-        const response = await fetch(`${API_URL}/file/copy`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'workspace-id': workspaceId
-          },
-          body: JSON.stringify({
-            sourcePath,
-            destPath
-          })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          // Copy successful, refresh file tree
-          loadFileTree();
-          showCopyDialog.value = false;
-          destinationPath.value = '';
-        } else {
-          alert(`Failed to copy file: ${data.message}`);
-        }
-      } catch (error) {
-        console.error('Error copying file:', error);
-        alert('Failed to copy file. Check console for details.');
-      } finally {
-        hideLoading();
-      }
-    };
-    
-    // New file handlers
-    const createNewFile = () => {
-      showNewFileDialog.value = true;
-      newFilePath.value = '';
-    };
-    
-    const cancelNewFile = () => {
-      showNewFileDialog.value = false;
-      newFilePath.value = '';
-    };
-    
-    const confirmNewFile = async () => {
-      if (!newFilePath.value.trim()) {
-        alert('Please enter a file path');
-        return;
-      }
-      
-      try {
-        showLoading('Creating file...');
-        const response = await fetch(`${API_URL}/file/save`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'workspace-id': workspaceId.value
-          },
-          body: JSON.stringify({
-            filePath: newFilePath.value,
-            content: ''
-          })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          showNewFileDialog.value = false;
-          // Update changed files list after creating a file
-          await loadChangedFiles();
-          loadFileTree();
-          openFile(newFilePath.value);
-        } else {
-          alert(`Failed to create file: ${data.message}`);
-        }
-      } catch (error) {
-        console.error('Error creating file:', error);
-        alert('Failed to create file. Check console for details.');
-      } finally {
-        hideLoading();
-      }
-    };
-    
-    // File upload handlers
-    const uploadFile = () => {
-      showUploadDialog.value = true;
-      uploadPath.value = '';
-      selectedFileToUpload.value = null;
-    };
-    
-    const cancelUpload = () => {
-      showUploadDialog.value = false;
-      uploadPath.value = '';
-      selectedFileToUpload.value = null;
-    };
-    
-    const handleFileSelected = (event) => {
-      const file = event.target.files[0];
-      selectedFileToUpload.value = file || null;
-      
-      // Auto-fill uploadPath with the filename if not provided
-      if (file && !uploadPath.value) {
-        uploadPath.value = file.name;
-      }
-    };
-    
-    const confirmUpload = async () => {
-      if (!uploadPath.value.trim() || !selectedFileToUpload.value) {
-        alert('Please select a file and enter a destination path');
-        return;
-      }
-      
-      try {
-        showLoading('Uploading file...');
-        const workspaceId = localStorage.getItem('workspaceId');
-        
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          const content = e.target.result;
-          
-          await fetch(`${API_URL}/file/upload`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'workspace-id': workspaceId
-            },
-            body: JSON.stringify({
-              path: uploadPath.value,
-              content
-            })
-          });
-          
-          showUploadDialog.value = false;
-          loadFileTree();
-          hideLoading();
-        };
-        
-        reader.readAsText(selectedFileToUpload.value);
-      } catch (error) {
-        console.error('Error uploading file:', error);
-        alert('Failed to upload file. Check console for details.');
-        hideLoading();
-      }
-    };
-    
+
     // Generate preview
     const generatePreview = async () => {
       try {
@@ -981,90 +603,22 @@ export default {
       }
     };
 
-    // Load changed files from git status
-    const loadChangedFiles = async () => {
-      try {
-        const response = await fetch(`${API_URL}/file/changes`, {
-          headers: {
-            'workspace-id': workspaceId.value
-          }
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          // Create a mapping of file paths to their git status
-          const changes = {};
-          data.changedFiles.forEach(file => {
-            changes[file.path] = file.status;
-          });
-          
-          changedFiles.value = changes;
-        } else {
-          console.error('Failed to get changed files:', data.message);
-        }
-      } catch (error) {
-        console.error('Error getting changed files:', error);
-      }
-    };
-
-    // Panel resize handlers
-    const startResizeLeft = (e) => {
-      isResizingLeft.value = true;
-      document.addEventListener('mousemove', handleMouseMoveLeft);
-      document.addEventListener('mouseup', stopResize);
-      e.preventDefault();
-    };
-    
-    const startResizeMiddle = (e) => {
-      isResizingMiddle.value = true;
-      document.addEventListener('mousemove', handleMouseMoveMiddle);
-      document.addEventListener('mouseup', stopResize);
-      e.preventDefault();
-    };
-    
-    const handleMouseMoveLeft = (e) => {
-      if (!isResizingLeft.value) return;
-      
-      const newWidth = Math.max(150, Math.min(500, e.clientX));
-      leftPanelWidth.value = newWidth;
-    };
-    
-    const handleMouseMoveMiddle = (e) => {
-      if (!isResizingMiddle.value) return;
-      
-      const totalWidth = window.innerWidth - leftPanelWidth.value;
-      const minRightWidth = 200;
-      
-      const maxMiddleWidth = totalWidth - minRightWidth;
-      const newWidth = Math.max(200, Math.min(maxMiddleWidth, e.clientX - leftPanelWidth.value));
-      middlePanelWidth.value = newWidth;
-    };
-    
-    const stopResize = () => {
-      isResizingLeft.value = false;
-      isResizingMiddle.value = false;
-      document.removeEventListener('mousemove', handleMouseMoveLeft);
-      document.removeEventListener('mousemove', handleMouseMoveMiddle);
-      document.removeEventListener('mouseup', stopResize);
-    };
-
-    const handleWindowResize = () => {
-      const totalWidth = window.innerWidth;
-      
-      const maxLeftWidth = totalWidth * 0.4;
-      if (leftPanelWidth.value > maxLeftWidth) {
-        leftPanelWidth.value = maxLeftWidth;
-      }
-      
-      const maxMiddleWidth = (totalWidth - leftPanelWidth.value) * 0.7;
-      if (middlePanelWidth.value > maxMiddleWidth) {
-        middlePanelWidth.value = maxMiddleWidth;
-      }
-    };
-
     const handleBuildCompleted = () => {
       loadPreviewFiles();
+    };
+    
+    // Handle file path updates from file operations
+    const handleFilePathUpdate = ({ oldPath, newPath }) => {
+      // If the file is currently open, update the path
+      if (currentFile.value === oldPath) {
+        currentFile.value = newPath;
+        
+        // If the file is being deleted (newPath is empty), also clear content
+        if (!newPath) {
+          fileContent.value = '';
+          isFileEditable.value = true;
+        }
+      }
     };
 
     onMounted(() => {
@@ -1086,17 +640,12 @@ export default {
             loadPreviewFiles();
           }, 1000);
         });
-        loadChangedFiles();
       }
-      
-      window.addEventListener('resize', handleWindowResize);
     });
     
     onUnmounted(() => {
-      document.removeEventListener('mousemove', handleMouseMoveLeft);
-      document.removeEventListener('mousemove', handleMouseMoveMiddle);
+      document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', stopResize);
-      window.removeEventListener('resize', handleWindowResize);
     });
 
     provide('changedFiles', changedFiles);
@@ -1121,64 +670,6 @@ export default {
       openFile,
       saveFile,
       
-      // File operations
-      selectedFile,
-      showFileMenu,
-      fileMenuPosition,
-      showFileOptions: (file) => {
-        selectedFile.value = file;
-        showFileMenu.value = true;
-        
-        // Position the menu near the clicked element
-        nextTick(() => {
-          const rect = event.target.getBoundingClientRect();
-          fileMenuPosition.value = {
-            top: `${rect.bottom + window.scrollY}px`,
-            left: `${rect.left + window.scrollX}px`
-          };
-        });
-      },
-      
-      // Rename
-      showRenameDialog,
-      newFileName,
-      renameFile,
-      cancelRename,
-      confirmRename,
-      
-      // Delete
-      deleteFile,
-      
-      // Move
-      showMoveDialog,
-      destinationPath,
-      moveFile,
-      cancelMove,
-      confirmMove,
-      
-      // Copy
-      showCopyDialog,
-      copyFile,
-      cancelCopy,
-      confirmCopy,
-      
-      // New file
-      showNewFileDialog,
-      newFilePath,
-      createNewFile,
-      cancelNewFile,
-      confirmNewFile,
-      
-      // Upload file
-      showUploadDialog,
-      uploadPath,
-      selectedFileToUpload,
-      fileInput,
-      uploadFile,
-      cancelUpload,
-      handleFileSelected,
-      confirmUpload,
-      
       // Preview
       previewFiles,
       selectedPreview,
@@ -1190,14 +681,19 @@ export default {
       
       // Layout
       leftPanelWidth,
-      middlePanelWidth,
-      startResizeLeft,
-      startResizeMiddle,
+      rightPanelWidth,
+      startResize,
+      resizeState,
       previewPaneRef,
 
       // Loading
       isLoading,
-      loadingMessage
+      loadingMessage,
+      showLoading,
+      hideLoading,
+      
+      // File path update handler for operations done in FileTreeDirectory
+      handleFilePathUpdate
     };
   }
 };
@@ -1273,18 +769,22 @@ body {
 
 /* Left column - File Tree */
 .file-tree {
-  flex-grow: 1;
   background-color: #f8f8f8;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  flex-basis: 20%;
+  width: 20%;
+  min-width: 250px;
 }
 
 .file-tree-header {
-  padding: 0.75em;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
   border-bottom: 1px solid #eee;
   flex-shrink: 0;
+  min-height: 3.5rem;
 }
 
 .file-list {
@@ -1394,16 +894,16 @@ body {
 /* Middle column - Code Editor */
 .code-editor {
   flex-grow: 1;
-  flex-basis: 40%;
   overflow: hidden;
+  min-width: 250px;
 }
 
 /* Right column - Preview Pane */
 .preview-pane {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  flex-basis: 40%;
+  width: 40%;
+  min-width: 250px;
   overflow: hidden;
 }
 
@@ -1419,11 +919,28 @@ body {
   cursor: col-resize;
   transition: background-color 0.2s;
   flex: 0 0 auto;
+  position: relative;
+  z-index: 10; /* Ensure it's above other elements */
 }
 
-.resize-handle:hover, 
-.resize-handle:active {
+/* Create a wider clickable area */
+.resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -5px; /* Extend 5px to the left */
+  width: 16px; /* Total width 16px (extends 5px left + 6px handle + 5px right) */
+  height: 100%;
+  cursor: col-resize;
+  z-index: 5;
+}
+
+.resize-handle:hover {
   background-color: #007bff;
+}
+
+.resize-handle.resizing {
+  background-color: #0056b3;
 }
 
 .preview-header {
@@ -1507,103 +1024,6 @@ select {
   margin: 2rem 0;
   color: #777;
   text-align: center;
-}
-
-/* File operations menu */
-.file-menu-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 100;
-}
-
-.file-menu {
-  position: absolute;
-  background-color: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-  min-width: 120px;
-  z-index: 101;
-}
-
-.menu-item {
-  padding: 0.5rem 1rem;
-  background: none;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-  color: #333;
-}
-
-.menu-item:hover {
-  background-color: #f5f5f5;
-}
-
-/* Modal dialog for operations */
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-.modal-content {
-  background-color: white;
-  padding: 1.5rem;
-  border-radius: 4px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-  width: 400px;
-  max-width: 90%;
-}
-
-.form-group {
-  margin-bottom: 1rem;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-}
-
-.form-group input {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 1rem;
-}
-
-.secondary-button {
-  background-color: #6c757d;
-}
-
-.secondary-button:hover {
-  background-color: #5a6268;
-}
-
-.primary-button {
-  background-color: #007bff;
-}
-
-.primary-button:hover {
-  background-color: #0069d9;
 }
 
 /* Loading overlay styles */

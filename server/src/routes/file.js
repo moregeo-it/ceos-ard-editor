@@ -58,6 +58,37 @@ router.get('/list', async (req, res) => {
 
     // Get directory contents
     const items = await fs.readdir(dirPath);
+    
+    // Get git status
+    const gitCmd = 'git status --porcelain';
+    let { stdout } = await execPromise(gitCmd, { cwd: req.workspacePath });
+    
+    // Parse git status output
+    const changedFiles = {};
+    const deletedFiles = [];
+    
+    // Parse git status output
+    stdout.split('\n')
+      .filter(line => line.trim() !== '')
+      .forEach(line => {
+        // Git status format is "XY filename"
+        // where X is staging status and Y is working tree status
+        let status = line.substring(0, 2).trim();
+        if (status == '??') {
+          status = 'A';
+        }
+        const filePath = line.substring(3);
+        
+        // Store the file's git status
+        changedFiles[filePath] = status;
+        
+        // Track deleted files to make sure they show up in the file list
+        if (status.startsWith('D') || status.includes('D')) {
+          deletedFiles.push(filePath);
+        }
+      });
+
+    // Get the list of files in the current directory
     const fileList = await Promise.all(items
       // Filter out dot files and build folder at the top level
       .filter(item => {
@@ -73,19 +104,69 @@ router.get('/list', async (req, res) => {
       })
       .map(async (item) => {
         const itemPath = path.join(dirPath, item);
+        const relativePath = path.relative(req.workspacePath, itemPath).replace(/\\/g, '/');
         const stats = await fs.stat(itemPath);
         return {
           name: item,
-          path: path.relative(req.workspacePath, itemPath).replace(/\\/g, '/'),
+          path: relativePath,
           isDirectory: stats.isDirectory(),
           size: stats.size,
-          modifiedTime: stats.mtime
+          modifiedTime: stats.mtime,
+          // Add git status information if file is changed
+          gitStatus: changedFiles[relativePath] || null
         };
       }));
 
+    // Add deleted files that belong in this directory
+    if (dir) {
+      // For subdirectories, only include deleted files within this directory
+      const dirPrefix = dir.endsWith('/') ? dir : dir + '/';
+      
+      deletedFiles.forEach(filePath => {
+        // Filter deleted files to only those that belong in this directory
+        if (filePath.startsWith(dirPrefix)) {
+          const fileName = path.basename(filePath);
+          const relativePath = filePath;
+          
+          // Don't add if the file is already in the list (shouldn't happen for deleted files)
+          if (!fileList.some(file => file.path === relativePath)) {
+            fileList.push({
+              name: fileName,
+              path: relativePath,
+              isDirectory: false, // Deleted directories are more complex, mark them as files for now
+              size: 0,
+              modifiedTime: new Date(),
+              gitStatus: changedFiles[relativePath],
+              isDeleted: true
+            });
+          }
+        }
+      });
+    } else {
+      // For the root directory, include deleted files that are directly in the root
+      deletedFiles.forEach(filePath => {
+        // Check if this file is directly in the root (no directory separators)
+        if (!filePath.includes('/')) {
+          // Don't add if the file is already in the list
+          if (!fileList.some(file => file.path === filePath)) {
+            fileList.push({
+              name: filePath,
+              path: filePath,
+              isDirectory: false,
+              size: 0,
+              modifiedTime: new Date(),
+              gitStatus: changedFiles[filePath],
+              isDeleted: true
+            });
+          }
+        }
+      });
+    }
+
     return res.status(200).json({
       success: true,
-      files: fileList
+      files: fileList,
+      changedFiles
     });
   } catch (error) {
     console.error('Error listing files:', error);
@@ -655,42 +736,6 @@ router.get('/view/:filePath(*)', async (req, res) => {
   }
 });
 
-// Get changed files (git status)
-router.get('/changes', async (req, res) => {
-  try {
-    // Get git status
-    const gitCmd = 'git status --porcelain';
-    let { stdout } = await execPromise(gitCmd, { cwd: req.workspacePath });
-    
-    // Parse git status output
-    const changedFiles = stdout.split('\n')
-      .filter(line => line.trim() !== '')
-      .map(line => {
-        // Git status format is "XY filename"
-        // where X is staging status and Y is working tree status
-        const status = line.substring(0, 2);
-        const filePath = line.substring(3);
-        
-        return {
-          path: filePath,
-          status: status.trim()
-        };
-      });
-    
-    return res.status(200).json({
-      success: true,
-      changedFiles
-    });
-  } catch (error) {
-    console.error('Error getting changed files:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to get changed files',
-      error: error.message
-    });
-  }
-});
-
 // Helper function to determine content type
 function getContentType(ext) {
   const contentTypes = {
@@ -775,6 +820,48 @@ router.get('/pfs-references', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to get PFS references',
+      error: error.message
+    });
+  }
+});
+
+// Revert changes to a file (restore from git)
+router.post('/revert', async (req, res) => {
+  try {
+    const { filePath } = req.body;
+    
+    if (!filePath) {
+      return res.status(400).json({
+        success: false,
+        message: 'File path is required'
+      });
+    }
+
+    // Get the full path
+    const fullPath = path.join(req.workspacePath, filePath);
+    
+    // Check if path is within the workspace
+    if (!fullPath.startsWith(req.workspacePath)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid file path'
+      });
+    }
+
+    // Execute git checkout to restore the file
+    const gitCmd = `git checkout -- "${filePath}"`;
+    await execPromise(gitCmd, { cwd: req.workspacePath });
+    
+    return res.status(200).json({
+      success: true,
+      message: 'File reverted successfully',
+      filePath
+    });
+  } catch (error) {
+    console.error('Error reverting file changes:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to revert file changes',
       error: error.message
     });
   }

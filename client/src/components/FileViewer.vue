@@ -5,14 +5,6 @@
         <h3 class="file-name">{{ filename || 'Untitled' }}</h3>
         <div class="file-type-indicator">{{ getFileType() }}</div>
       </div>
-      <div class="viewer-actions">
-        <button @click="openInNewTab" class="action-button" title="Open in new tab">
-          <span class="icon">↗️</span>
-        </button>
-        <button @click="downloadFile" class="action-button" title="Download">
-          <span class="icon">⬇️</span>
-        </button>
-      </div>
     </div>
     <div class="viewer-content">
       <!-- Image viewer -->
@@ -32,8 +24,8 @@
           <h3>{{ getFileExtension().toUpperCase() }} File</h3>
           <p>This file cannot be displayed in the editor.</p>
           <div class="actions">
-            <button @click="downloadFile" class="download-button">Download File</button>
-            <button @click="openInNewTab" class="open-button">Open in New Tab</button>
+            <button @click="downloadFile" class="action-button">Download File</button>
+            <button @click="openInNewTab" class="action-button">Open in New Tab</button>
           </div>
         </div>
       </div>
@@ -156,6 +148,7 @@ export default {
   padding: 0.5rem 1rem;
   background-color: #f5f5f5;
   border-bottom: 1px solid #ddd;
+  min-height: 3.5rem;
 }
 
 .file-info {
@@ -180,21 +173,6 @@ export default {
 .viewer-actions {
   display: flex;
   gap: 0.5rem;
-}
-
-.action-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.action-button:hover {
-  background-color: #e0e0e0;
 }
 
 .icon {
@@ -274,29 +252,33 @@ export default {
   justify-content: center;
 }
 
-.download-button, .open-button {
+.action-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-button:hover {
+  background-color: #e0e0e0;
+}
+
+.action-button {
   padding: 0.5rem 1rem;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.9rem;
-}
-
-.download-button {
   background-color: #007acc;
   color: white;
 }
 
-.open-button {
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
-}
-
-.download-button:hover {
+.action-button:hover {
   background-color: #0062a3;
-}
-
-.open-button:hover {
-  background-color: #e5e5e5;
+  color: white;
 }
 </style>

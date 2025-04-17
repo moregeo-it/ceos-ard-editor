@@ -93,8 +93,6 @@ router.post('/build', async (req, res) => {
       if (pfs) {
         cmdArgs.push('--pfs', pfs);
       }
-
-      console.log(cmdArgs);
         
       // Run the ceos-ard build command
       const buildCmd = spawn('ceos-ard', cmdArgs, { 
