@@ -81,10 +81,15 @@
         <!-- Middle column: Code editor -->
         <div class="column code-editor" :style="{ width: middlePanelWidth + 'px' }">
           <code-editor 
-            v-if="currentFile"
+            v-if="currentFile && isFileEditable"
             v-model="fileContent"
             :filename="currentFile"
             @save="saveFile"
+          />
+          <file-viewer 
+            v-else-if="currentFile && !isFileEditable"
+            :filename="currentFile"
+            :content="fileContent"
           />
           <div v-else class="no-file-selected">
             Select a file to edit
@@ -217,6 +222,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import FileTreeDirectory from './components/FileTreeDirectory.vue';
 import CodeEditor from './components/CodeEditor.vue';
 import PreviewPane from './components/PreviewPane.vue';
+import FileViewer from './components/FileViewer.vue';
 
 const API_URL = 'http://localhost:3000/api';
 
@@ -225,7 +231,8 @@ export default {
   components: {
     FileTreeDirectory,
     CodeEditor,
-    PreviewPane
+    PreviewPane,
+    FileViewer
   },
   setup() {
     // Workspace state
@@ -240,6 +247,7 @@ export default {
     const currentFile = ref('');
     const fileContent = ref('');
     const expandedDirs = ref({});
+    const isFileEditable = ref(true);
 
     // File operations state
     const selectedFile = ref(null);
@@ -462,6 +470,7 @@ export default {
         if (data.success) {
           currentFile.value = filePath;
           fileContent.value = data.content;
+          isFileEditable.value = data.isEditable;
         } else {
           alert(`Failed to open file: ${data.message}`);
         }
@@ -1079,6 +1088,7 @@ export default {
       // Current file
       currentFile,
       fileContent,
+      isFileEditable,
       openFile,
       saveFile,
       

@@ -8,7 +8,8 @@ const WORKSPACES_DIR = path.join(__dirname, '../../workspaces');
 // Middleware to validate workspace ID
 const validateWorkspace = async (req, res, next) => {
   try {
-    const workspaceId = req.headers['workspace-id'];
+    // Accept workspace ID from either headers or query parameters
+    const workspaceId = req.headers['workspace-id'] || req.query['workspace-id'];
     if (!workspaceId) {
       return res.status(401).json({
         success: false,
@@ -123,13 +124,30 @@ router.get('/content', async (req, res) => {
       });
     }
 
-    // Read file content
+    // Check if file is editable
+    const extension = path.extname(fullPath).toLowerCase();
+    const editableExtensions = ['.md', '.yaml', '.yml', '.bib', '.txt', ''];
+    const isEditable = editableExtensions.includes(extension);
+    
+    // For non-editable files, return success but with isEditable=false
+    // The client will handle displaying these files differently
+    if (!isEditable) {
+      return res.status(200).json({
+        success: true,
+        content: '',
+        filePath,
+        isEditable: false
+      });
+    }
+
+    // Read file content for editable files
     const content = await fs.readFile(fullPath, 'utf-8');
     
     return res.status(200).json({
       success: true,
       content,
-      filePath
+      filePath,
+      isEditable: true
     });
   } catch (error) {
     console.error('Error getting file content:', error);
@@ -466,5 +484,78 @@ router.post('/upload', async (req, res) => {
     });
   }
 });
+
+// View file (serve file directly)
+router.get('/view/:filePath(*)', async (req, res) => {
+  try {
+    const filePath = req.params.filePath;
+    
+    if (!filePath) {
+      return res.status(400).json({
+        success: false,
+        message: 'File path is required'
+      });
+    }
+
+    const fullPath = path.join(req.workspacePath, filePath);
+    
+    // Check if file exists and is within the workspace
+    if (!await fs.pathExists(fullPath) || !fullPath.startsWith(req.workspacePath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'File not found or invalid path'
+      });
+    }
+
+    // Check if it's a directory
+    const stats = await fs.stat(fullPath);
+    if (stats.isDirectory()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Path points to a directory, not a file'
+      });
+    }
+
+    // Determine content type based on file extension
+    const ext = path.extname(fullPath).toLowerCase();
+    const contentType = getContentType(ext);
+    
+    if (contentType) {
+      res.setHeader('Content-Type', contentType);
+    }
+    
+    // Serve the file directly
+    return res.sendFile(fullPath);
+  } catch (error) {
+    console.error('Error serving file:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to serve file',
+      error: error.message
+    });
+  }
+});
+
+// Helper function to determine content type
+function getContentType(ext) {
+  const contentTypes = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.webp': 'image/webp',
+    '.bmp': 'image/bmp',
+    '.pdf': 'application/pdf',
+    '.json': 'application/json',
+    '.txt': 'text/plain',
+    '.md': 'text/plain',
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.js': 'application/javascript'
+  };
+  
+  return contentTypes[ext] || 'application/octet-stream';
+}
 
 module.exports = router;
