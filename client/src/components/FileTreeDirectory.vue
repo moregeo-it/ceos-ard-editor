@@ -252,22 +252,12 @@ export default {
           return '📝'; // Markdown
         case 'yaml':
         case 'yml':
-          return '📊'; // YAML
-        case 'json':
-          return '📋'; // JSON
-        case 'html':
-          return '📄'; // HTML
-        case 'js':
-          return '📜'; // JavaScript
-        case 'css':
-          return '🎨'; // CSS
+          return '📋'; // YAML
         case 'png':
         case 'jpg':
         case 'jpeg':
         case 'gif':
           return '🖼️'; // Image
-        case 'pdf':
-          return '📕'; // PDF
         default:
           return '📄'; // Default file icon
       }

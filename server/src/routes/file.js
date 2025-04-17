@@ -713,4 +713,71 @@ function getContentType(ext) {
   return contentTypes[ext] || 'application/octet-stream';
 }
 
+// Get PFS documents that use a requirement file
+router.get('/pfs-references', async (req, res) => {
+  try {
+    const { requirementPath } = req.query;
+    
+    if (!requirementPath) {
+      return res.status(400).json({
+        success: false,
+        message: 'Requirement file path is required'
+      });
+    }
+
+    // Check if this is a requirements file
+    if (!requirementPath.startsWith('requirements/')) {
+      return res.status(200).json({
+        success: true,
+        pfsDocuments: []
+      });
+    }
+
+    // Extract the requirement name from the path (without the .yaml extension and requirements/ prefix)
+    const requirementName = requirementPath.replace('requirements/', '').replace('.yaml', '');
+    
+    // Find all PFS folders
+    const pfsDir = path.join(req.workspacePath, 'pfs');
+    if (!await fs.pathExists(pfsDir)) {
+      return res.status(200).json({
+        success: true,
+        pfsDocuments: []
+      });
+    }
+
+    const pfsFolders = await fs.readdir(pfsDir);
+    const pfsDocuments = [];
+    
+    // Check each PFS folder's requirements.yaml file
+    for (const pfsFolder of pfsFolders) {
+      const requirementsFilePath = path.join(pfsDir, pfsFolder, 'requirements.yaml');
+      
+      if (await fs.pathExists(requirementsFilePath)) {
+        try {
+          const content = await fs.readFile(requirementsFilePath, 'utf-8');
+          
+          // Check if the requirement name is in the content
+          if (content.includes(requirementName)) {
+            pfsDocuments.push(pfsFolder);
+          }
+        } catch (error) {
+          console.warn(`Could not read requirements file for ${pfsFolder}:`, error.message);
+        }
+      }
+    }
+    
+    return res.status(200).json({
+      success: true,
+      pfsDocuments
+    });
+  } catch (error) {
+    console.error('Error getting PFS references:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get PFS references',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

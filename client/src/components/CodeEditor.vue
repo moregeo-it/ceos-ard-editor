@@ -3,6 +3,15 @@
     <div class="editor-header">
       <div class="file-info">
         <h3 class="file-name">{{ filename || 'Untitled' }}</h3>
+        
+        <!-- PFS References Dropdown -->
+        <div v-if="isRequirementFile" class="pfs-references">
+          <span class="pfs-label">Used in:</span>
+          <select class="pfs-select">
+            <option v-for="pfs in pfsReferences" :key="pfs" :value="pfs">{{ pfs }}</option>
+          </select>
+        </div>
+        
         <button @click="saveFile" class="save-button">Save</button>
       </div>
     </div>
@@ -11,13 +20,15 @@
 </template>
 
 <script>
-import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, watch, onMounted, onBeforeUnmount, nextTick, computed } from 'vue';
 import { EditorState, Compartment } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { yaml } from '@codemirror/lang-yaml';
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
+
+const API_URL = 'http://localhost:3000/api';
 
 export default {
   name: 'CodeEditor',
@@ -35,6 +46,14 @@ export default {
   setup(props, { emit }) {
     const editorContainer = ref(null);
     let view = null;
+    
+    // References to PFS documents
+    const pfsReferences = ref([]);
+    
+    // Check if the file is a requirement file
+    const isRequirementFile = computed(() => {
+      return props.filename?.startsWith('requirements/') && props.filename?.endsWith('.yaml');
+    });
     
     // Language compartment for dynamic language switching
     const languageConf = new Compartment();
@@ -75,6 +94,37 @@ export default {
         return true;
       },
       preventDefault: true
+    };
+    
+    // Fetch PFS references for requirement files
+    const fetchPFSReferences = async () => {
+      if (!isRequirementFile.value) {
+        pfsReferences.value = [];
+        return;
+      }
+      
+      try {
+        const workspaceId = localStorage.getItem('workspaceId');
+        if (!workspaceId) return;
+        
+        const response = await fetch(
+          `${API_URL}/file/pfs-references?requirementPath=${encodeURIComponent(props.filename)}`,
+          {
+            headers: {
+              'workspace-id': workspaceId
+            }
+          }
+        );
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          pfsReferences.value = data.pfsDocuments || [];
+        }
+      } catch (error) {
+        console.error('Error fetching PFS references:', error);
+        pfsReferences.value = [];
+      }
     };
     
     // Initialize CodeMirror editor
@@ -159,6 +209,9 @@ export default {
           // Otherwise reinitialize the editor
           initEditor();
         }
+        
+        // Fetch PFS references when filename changes
+        fetchPFSReferences();
       });
     });
     
@@ -167,6 +220,9 @@ export default {
       // Initialize editor after the DOM is ready
       nextTick(() => {
         initEditor();
+        
+        // Initial PFS references fetch
+        fetchPFSReferences();
       });
     });
     
@@ -181,7 +237,9 @@ export default {
     return {
       editorContainer,
       saveFile,
-      getDisplayFilename
+      getDisplayFilename,
+      isRequirementFile,
+      pfsReferences
     };
   }
 };
@@ -219,6 +277,32 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex-grow: 1;
+  margin-right: 0.5rem;
+}
+
+.pfs-references {
+  display: flex;
+  align-items: center;
+  margin-right: auto;
+  flex-grow: 1;
+}
+
+.pfs-label {
+  font-size: 0.9rem;
+  color: #666;
+  margin-right: 0.5rem;
+}
+
+.pfs-select {
+  padding: 0.25rem;
+  font-size: 0.9rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: white;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .editor-container {
@@ -235,7 +319,7 @@ export default {
   padding: 0.5rem 1rem;
   cursor: pointer;
   font-size: 0.9rem;
-  margin-left: 1rem;
+  flex: 0 0 auto;
 }
 
 .save-button:hover {
