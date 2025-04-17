@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs-extra');
+const { exec } = require('child_process');
+const util = require('util');
+const execPromise = util.promisify(exec);
 
 const WORKSPACES_DIR = path.join(__dirname, '../../workspaces');
 
@@ -531,6 +534,42 @@ router.get('/view/:filePath(*)', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to serve file',
+      error: error.message
+    });
+  }
+});
+
+// Get changed files (git status)
+router.get('/changes', async (req, res) => {
+  try {
+    // Get git status
+    const gitCmd = 'git status --porcelain';
+    let { stdout } = await execPromise(gitCmd, { cwd: req.workspacePath });
+    
+    // Parse git status output
+    const changedFiles = stdout.split('\n')
+      .filter(line => line.trim() !== '')
+      .map(line => {
+        // Git status format is "XY filename"
+        // where X is staging status and Y is working tree status
+        const status = line.substring(0, 2);
+        const filePath = line.substring(3);
+        
+        return {
+          path: filePath,
+          status: status.trim()
+        };
+      });
+    
+    return res.status(200).json({
+      success: true,
+      changedFiles
+    });
+  } catch (error) {
+    console.error('Error getting changed files:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get changed files',
       error: error.message
     });
   }

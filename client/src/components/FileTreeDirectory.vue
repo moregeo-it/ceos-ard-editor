@@ -16,13 +16,17 @@
       <div v-for="file in sortedFiles" :key="file.path" class="file-item">
         <div 
           class="file-entry"
-          :class="{ 'is-directory': file.isDirectory }"
+          :class="{ 
+            'is-directory': file.isDirectory,
+            'is-changed': !file.isDirectory && isFileChanged(file.path)
+          }"
           @click="handleFileClick(file)"
         >
           <span class="icon">{{ file.isDirectory ? '📁' : getFileIcon(file.name) }}</span>
           <span class="name">{{ file.name }}</span>
           
           <div class="file-actions">
+            <span v-if="!file.isDirectory && isFileChanged(file.path)" class="change-indicator" :title="`File changed (${getFileChangeStatus(file.path)})`">*</span>
             <button @click.stop="showFileOptions(file)" class="action-button">⋮</button>
           </div>
         </div>
@@ -33,61 +37,6 @@
             @select-file="$emit('select-file', $event)"
             @refresh="refreshDirectory"
           />
-        </div>
-      </div>
-    </div>
-    
-    <!-- File options menu modal -->
-    <div v-if="showFileMenu" class="file-menu-modal" @click.self="showFileMenu = false">
-      <div class="file-menu" :style="fileMenuPosition">
-        <button @click="renameFile" class="menu-item">Rename</button>
-        <button @click="deleteFile" class="menu-item">Delete</button>
-        <button @click="copyFile" class="menu-item">Copy</button>
-        <button @click="moveFile" class="menu-item">Move</button>
-      </div>
-    </div>
-    
-    <!-- Rename File Dialog -->
-    <div class="modal" v-if="showRenameDialog">
-      <div class="modal-content">
-        <h3>Rename {{ selectedFile ? selectedFile.name : '' }}</h3>
-        <div class="form-group">
-          <label>New name:</label>
-          <input type="text" v-model="newFileName" placeholder="Enter new name" />
-        </div>
-        <div class="form-actions">
-          <button @click="cancelRename" class="secondary-button">Cancel</button>
-          <button @click="confirmRename" class="primary-button">Rename</button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Move File Dialog -->
-    <div class="modal" v-if="showMoveDialog">
-      <div class="modal-content">
-        <h3>Move {{ selectedFile ? selectedFile.name : '' }}</h3>
-        <div class="form-group">
-          <label>Destination path:</label>
-          <input type="text" v-model="destinationPath" placeholder="e.g., folder/" />
-        </div>
-        <div class="form-actions">
-          <button @click="cancelMove" class="secondary-button">Cancel</button>
-          <button @click="confirmMove" class="primary-button">Move</button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Copy File Dialog -->
-    <div class="modal" v-if="showCopyDialog">
-      <div class="modal-content">
-        <h3>Copy {{ selectedFile ? selectedFile.name : '' }}</h3>
-        <div class="form-group">
-          <label>Destination path:</label>
-          <input type="text" v-model="destinationPath" placeholder="e.g., folder/newname.yml" />
-        </div>
-        <div class="form-actions">
-          <button @click="cancelCopy" class="secondary-button">Cancel</button>
-          <button @click="confirmCopy" class="primary-button">Copy</button>
         </div>
       </div>
     </div>
@@ -129,7 +78,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, inject, onMounted, nextTick } from 'vue';
 
 const API_URL = 'http://localhost:3000/api';
 
@@ -145,30 +94,30 @@ export default {
       default: false
     }
   },
-  emits: ['select-file', 'refresh'],
+  emits: ['select-file', 'refresh', 'show-file-options'],
   setup(props, { emit }) {
     const files = ref([]);
     const loading = ref(true);
     const error = ref(false);
     const expandedDirs = ref({});
     
-    // File operations state
+    // Get changedFiles from parent App component
+    const parentChangedFiles = inject('changedFiles', {});
+    
+    // File operations state - keep minimal, let parent App handle most operations
     const selectedFile = ref(null);
     const showFileMenu = ref(false);
     const fileMenuPosition = ref({ top: '0px', left: '0px' });
-    const showRenameDialog = ref(false);
-    const showMoveDialog = ref(false);
-    const showCopyDialog = ref(false);
     const showNewFileDialog = ref(false);
     const showUploadDialog = ref(false);
     
-    // Form values
-    const newFileName = ref('');
-    const destinationPath = ref('');
+    // Form values - keep only what's needed for this component
     const newFilePath = ref('');
     const uploadPath = ref('');
     const selectedFileToUpload = ref(null);
     const fileInput = ref(null);
+    
+    const changedFiles = ref({});
     
     const loadDirectory = async () => {
       loading.value = true;
@@ -191,6 +140,7 @@ export default {
         
         if (data.success) {
           files.value = data.files;
+          changedFiles.value = data.changedFiles || parentChangedFiles;
         } else {
           error.value = true;
           console.error('Failed to load directory:', data.message);
@@ -263,6 +213,14 @@ export default {
       }
     };
     
+    const isFileChanged = (filePath) => {
+      return changedFiles.value[filePath] !== undefined;
+    };
+    
+    const getFileChangeStatus = (filePath) => {
+      return changedFiles.value[filePath] || 'unknown';
+    };
+    
     // Handle showing file options menu
     const showFileOptions = (file) => {
       selectedFile.value = file;
@@ -276,214 +234,12 @@ export default {
           left: `${rect.left + window.scrollX}px`
         };
       });
-    };
-    
-    // Rename file handlers
-    const renameFile = () => {
-      if (!selectedFile.value) return;
       
-      showFileMenu.value = false;
-      newFileName.value = selectedFile.value.name;
-      showRenameDialog.value = true;
+      // Emit event to parent so it can handle file operations
+      emit('show-file-options', file);
     };
     
-    const cancelRename = () => {
-      showRenameDialog.value = false;
-      newFileName.value = '';
-    };
-    
-    const confirmRename = async () => {
-      if (!selectedFile.value || !newFileName.value.trim()) return;
-      
-      try {
-        const workspaceId = localStorage.getItem('workspaceId');
-        
-        // Get old file path and new file path
-        const oldPath = selectedFile.value.path;
-        const pathParts = oldPath.split('/');
-        pathParts.pop(); // Remove the old filename
-        const newPath = pathParts.length > 0 
-          ? `${pathParts.join('/')}/${newFileName.value}`
-          : newFileName.value;
-        
-        const response = await fetch(`${API_URL}/file/rename`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'workspace-id': workspaceId
-          },
-          body: JSON.stringify({
-            oldPath,
-            newPath
-          })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          // Update successful, refresh file tree
-          refreshDirectory();
-          showRenameDialog.value = false;
-          newFileName.value = '';
-        } else {
-          alert(`Failed to rename file: ${data.message}`);
-        }
-      } catch (error) {
-        console.error('Error renaming file:', error);
-        alert('Failed to rename file. Check console for details.');
-      }
-    };
-    
-    // Delete file handlers
-    const deleteFile = async () => {
-      if (!selectedFile.value) return;
-      showFileMenu.value = false;
-      
-      if (!confirm(`Are you sure you want to delete ${selectedFile.value.name}?`)) {
-        return;
-      }
-      
-      try {
-        const workspaceId = localStorage.getItem('workspaceId');
-        
-        const response = await fetch(`${API_URL}/file/delete`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'workspace-id': workspaceId
-          },
-          body: JSON.stringify({
-            filePath: selectedFile.value.path
-          })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          // Delete successful, refresh file tree
-          refreshDirectory();
-        } else {
-          alert(`Failed to delete file: ${data.message}`);
-        }
-      } catch (error) {
-        console.error('Error deleting file:', error);
-        alert('Failed to delete file. Check console for details.');
-      }
-    };
-    
-    // Move file handlers
-    const moveFile = () => {
-      if (!selectedFile.value) return;
-      
-      showFileMenu.value = false;
-      destinationPath.value = '';
-      showMoveDialog.value = true;
-    };
-    
-    const cancelMove = () => {
-      showMoveDialog.value = false;
-      destinationPath.value = '';
-    };
-    
-    const confirmMove = async () => {
-      if (!selectedFile.value || !destinationPath.value.trim()) return;
-      
-      try {
-        const workspaceId = localStorage.getItem('workspaceId');
-        
-        const sourcePath = selectedFile.value.path;
-        let destPath = destinationPath.value;
-        
-        // If destination is a directory path (ends with /) append the original filename
-        if (destPath.endsWith('/')) {
-          destPath += selectedFile.value.name;
-        }
-        
-        const response = await fetch(`${API_URL}/file/move`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'workspace-id': workspaceId
-          },
-          body: JSON.stringify({
-            sourcePath,
-            destPath
-          })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          // Move successful, refresh file tree
-          refreshDirectory();
-          showMoveDialog.value = false;
-          destinationPath.value = '';
-        } else {
-          alert(`Failed to move file: ${data.message}`);
-        }
-      } catch (error) {
-        console.error('Error moving file:', error);
-        alert('Failed to move file. Check console for details.');
-      }
-    };
-    
-    // Copy file handlers
-    const copyFile = () => {
-      if (!selectedFile.value) return;
-      
-      showFileMenu.value = false;
-      destinationPath.value = '';
-      showCopyDialog.value = true;
-    };
-    
-    const cancelCopy = () => {
-      showCopyDialog.value = false;
-      destinationPath.value = '';
-    };
-    
-    const confirmCopy = async () => {
-      if (!selectedFile.value || !destinationPath.value.trim()) return;
-      
-      try {
-        const workspaceId = localStorage.getItem('workspaceId');
-        
-        const sourcePath = selectedFile.value.path;
-        let destPath = destinationPath.value;
-        
-        // If destination is a directory path (ends with /) append the original filename
-        if (destPath.endsWith('/')) {
-          destPath += selectedFile.value.name;
-        }
-        
-        const response = await fetch(`${API_URL}/file/copy`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'workspace-id': workspaceId
-          },
-          body: JSON.stringify({
-            sourcePath,
-            destPath
-          })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          // Copy successful, refresh file tree
-          refreshDirectory();
-          showCopyDialog.value = false;
-          destinationPath.value = '';
-        } else {
-          alert(`Failed to copy file: ${data.message}`);
-        }
-      } catch (error) {
-        console.error('Error copying file:', error);
-        alert('Failed to copy file. Check console for details.');
-      }
-    };
-    
-    // New file handlers
+    // New file handlers - simplified
     const createNewFile = () => {
       showNewFileDialog.value = true;
       newFilePath.value = '';
@@ -540,7 +296,7 @@ export default {
     // File upload handlers
     const uploadFile = () => {
       showUploadDialog.value = true;
-      uploadPath.value = '';
+      uploadPath.value = props.path ? props.path + '/' : '';
       selectedFileToUpload.value = null;
     };
     
@@ -553,6 +309,11 @@ export default {
     const handleFileSelected = (event) => {
       const file = event.target.files[0];
       selectedFileToUpload.value = file || null;
+      
+      // Auto-suggest path based on selected file name
+      if (file && uploadPath.value.endsWith('/')) {
+        uploadPath.value += file.name;
+      }
     };
     
     const confirmUpload = async () => {
@@ -608,29 +369,6 @@ export default {
       fileMenuPosition,
       showFileOptions,
       
-      // Rename
-      showRenameDialog,
-      newFileName,
-      renameFile,
-      cancelRename,
-      confirmRename,
-      
-      // Delete
-      deleteFile,
-      
-      // Move
-      showMoveDialog,
-      destinationPath,
-      moveFile,
-      cancelMove,
-      confirmMove,
-      
-      // Copy
-      showCopyDialog,
-      copyFile,
-      cancelCopy,
-      confirmCopy,
-      
       // New file
       showNewFileDialog,
       newFilePath,
@@ -646,7 +384,11 @@ export default {
       uploadFile,
       cancelUpload,
       handleFileSelected,
-      confirmUpload
+      confirmUpload,
+      
+      // Changed files
+      isFileChanged,
+      getFileChangeStatus
     };
   }
 };
@@ -690,6 +432,10 @@ export default {
   font-weight: bold;
 }
 
+.file-entry.is-changed {
+  background-color: #fff3cd;
+}
+
 .icon {
   margin-right: 0.4rem;
   font-size: 0.9rem;
@@ -725,6 +471,12 @@ export default {
 .action-button:hover {
   background-color: #ddd;
   color: #333;
+}
+
+.change-indicator {
+  color: #d9534f;
+  font-weight: bold;
+  margin-right: 0.5rem;
 }
 
 .subdirectory {

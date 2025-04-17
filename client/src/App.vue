@@ -31,44 +31,9 @@
         <div class="column file-tree" :style="{ width: leftPanelWidth + 'px' }">
           <div class="file-tree-header">
             <h3>Files</h3>
-            <!-- File tree controls -->
-            <div class="directory-controls">
-              <button @click="createNewFile" class="small-button">New File</button>
-              <button @click="handleUploadFile" class="small-button">Upload</button>
-              <button @click="loadFileTree" class="small-button">⟳</button>
-            </div>
           </div>
           <div class="file-list">
-            <!-- File tree content -->
-            <div class="file-tree-directory">
-              <div v-if="loadingFiles" class="loading">Loading...</div>
-              <div v-else-if="fileTreeError" class="error">Error loading files</div>
-              <div v-else-if="files.length === 0" class="empty">No files found</div>
-              <div v-else>
-                <div v-for="file in sortedFiles" :key="file.path" class="file-item">
-                  <div 
-                    class="file-entry"
-                    :class="{ 'is-directory': file.isDirectory }"
-                    @click="handleFileClick(file)"
-                  >
-                    <span class="icon">{{ file.isDirectory ? '📁' : getFileIcon(file.name) }}</span>
-                    <span class="name">{{ file.name }}</span>
-                    
-                    <div class="file-actions">
-                      <button @click.stop="showFileOptions(file)" class="action-button">⋮</button>
-                    </div>
-                  </div>
-                  
-                  <div v-if="file.isDirectory && expandedDirs[file.path]" class="subdirectory">
-                    <file-tree-directory
-                      :path="file.path"
-                      @select-file="openFile"
-                      @refresh="loadFileTree"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
+            <file-tree-directory path="" @select-file="openFile" @refresh="loadFileTree" />
           </div>
         </div>
         
@@ -218,7 +183,7 @@
 </template>
 
 <script>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, provide } from 'vue';
 import FileTreeDirectory from './components/FileTreeDirectory.vue';
 import CodeEditor from './components/CodeEditor.vue';
 import PreviewPane from './components/PreviewPane.vue';
@@ -238,7 +203,6 @@ export default {
     // Workspace state
     const workspaceId = ref(localStorage.getItem('workspaceId') || '');
     const isCreatingWorkspace = ref(false);
-    const isGeneratingPreview = ref(false);
 
     // File browser state
     const files = ref([]);
@@ -246,8 +210,8 @@ export default {
     const fileTreeError = ref(false);
     const currentFile = ref('');
     const fileContent = ref('');
-    const expandedDirs = ref({});
     const isFileEditable = ref(true);
+    const changedFiles = ref({}); // Track changed files by path
 
     // File operations state
     const selectedFile = ref(null);
@@ -376,57 +340,6 @@ export default {
       }
     };
 
-    // File tree functionality
-    const sortedFiles = computed(() => {
-      return [...files.value].sort((a, b) => {
-        // Directories first
-        if (a.isDirectory && !b.isDirectory) return -1;
-        if (!a.isDirectory && b.isDirectory) return 1;
-        
-        // Then alphabetically
-        return a.name.localeCompare(b.name);
-      });
-    });
-
-    const handleFileClick = (file) => {
-      if (file.isDirectory) {
-        // Toggle directory expansion
-        expandedDirs.value[file.path] = !expandedDirs.value[file.path];
-      } else {
-        // Open the file
-        openFile(file.path);
-      }
-    };
-
-    const getFileIcon = (filename) => {
-      const extension = filename.split('.').pop().toLowerCase();
-      
-      switch (extension) {
-        case 'md':
-          return '📝'; // Markdown
-        case 'yaml':
-        case 'yml':
-          return '📊'; // YAML
-        case 'json':
-          return '📋'; // JSON
-        case 'html':
-          return '📄'; // HTML
-        case 'js':
-          return '📜'; // JavaScript
-        case 'css':
-          return '🎨'; // CSS
-        case 'png':
-        case 'jpg':
-        case 'jpeg':
-        case 'gif':
-          return '🖼️'; // Image
-        case 'pdf':
-          return '📕'; // PDF
-        default:
-          return '📄'; // Default file icon
-      }
-    };
-
     // Load file tree
     const loadFileTree = async () => {
       loadingFiles.value = true;
@@ -443,6 +356,8 @@ export default {
         
         if (data.success) {
           files.value = data.files;
+          // Load changed files after loading the file tree
+          await loadChangedFiles();
         } else {
           fileTreeError.value = true;
           alert(`Failed to load file tree: ${data.message}`);
@@ -502,6 +417,9 @@ export default {
         const data = await response.json();
         
         if (data.success) {
+          // Update changed files list after saving
+          await loadChangedFiles();
+          
           // Automatically generate preview after saving
           await generatePreview();
         } else {
@@ -516,21 +434,6 @@ export default {
     };
     
     // File operations
-    // Handle showing file options menu
-    const showFileOptions = (file) => {
-      selectedFile.value = file;
-      showFileMenu.value = true;
-      
-      // Position the menu near the clicked element
-      nextTick(() => {
-        const rect = event.target.getBoundingClientRect();
-        fileMenuPosition.value = {
-          top: `${rect.bottom + window.scrollY}px`,
-          left: `${rect.left + window.scrollX}px`
-        };
-      });
-    };
-    
     // Rename file handlers
     const renameFile = () => {
       if (!selectedFile.value) return;
@@ -783,6 +686,8 @@ export default {
         
         if (data.success) {
           showNewFileDialog.value = false;
+          // Update changed files list after creating a file
+          await loadChangedFiles();
           loadFileTree();
           openFile(newFilePath.value);
         } else {
@@ -858,55 +763,6 @@ export default {
       }
     };
     
-    const handleUploadFile = () => {
-      const fileInput = document.createElement('input');
-      fileInput.type = 'file';
-      
-      fileInput.onchange = async (event) => {
-        const file = event.target.files[0];
-        if (file) {
-          try {
-            showLoading('Uploading file...');
-            
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-              const content = e.target.result;
-              
-              const currentDir = currentFile.value 
-                ? currentFile.value.substring(0, currentFile.value.lastIndexOf('/')) 
-                : '';
-              
-              const uploadPath = currentDir 
-                ? `${currentDir}/${file.name}` 
-                : file.name;
-              
-              await fetch(`${API_URL}/file/upload`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'workspace-id': workspaceId.value
-                },
-                body: JSON.stringify({
-                  path: uploadPath,
-                  content: content
-                })
-              });
-              
-              await loadFileTree();
-              openFile(uploadPath);
-            };
-            reader.readAsText(file);
-          } catch (error) {
-            console.error('Error uploading file:', error);
-          } finally {
-            hideLoading();
-          }
-        }
-      };
-      
-      fileInput.click();
-    };
-
     // Generate preview
     const generatePreview = async () => {
       try {
@@ -988,6 +844,33 @@ export default {
       }
     };
 
+    // Load changed files from git status
+    const loadChangedFiles = async () => {
+      try {
+        const response = await fetch(`${API_URL}/file/changes`, {
+          headers: {
+            'workspace-id': workspaceId.value
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          // Create a mapping of file paths to their git status
+          const changes = {};
+          data.changedFiles.forEach(file => {
+            changes[file.path] = file.status;
+          });
+          
+          changedFiles.value = changes;
+        } else {
+          console.error('Failed to get changed files:', data.message);
+        }
+      } catch (error) {
+        console.error('Error getting changed files:', error);
+      }
+    };
+
     // Panel resize handlers
     const startResizeLeft = (e) => {
       isResizingLeft.value = true;
@@ -1029,30 +912,6 @@ export default {
       document.removeEventListener('mouseup', stopResize);
     };
 
-    onMounted(() => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlWorkspaceId = urlParams.get('workspace');
-      
-      if (urlWorkspaceId) {
-        workspaceId.value = urlWorkspaceId;
-        localStorage.setItem('workspaceId', urlWorkspaceId);
-      }
-      
-      if (workspaceId.value) {
-        loadFileTree();
-        loadPreviewFiles();
-      }
-      
-      window.addEventListener('resize', handleWindowResize);
-    });
-    
-    onUnmounted(() => {
-      document.removeEventListener('mousemove', handleMouseMoveLeft);
-      document.removeEventListener('mousemove', handleMouseMoveMiddle);
-      document.removeEventListener('mouseup', stopResize);
-      window.removeEventListener('resize', handleWindowResize);
-    });
-    
     const handleWindowResize = () => {
       const totalWidth = window.innerWidth;
       
@@ -1067,10 +926,36 @@ export default {
       }
     };
 
+    onMounted(() => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlWorkspaceId = urlParams.get('workspace');
+      
+      if (urlWorkspaceId) {
+        workspaceId.value = urlWorkspaceId;
+        localStorage.setItem('workspaceId', urlWorkspaceId);
+      }
+      
+      if (workspaceId.value) {
+        loadFileTree();
+        loadPreviewFiles();
+        loadChangedFiles();
+      }
+      
+      window.addEventListener('resize', handleWindowResize);
+    });
+    
+    onUnmounted(() => {
+      document.removeEventListener('mousemove', handleMouseMoveLeft);
+      document.removeEventListener('mousemove', handleMouseMoveMiddle);
+      document.removeEventListener('mouseup', stopResize);
+      window.removeEventListener('resize', handleWindowResize);
+    });
+
+    provide('changedFiles', changedFiles);
+
     return {
       workspaceId,
       isCreatingWorkspace,
-      isGeneratingPreview,
       createWorkspace,
       closeWorkspace,
       copyWorkspaceUrl,
@@ -1079,10 +964,6 @@ export default {
       files,
       loadingFiles,
       fileTreeError,
-      expandedDirs,
-      sortedFiles,
-      handleFileClick,
-      getFileIcon,
       loadFileTree,
       
       // Current file
@@ -1096,7 +977,19 @@ export default {
       selectedFile,
       showFileMenu,
       fileMenuPosition,
-      showFileOptions,
+      showFileOptions: (file) => {
+        selectedFile.value = file;
+        showFileMenu.value = true;
+        
+        // Position the menu near the clicked element
+        nextTick(() => {
+          const rect = event.target.getBoundingClientRect();
+          fileMenuPosition.value = {
+            top: `${rect.bottom + window.scrollY}px`,
+            left: `${rect.left + window.scrollX}px`
+          };
+        });
+      },
       
       // Rename
       showRenameDialog,
@@ -1137,7 +1030,6 @@ export default {
       cancelUpload,
       handleFileSelected,
       confirmUpload,
-      handleUploadFile,
       
       // Preview
       previewFiles,
@@ -1154,9 +1046,7 @@ export default {
 
       // Loading
       isLoading,
-      loadingMessage,
-      showLoading,
-      hideLoading
+      loadingMessage
     };
   }
 };
@@ -1287,6 +1177,10 @@ body {
   font-weight: bold;
 }
 
+.file-entry.is-changed {
+  background-color: #fff3cd;
+}
+
 .icon {
   margin-right: 0.4rem;
   font-size: 0.9rem;
@@ -1322,6 +1216,12 @@ body {
 .action-button:hover {
   background-color: #ddd;
   color: #333;
+}
+
+.change-indicator {
+  color: #d73a49;
+  font-weight: bold;
+  margin-right: 0.5rem;
 }
 
 .subdirectory {
@@ -1384,7 +1284,7 @@ body {
   border-bottom: 1px solid #ddd;
 }
 
-.preview-header h3 {
+.preview-header h3, .file-tree-header h3 {
   margin: 0;
   font-size: 1rem;
   padding: 0;

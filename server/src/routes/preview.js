@@ -80,7 +80,7 @@ router.post('/build', async (req, res) => {
       buildInfo.status = 'in_progress';
       
       // Run the ceos-ard build command in the workspace
-      const buildCmd = spawn('ceos-ard', ['generate-all', '-o', 'build', '--pdf'], { 
+      const buildCmd = spawn('ceos-ard', ['generate-all', '-o', 'build', '--pdf', '--docx'], { 
         cwd: req.workspacePath,
         shell: true
       });
@@ -219,7 +219,13 @@ router.get('/content/:filename', async (req, res) => {
     }
     
     // Read preview file content
-    const content = await fs.readFile(filePath, 'utf-8');
+    let content = await fs.readFile(filePath, 'utf-8');
+
+    // Replace edit placeholders
+    content = content.replace(
+      /<!--\s*edit:\s*([\w\-\.\~\/]+)\s*-->/g,
+      (match, p1) =>  `<button class="edit" value="${p1}">Edit</button>`
+    );
     
     return res.status(200).json({
       success: true,
