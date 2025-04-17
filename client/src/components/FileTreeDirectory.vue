@@ -1,42 +1,101 @@
 <template>
-  <div class="file-tree-directory" :class="{ 'root-level': rootLevel }">
-    <!-- Show controls for all directories -->
-    <div class="directory-controls">
+  <div class="file-tree-directory">
+    <!-- Search bar - only show at root level -->
+    <div v-if="!path" class="search-container">
+      <input 
+        type="text" 
+        v-model="searchQuery" 
+        placeholder="Search files..." 
+        class="search-input" 
+        @keyup.enter="performSearch"
+      />
+      <button @click="performSearch" class="search-button">
+        🔍
+      </button>
+      <button 
+        v-if="isSearchActive" 
+        @click="clearSearch" 
+        class="clear-search-button"
+        title="Clear search"
+      >
+        ✖
+      </button>
+    </div>
+    
+    <!-- Search results - only show at root level -->
+    <div v-if="!path && isSearchActive" class="search-results">
+      <div class="search-results-header">
+        <span>Search results for "{{ searchQuery }}"</span>
+        <span v-if="searchResults.hasMoreResults" class="more-results-indicator">
+          (showing first 100 results)
+        </span>
+      </div>
+      
+      <div v-if="searchResults.loading" class="loading">Searching...</div>
+      <div v-else-if="searchResults.error" class="error">{{ searchResults.error }}</div>
+      <div v-else-if="searchResults.results.length === 0" class="empty">
+        No results found
+      </div>
+      <div v-else class="search-results-list">
+        <div 
+          v-for="result in searchResults.results" 
+          :key="result.path" 
+          class="search-result-item"
+          @click="handleResultClick(result)"
+        >
+          <span class="icon">{{ result.isDirectory ? '📁' : getFileIcon(result.name) }}</span>
+          <div class="result-details">
+            <span class="name">{{ result.name }}</span>
+            <span class="path">{{ result.path }}</span>
+            <div v-if="result.matchType === 'content'" class="match-info">
+              <span class="match-type">Content match</span>
+              <div class="text-extract" v-if="result.extract">{{ result.extract }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Show controls for all directories when not searching -->
+    <div v-if="!isSearchActive" class="directory-controls">
       <button @click="createNewFile" class="small-button">New File</button>
       <button @click="uploadFile" class="small-button">Upload</button>
       <button @click="refreshDirectory" class="small-button">⟳</button>
     </div>
     
-    <div v-if="loading" class="loading">Loading...</div>
-    <div v-else-if="error" class="error">Error loading directory</div>
-    <div v-else-if="files.length === 0" class="empty">
-      {{ rootLevel ? "No files found" : "Empty directory" }}
-    </div>
-    <div v-else>
-      <div v-for="file in sortedFiles" :key="file.path" class="file-item">
-        <div 
-          class="file-entry"
-          :class="{ 
-            'is-directory': file.isDirectory,
-            'is-changed': !file.isDirectory && isFileChanged(file.path)
-          }"
-          @click="handleFileClick(file)"
-        >
-          <span class="icon">{{ file.isDirectory ? '📁' : getFileIcon(file.name) }}</span>
-          <span class="name">{{ file.name }}</span>
-          
-          <div class="file-actions">
-            <span v-if="!file.isDirectory && isFileChanged(file.path)" class="change-indicator" :title="`File changed (${getFileChangeStatus(file.path)})`">*</span>
-            <button @click.stop="showFileOptions(file)" class="action-button">⋮</button>
+    <!-- Regular file tree (shown when not searching or for non-root levels) -->
+    <div v-if="!isSearchActive">
+      <div v-if="loading" class="loading">Loading...</div>
+      <div v-else-if="error" class="error">Error loading directory</div>
+      <div v-else-if="files.length === 0" class="empty">
+        No files found
+      </div>
+      <div v-else>
+        <div v-for="file in sortedFiles" :key="file.path" class="file-item">
+          <div 
+            class="file-entry"
+            :class="{ 
+              'is-directory': file.isDirectory,
+              'is-changed': !file.isDirectory && isFileChanged(file.path)
+            }"
+            @click="handleFileClick(file)"
+          >
+            <span class="icon">{{ file.isDirectory ? '📁' : getFileIcon(file.name) }}</span>
+            <span class="name">{{ file.name }}</span>
+            
+            <div class="file-actions">
+              <span v-if="!file.isDirectory && isFileChanged(file.path)" class="change-indicator" :title="`File changed (${getFileChangeStatus(file.path)})`">*</span>
+              <button @click.stop="showFileOptions(file)" class="action-button">⋮</button>
+            </div>
           </div>
-        </div>
-        
-        <div v-if="file.isDirectory && expandedDirs[file.path]" class="subdirectory">
-          <file-tree-directory
-            :path="file.path"
-            @select-file="$emit('select-file', $event)"
-            @refresh="refreshDirectory"
-          />
+          
+          <div v-if="file.isDirectory && expandedDirs[file.path]" class="subdirectory">
+            <file-tree-directory
+              :path="file.path"
+              @select-file="$emit('select-file', $event)"
+              @refresh="refreshDirectory"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -88,10 +147,6 @@ export default {
     path: {
       type: String,
       required: true
-    },
-    rootLevel: {
-      type: Boolean,
-      default: false
     }
   },
   emits: ['select-file', 'refresh', 'show-file-options'],
@@ -116,6 +171,16 @@ export default {
     const uploadPath = ref('');
     const selectedFileToUpload = ref(null);
     const fileInput = ref(null);
+    
+    // Search functionality
+    const searchQuery = ref('');
+    const isSearchActive = ref(false);
+    const searchResults = ref({
+      results: [],
+      loading: false,
+      error: null,
+      hasMoreResults: false
+    });
     
     const changedFiles = ref({});
     
@@ -156,11 +221,6 @@ export default {
     const refreshDirectory = () => {
       // Always reload the directory data
       loadDirectory();
-      
-      // For root level, also emit refresh to parent for any additional refresh tasks
-      if (props.rootLevel) {
-        emit('refresh');
-      }
     };
     
     const sortedFiles = computed(() => {
@@ -351,6 +411,90 @@ export default {
       }
     };
     
+    // Search functionality
+    const performSearch = async () => {
+      if (!searchQuery.value.trim()) {
+        clearSearch();
+        return;
+      }
+      
+      isSearchActive.value = true;
+      searchResults.value.loading = true;
+      searchResults.value.error = null;
+      searchResults.value.results = [];
+      
+      try {
+        const workspaceId = localStorage.getItem('workspaceId');
+        if (!workspaceId) {
+          searchResults.value.error = 'No workspace selected';
+          return;
+        }
+        
+        const response = await fetch(
+          `${API_URL}/file/search?query=${encodeURIComponent(searchQuery.value)}`, 
+          {
+            headers: {
+              'workspace-id': workspaceId
+            }
+          }
+        );
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          searchResults.value.results = data.results;
+          searchResults.value.hasMoreResults = data.hasMoreResults;
+        } else {
+          searchResults.value.error = data.message || 'Failed to perform search';
+        }
+      } catch (error) {
+        console.error('Error performing search:', error);
+        searchResults.value.error = 'Error performing search';
+      } finally {
+        searchResults.value.loading = false;
+      }
+    };
+    
+    const clearSearch = () => {
+      isSearchActive.value = false;
+      searchQuery.value = '';
+      searchResults.value.results = [];
+      searchResults.value.error = null;
+      searchResults.value.loading = false;
+    };
+    
+    const handleResultClick = (result) => {
+      if (result.isDirectory) {
+        // Navigate to the directory
+        // For simplicity, we just open the file tree to that directory
+        const pathParts = result.path.split('/');
+        let currentPath = '';
+        
+        // Expand each directory in the path
+        for (let i = 0; i < pathParts.length - 1; i++) {
+          if (pathParts[i]) {
+            if (currentPath) {
+              currentPath += '/';
+            }
+            currentPath += pathParts[i];
+            expandedDirs.value[currentPath] = true;
+          }
+        }
+        
+        // Finally, emit select-file to highlight the directory
+        emit('select-file', result.path);
+        
+        // Optionally clear search after navigating
+        clearSearch();
+      } else {
+        // It's a file, open it directly
+        emit('select-file', result.path);
+        
+        // Optionally clear search after opening a file
+        clearSearch();
+      }
+    };
+    
     onMounted(loadDirectory);
     
     return {
@@ -388,7 +532,15 @@ export default {
       
       // Changed files
       isFileChanged,
-      getFileChangeStatus
+      getFileChangeStatus,
+      
+      // Search functionality
+      searchQuery,
+      isSearchActive,
+      searchResults,
+      performSearch,
+      clearSearch,
+      handleResultClick
     };
   }
 };
@@ -397,10 +549,6 @@ export default {
 <style scoped>
 .file-tree-directory {
   margin-top: 0.15rem;
-}
-
-.file-tree-directory.root-level {
-  margin-top: 0;
 }
 
 .directory-controls {
@@ -610,5 +758,141 @@ export default {
 .directory-tree {
   width: 100%;
   overflow: visible; /* Allow content to flow naturally */
+}
+
+/* Search related styles */
+.search-container {
+  display: flex;
+  margin-bottom: 0.75rem;
+  position: relative;
+}
+
+.search-input {
+  flex-grow: 1;
+  padding: 0.4rem 2rem 0.4rem 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.search-button {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: none;
+  border: none;
+  padding: 0 0.5rem;
+  cursor: pointer;
+  color: #666;
+}
+
+.clear-search-button {
+  position: absolute;
+  right: 1.5rem;
+  top: 0;
+  bottom: 0;
+  background: none;
+  border: none;
+  padding: 0 0.5rem;
+  cursor: pointer;
+  color: #666;
+  font-size: 0.8rem;
+}
+
+.search-results {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 0.75rem;
+  background-color: #f8f8f8;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.search-results-header {
+  padding: 0.5rem;
+  font-weight: bold;
+  border-bottom: 1px solid #ddd;
+  background-color: #f0f0f0;
+  font-size: 0.9rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+.more-results-indicator {
+  font-style: italic;
+  font-weight: normal;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.search-results-list {
+  padding: 0.5rem 0;
+}
+
+.search-result-item {
+  padding: 0.5rem;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  align-items: flex-start;
+}
+
+.search-result-item:last-child {
+  border-bottom: none;
+}
+
+.search-result-item:hover {
+  background-color: #f0f0f0;
+}
+
+.result-details {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.result-details .name {
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.result-details .path {
+  font-size: 0.8rem;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.match-info {
+  margin-top: 0.3rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.match-type {
+  font-size: 0.75rem;
+  color: #0066cc;
+}
+
+.text-extract {
+  font-size: 0.85rem;
+  color: #333;
+  margin-top: 0.2rem;
+  position: relative;
+  background-color: #f2f5f8;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border-left: 3px solid #0066cc;
+  font-family: monospace;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-height: 8rem;
+  overflow-y: auto;
 }
 </style>

@@ -97,6 +97,122 @@ router.get('/list', async (req, res) => {
   }
 });
 
+// Search files (both filenames and content)
+router.get('/search', async (req, res) => {
+  try {
+    const { query = '' } = req.query;
+    
+    if (!query.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Search query is required'
+      });
+    }
+
+    // Results array
+    const results = [];
+    const maxResults = 100; // Limit number of results to prevent overload
+    let resultCount = 0;
+
+    // Function to search a file/directory recursively
+    const searchRecursively = async (dirPath, relativePath = '') => {
+      if (resultCount >= maxResults) return;
+
+      const items = await fs.readdir(dirPath);
+      
+      for (const item of items) {
+        if (resultCount >= maxResults) break;
+
+        // Skip hidden files and specified directories at root level
+        if (item.startsWith('.')) continue;
+        if (['templates', 'build'].includes(item) && relativePath === '') continue;
+        if (item.endsWith('.git')) continue; // Skip git directory
+
+        const itemPath = path.join(dirPath, item);
+        const itemRelativePath = path.join(relativePath, item).replace(/\\/g, '/');
+        const stats = await fs.stat(itemPath);
+
+        // Check filename match
+        if (item.toLowerCase().includes(query.toLowerCase())) {
+          results.push({
+            path: itemRelativePath,
+            name: item,
+            isDirectory: stats.isDirectory(),
+            matchType: 'filename',
+            size: stats.size,
+            modifiedTime: stats.mtime
+          });
+          resultCount++;
+        }
+
+        if (stats.isDirectory()) {
+          // Search within subdirectory
+          await searchRecursively(itemPath, itemRelativePath);
+        } else {
+          // Check if file is likely to be binary by extension
+          const ext = path.extname(item).toLowerCase();
+          const binaryExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.docx', '.xlsx'];
+          
+          if (!binaryExtensions.includes(ext) && resultCount < maxResults) {
+            // For text files, search content
+            try {
+              const content = await fs.readFile(itemPath, 'utf-8');
+              const lowerContent = content.toLowerCase();
+              const lowerQuery = query.toLowerCase();
+              
+              if (lowerContent.includes(lowerQuery)) {
+                // Extract context around the match
+                const matchIndex = lowerContent.indexOf(lowerQuery);
+                const extractStart = Math.max(0, matchIndex - 40);
+                const extractEnd = Math.min(content.length, matchIndex + query.length + 40);
+                
+                let extractText = content.substring(extractStart, extractEnd);
+                
+                // Add ellipsis if we're not starting from the beginning or ending at the end
+                if (extractStart > 0) extractText = '...' + extractText;
+                if (extractEnd < content.length) extractText = extractText + '...';
+                
+                // Only add to results if not already added via filename match
+                if (!results.some(r => r.path === itemRelativePath)) {
+                  results.push({
+                    path: itemRelativePath,
+                    name: item,
+                    isDirectory: false,
+                    matchType: 'content',
+                    extract: extractText,
+                    size: stats.size,
+                    modifiedTime: stats.mtime
+                  });
+                  resultCount++;
+                }
+              }
+            } catch (err) {
+              // Skip files that can't be read as text
+              console.warn(`Could not read file for search: ${itemPath}`, err.message);
+            }
+          }
+        }
+      }
+    };
+
+    // Start recursive search
+    await searchRecursively(req.workspacePath);
+
+    return res.status(200).json({
+      success: true,
+      results,
+      hasMoreResults: resultCount >= maxResults
+    });
+  } catch (error) {
+    console.error('Error searching files:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to search files',
+      error: error.message
+    });
+  }
+});
+
 // Get file content
 router.get('/content', async (req, res) => {
   try {
