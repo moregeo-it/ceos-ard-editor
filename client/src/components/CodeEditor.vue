@@ -12,8 +12,12 @@
 
 <script>
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
-import * as monaco from 'monaco-editor';
-import loader from '@monaco-editor/loader';
+import { EditorState, Compartment } from '@codemirror/state';
+import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { markdown } from '@codemirror/lang-markdown';
+import { yaml } from '@codemirror/lang-yaml';
+import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 
 export default {
   name: 'CodeEditor',
@@ -30,283 +34,131 @@ export default {
   emits: ['update:modelValue', 'save'],
   setup(props, { emit }) {
     const editorContainer = ref(null);
-    let editor = null;
-    let monacoLoaded = false;
+    let view = null;
+    
+    // Language compartment for dynamic language switching
+    const languageConf = new Compartment();
     
     // Determine language from filename
     const getLanguage = () => {
-      if (!props.filename) return 'plaintext';
+      if (!props.filename) return null;
       
       const extension = props.filename.split('.').pop().toLowerCase();
       
       switch (extension) {
         case 'md':
-          return 'markdown';
+          return markdown();
         case 'yaml':
         case 'yml':
-          return 'yaml';
-        case 'json':
-          return 'json';
-        case 'html':
-          return 'html';
-        case 'js':
-          return 'javascript';
-        case 'css':
-          return 'css';
-        case 'txt':
-          return 'plaintext';
+          return yaml();
         default:
-          return 'plaintext';
+          return null; // Default to plain text
       }
     };
-    
-    // Configure YAML language if needed
-    const configureYamlLanguage = () => {
-      if (!monaco.languages.getLanguages().find(lang => lang.id === 'yaml')) {
-        monaco.languages.register({ id: 'yaml' });
-        
-        // Basic YAML syntax highlighting definition
-        monaco.languages.setMonarchTokensProvider('yaml', {
-          tokenizer: {
-            root: [
-              [/^(\s*)([a-zA-Z0-9_-]+)(:)(\s*)(.*)$/, ['white', 'key', 'delimiter', 'white', 'value']],
-              [/^(\s*)(-\s+)(.*)$/, ['white', 'delimiter', 'value']],
-              [/#.*$/, 'comment'],
-              [/"([^"\\]|\\.)*$/, 'string.invalid'],
-              [/'([^'\\]|\\.)*$/, 'string.invalid'],
-              [/"/, 'string', '@string_double'],
-              [/'/, 'string', '@string_single'],
-              [/[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?/, 'number'],
-              [/\b(true|false|null)\b/, 'keyword']
-            ],
-            string_double: [
-              [/[^\\"]+/, 'string'],
-              [/\\./, 'string.escape'],
-              [/"/, 'string', '@pop']
-            ],
-            string_single: [
-              [/[^\\']+/, 'string'],
-              [/\\./, 'string.escape'],
-              [/'/, 'string', '@pop']
-            ]
-          }
-        });
-        
-        // Simple YAML completion provider
-        monaco.languages.registerCompletionItemProvider('yaml', {
-          provideCompletionItems: () => {
-            const suggestions = [
-              {
-                label: 'name:',
-                kind: monaco.languages.CompletionItemKind.Property,
-                insertText: 'name: ',
-                detail: 'Property name'
-              },
-              {
-                label: 'version:',
-                kind: monaco.languages.CompletionItemKind.Property,
-                insertText: 'version: ',
-                detail: 'Version identifier'
-              },
-              {
-                label: 'description:',
-                kind: monaco.languages.CompletionItemKind.Property,
-                insertText: 'description: ',
-                detail: 'Description text'
-              },
-              {
-                label: '- item',
-                kind: monaco.languages.CompletionItemKind.Snippet,
-                insertText: '- ',
-                detail: 'List item'
-              }
-            ];
-            
-            return { suggestions };
-          }
-        });
-      }
-    };
-    
-    // Simple YAML validation
-    const validateYaml = (content) => {
-      if (!editor) return;
-      
-      try {
-        const language = getLanguage();
-        if (language !== 'yaml') return;
-        
-        // Perform basic YAML validation
-        // Check for common issues like incorrect indentation
-        const lines = content.split('\n');
-        const markers = [];
-        
-        let inSequence = false;
-        let previousIndent = 0;
-        
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          const trimmedLine = line.trimStart();
-          const indent = line.length - trimmedLine.length;
-          
-          // Skip empty lines and comments
-          if (trimmedLine === '' || trimmedLine.startsWith('#')) continue;
-          
-          // Check for incorrect colons
-          if (trimmedLine.includes(':') && !trimmedLine.includes(': ') && 
-              !trimmedLine.endsWith(':') && !trimmedLine.includes('http:') && !trimmedLine.includes('https:')) {
-            markers.push({
-              severity: monaco.MarkerSeverity.Error,
-              message: 'Missing space after colon',
-              startLineNumber: i + 1,
-              startColumn: line.indexOf(':') + 1,
-              endLineNumber: i + 1,
-              endColumn: line.indexOf(':') + 2
-            });
-          }
-          
-          // Check for tabs instead of spaces
-          if (line.includes('\t')) {
-            markers.push({
-              severity: monaco.MarkerSeverity.Warning,
-              message: 'Tab character found, consider using spaces for indentation',
-              startLineNumber: i + 1,
-              startColumn: line.indexOf('\t') + 1,
-              endLineNumber: i + 1,
-              endColumn: line.indexOf('\t') + 2
-            });
-          }
-          
-          // Check for inconsistent indentation
-          if (indent % 2 !== 0) {
-            markers.push({
-              severity: monaco.MarkerSeverity.Warning,
-              message: 'Inconsistent indentation (not a multiple of 2 spaces)',
-              startLineNumber: i + 1,
-              startColumn: 1,
-              endLineNumber: i + 1,
-              endColumn: indent + 1
-            });
-          }
-          
-          // Check for sequence markers (- ) without proper indentation
-          if (trimmedLine.startsWith('- ') && indent <= previousIndent && inSequence) {
-            if (indent < previousIndent) {
-              // End of sequence, reset
-              inSequence = false;
-            } else {
-              // Same indentation but unexpected - marker
-              markers.push({
-                severity: monaco.MarkerSeverity.Info,
-                message: 'Sequence item at same indentation level',
-                startLineNumber: i + 1,
-                startColumn: 1,
-                endLineNumber: i + 1,
-                endColumn: 3
-              });
-            }
-          } else if (trimmedLine.startsWith('- ')) {
-            inSequence = true;
-          }
-          
-          previousIndent = indent;
-        }
-        
-        // Set markers on the model
-        if (editor && editor.getModel()) {
-          monaco.editor.setModelMarkers(editor.getModel(), 'yaml-validation', markers);
-        }
-      } catch (err) {
-        console.error('Error validating YAML:', err);
-      }
+
+    // Get filename display name
+    const getDisplayFilename = () => {
+      return props.filename?.split('/').pop() || 'Untitled';
     };
     
     // Save file function for the save button
     const saveFile = () => {
       emit('save');
     };
+
+    // Handle Ctrl+S save command
+    const saveCommand = {
+      key: 'Ctrl-s',
+      mac: 'Cmd-s',
+      run: () => {
+        saveFile();
+        return true;
+      },
+      preventDefault: true
+    };
     
-    // Initialize Monaco editor
-    const initEditor = async () => {
+    // Initialize CodeMirror editor
+    const initEditor = () => {
       if (!editorContainer.value) return;
       
       // Dispose existing editor if it exists
-      if (editor) {
-        editor.dispose();
+      if (view) {
+        view.destroy();
       }
       
       try {
-        // Ensure Monaco is loaded
-        if (!monacoLoaded) {
-          await loader.init();
-          monacoLoaded = true;
-          
-          // Configure YAML language once Monaco is loaded
-          configureYamlLanguage();
-        }
+        // Choose language based on file extension
+        const language = getLanguage();
         
-        // Create new editor
-        editor = monaco.editor.create(editorContainer.value, {
-          value: props.modelValue,
-          language: getLanguage(),
-          theme: 'vs',
-          automaticLayout: true,
-          minimap: {
-            enabled: false // Disable the minimap/code preview on the right side
-          },
-          lineNumbers: 'on',
-          fontSize: 14,
-          fontFamily: 'Consolas, "Courier New", monospace',
-          scrollBeyondLastLine: false,
-          tabSize: 2,
-          wordWrap: 'on',
-          renderWhitespace: 'all',
-          formatOnPaste: true,
-          fixedOverflowWidgets: true, // Prevent widgets from creating scrollbars
-          contextmenu: true
+        // Editor extensions
+        const extensions = [
+          lineNumbers(),
+          highlightActiveLine(),
+          history(),
+          keymap.of([
+            indentWithTab,
+            saveCommand,
+            ...defaultKeymap,
+            ...historyKeymap
+          ]),
+          EditorView.updateListener.of(update => {
+            if (update.docChanged) {
+              emit('update:modelValue', update.state.doc.toString());
+            }
+          }),
+          languageConf.of(language || []),
+          syntaxHighlighting(defaultHighlightStyle),
+          EditorView.lineWrapping,
+          EditorState.tabSize.of(2)
+        ];
+
+        // Create editor state
+        const state = EditorState.create({
+          doc: props.modelValue,
+          extensions
         });
         
-        // Listen for content changes
-        editor.onDidChangeModelContent(() => {
-          const content = editor.getValue();
-          emit('update:modelValue', content);
-          
-          // Validate YAML content
-          validateYaml(content);
+        // Create editor view
+        view = new EditorView({
+          state,
+          parent: editorContainer.value
         });
         
-        // Listen for save keyboard shortcut (Ctrl+S)
-        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-          emit('save');
+        // Focus editor
+        nextTick(() => {
+          view?.focus();
         });
-        
-        // Force layout refresh
-        setTimeout(() => {
-          if (editor) {
-            editor.layout();
-            
-            // Initial validation
-            validateYaml(props.modelValue);
-          }
-        }, 100);
       } catch (err) {
-        console.error('Error initializing Monaco editor:', err);
+        console.error('Error initializing CodeMirror editor:', err);
       }
     };
     
     // Handle editor updates when props change
-    watch(() => props.modelValue, (newVal) => {
-      if (editor && editor.getValue() !== newVal) {
-        editor.setValue(newVal);
-        validateYaml(newVal);
+    watch(() => props.modelValue, (newVal, oldVal) => {
+      if (view && newVal !== oldVal && newVal !== view.state.doc.toString()) {
+        view.dispatch({
+          changes: {
+            from: 0,
+            to: view.state.doc.length,
+            insert: newVal
+          }
+        });
       }
     });
     
     // Update editor language when filename changes and reinitialize editor
     watch(() => props.filename, () => {
       nextTick(() => {
-        // Re-initialize the editor when the file changes
-        initEditor();
+        // If editor already exists, just update the language
+        if (view) {
+          const language = getLanguage();
+          view.dispatch({
+            effects: languageConf.reconfigure(language || [])
+          });
+        } else {
+          // Otherwise reinitialize the editor
+          initEditor();
+        }
       });
     });
     
@@ -320,14 +172,16 @@ export default {
     
     // Clean up on unmount
     onBeforeUnmount(() => {
-      if (editor) {
-        editor.dispose();
+      if (view) {
+        view.destroy();
+        view = null;
       }
     });
     
     return {
       editorContainer,
-      saveFile
+      saveFile,
+      getDisplayFilename
     };
   }
 };
@@ -388,25 +242,53 @@ export default {
   background-color: #0069d9;
 }
 
-.code-editor-container .cm-diagnostic-error {
-  /* Style for the error underlines in CodeMirror */
-  text-decoration: underline wavy #3b82f6;
-  position: relative;
+/* CodeMirror specific styles */
+:deep(.cm-editor) {
+  height: 100%;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
 }
 
-.code-editor-container .cm-diagnostic-error:hover::after {
-  content: attr(data-error);
-  position: absolute;
-  left: 0;
-  bottom: 100%;
-  background-color: #f8f9fa;
-  border: 1px solid #dee2e6;
-  border-radius: 0.25rem;
-  padding: 0.5rem;
-  color: #dc3545;
-  z-index: 1000;
-  white-space: nowrap;
-  font-size: 0.875rem;
-  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+:deep(.cm-content) {
+  padding: 4px 0;
 }
+
+:deep(.cm-gutters) {
+  border-right: 1px solid #ddd;
+  background-color: #f8f8f8;
+}
+
+:deep(.cm-activeLineGutter) {
+  background-color: #e8f2ff;
+}
+
+:deep(.cm-line) {
+  padding: 0 4px 0 6px;
+}
+
+:deep(.cm-diagnostic-error) {
+  text-decoration: underline wavy #d73a49;
+}
+
+:deep(.cm-diagnostic-warning) {
+  text-decoration: underline wavy #e36209;
+}
+
+:deep(.cm-matchingBracket) {
+  background-color: rgba(0, 120, 212, 0.2);
+}
+
+:deep(.cm-selectionMatch) {
+  background-color: rgba(0, 120, 212, 0.1);
+}
+
+/* Syntax highlighting */
+:deep(.cm-keyword) { color: #569cd6; }
+:deep(.cm-operator) { color: #d4d4d4; }
+:deep(.cm-string) { color: #ce9178; }
+:deep(.cm-number) { color: #b5cea8; }
+:deep(.cm-comment) { color: #6a9955; }
+:deep(.cm-meta) { color: #d4d4d4; }
+:deep(.cm-tag) { color: #569cd6; }
+:deep(.cm-attribute) { color: #9cdcfe; }
 </style>

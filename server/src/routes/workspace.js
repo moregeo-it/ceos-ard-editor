@@ -8,7 +8,7 @@ const { execSync } = require('child_process');
 
 // Base directory for workspaces
 const WORKSPACES_DIR = path.join(__dirname, '../../workspaces');
-const REPO_URL = 'https://github.com/ceos-org/ceos-ard';
+const REPO_URL = 'https://github.com/m-mohr/ceos-ard';
 
 // Create a new workspace
 router.post('/create', async (req, res) => {
