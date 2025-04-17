@@ -43,18 +43,24 @@ const validateWorkspace = async (req, res, next) => {
 // Apply middleware to all routes
 router.use(validateWorkspace);
 
-// Generate preview by building the project
+// Unified build endpoint that handles both all files and specific PFS builds
 router.post('/build', async (req, res) => {
   try {
     const workspaceId = req.headers['workspace-id'];
+    const pfs = req.query.pfs; // Optional PFS parameter
     
     // Check if a build is already in progress for this workspace
     if (buildProcesses.has(workspaceId)) {
-      return res.status(409).json({
-        success: false,
-        message: 'Build already in progress for this workspace',
-        status: 'in_progress'
-      });
+      const existingBuild = buildProcesses.get(workspaceId);
+      
+      // If there's a running process, kill it
+      if (existingBuild.process && existingBuild.process.kill) {
+        console.log(`Aborting existing build for workspace ${workspaceId}`);
+        existingBuild.process.kill('SIGTERM');
+        existingBuild.status = 'aborted';
+        existingBuild.endTime = Date.now();
+        existingBuild.error = 'Build aborted because a new build was requested';
+      }
     }
     
     // Create tracking object
@@ -63,7 +69,10 @@ router.post('/build', async (req, res) => {
       logs: [],
       startTime: Date.now(),
       endTime: null,
-      error: null
+      error: null,
+      process: null, // Track the process object itself
+      type: pfs ? 'specific' : 'all', // Indicate if this is a specific file build
+      pfs: pfs // Store the PFS name if provided
     };
     
     buildProcesses.set(workspaceId, buildInfo);
@@ -71,7 +80,7 @@ router.post('/build', async (req, res) => {
     // Respond immediately that the build has started
     res.status(202).json({
       success: true,
-      message: 'Build process started',
+      message: pfs ? `Build process started for ${pfs}` : 'Build process started for all previews',
       status: 'started'
     });
     
@@ -79,11 +88,22 @@ router.post('/build', async (req, res) => {
     try {
       buildInfo.status = 'in_progress';
       
-      // Run the ceos-ard build command in the workspace
-      const buildCmd = spawn('ceos-ard', ['generate-all', '-o', 'build', '--pdf', '--docx'], { 
+      // Prepare command arguments based on whether a specific PFS was provided
+      const cmdArgs = ['generate-all', '-o', 'build', '--pdf', '--docx'];
+      if (pfs) {
+        cmdArgs.push('--pfs', pfs);
+      }
+
+      console.log(cmdArgs);
+        
+      // Run the ceos-ard build command
+      const buildCmd = spawn('ceos-ard', cmdArgs, { 
         cwd: req.workspacePath,
         shell: true
       });
+      
+      // Store the process reference
+      buildInfo.process = buildCmd;
       
       // Collect output
       buildCmd.stdout.on('data', (data) => {
@@ -99,11 +119,13 @@ router.post('/build', async (req, res) => {
       // Handle process completion
       buildCmd.on('close', (code) => {
         buildInfo.endTime = Date.now();
-        if (code === 0) {
-          buildInfo.status = 'completed';
-        } else {
-          buildInfo.status = 'failed';
-          buildInfo.error = `Process exited with code ${code}`;
+        if (buildInfo.status !== 'aborted') {
+          if (code === 0) {
+            buildInfo.status = 'completed';
+          } else {
+            buildInfo.status = 'failed';
+            buildInfo.error = `Process exited with code ${code}`;
+          }
         }
         
         // Automatically remove from tracking after 10 minutes
@@ -224,7 +246,7 @@ router.get('/content/:filename', async (req, res) => {
     // Replace edit placeholders
     content = content.replace(
       /<!--\s*edit:\s*([\w\-\.\~\/]+)\s*-->/g,
-      (match, p1) =>  `<button class="edit" value="${p1}">Edit</button>`
+      (match, p1) =>  `<a name="${p1}"></a><button class="edit" value="${p1}">Edit</button>`
     );
     
     return res.status(200).json({

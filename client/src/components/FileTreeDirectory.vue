@@ -60,7 +60,7 @@
     <div v-if="!isSearchActive" class="directory-controls">
       <button @click="createNewFile" class="small-button">New File</button>
       <button @click="uploadFile" class="small-button">Upload</button>
-      <button @click="refreshDirectory" class="small-button">⟳</button>
+      <button @click="refreshDirectory" title="Reload" class="small-button">⟳</button>
     </div>
     
     <!-- Regular file tree (shown when not searching or for non-root levels) -->
@@ -554,7 +554,7 @@ export default {
 .directory-controls {
   display: flex;
   margin-bottom: 0.75rem;
-  gap: 0.3rem;
+  gap: 0.2rem;
 }
 
 .file-item {

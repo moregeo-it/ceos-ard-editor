@@ -71,8 +71,10 @@
         <div class="column preview-pane">
           <div class="preview-header">
             <h3>Preview</h3>
-            <div class="preview-selector" v-if="previewFiles.length > 0">
-              <select v-model="selectedPreview" @change="loadPreview">
+            <div class="preview-selector">
+              <button @click="generateAllPreviews" title="Regenerate all">⟳</button>
+              &nbsp;
+              <select v-if="previewFiles.length > 0" v-model="selectedPreview" @change="loadPreview">
                 <option v-for="file in previewFiles" :key="file.path" :value="file.name">
                   {{ file.name.replace('.html', '') }}
                 </option>
@@ -83,8 +85,12 @@
             No previews available. Save your changes to generate a preview.
           </div>
           <preview-pane 
-            v-if="selectedPreview && previewContent"
+            v-if="selectedPreview"
             :content="previewContent"
+            :selected-preview-name="selectedPreview"
+            @build-completed="handleBuildCompleted"
+            @open-file="openFile"
+            ref="previewPaneRef"
           />
         </div>
       </div>
@@ -235,6 +241,7 @@ export default {
     const previewFiles = ref([]);
     const selectedPreview = ref('');
     const previewContent = ref('');
+    const previewPaneRef = ref(null);
     
     // Panel resize state
     const leftPanelWidth = ref(250);
@@ -372,6 +379,7 @@ export default {
 
     // Open a file for editing
     const openFile = async (filePath) => {
+      console.log(filePath);
       try {
         showLoading('Loading file...');
         const response = await fetch(`${API_URL}/file/content?filePath=${encodeURIComponent(filePath)}`, {
@@ -420,8 +428,13 @@ export default {
           // Update changed files list after saving
           await loadChangedFiles();
           
-          // Automatically generate preview after saving
-          await generatePreview();
+          // Rebuild only the current preview if one is selected
+          if (selectedPreview.value && previewPaneRef.value) {
+            previewPaneRef.value.generatePreview(selectedPreview.value);
+          } else {
+            // If no preview is selected yet, generate all previews
+            await generateAllPreviews();
+          }
         } else {
           alert(`Failed to save file: ${data.message}`);
         }
@@ -770,6 +783,9 @@ export default {
         
         const response = await fetch(`${API_URL}/preview/build`, {
           method: 'POST',
+          query: {
+            pfs: selectedPreview.value
+          },
           headers: {
             'workspace-id': workspaceId.value
           }
@@ -790,9 +806,123 @@ export default {
       }
     };
 
+    // Generate all previews (initial load)
+    const generateAllPreviews = async () => {
+      try {
+        showLoading('Generating all previews...');
+        
+        // Use the unified build endpoint without a pfs parameter to build all files
+        const response = await fetch(`${API_URL}/preview/build`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Workspace-Id': workspaceId.value
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          // Start polling for build status
+          pollBuildStatus();
+        } else {
+          alert(`Failed to generate previews: ${data.message}`);
+          hideLoading();
+        }
+      } catch (error) {
+        console.error('Error generating previews:', error);
+        alert('Failed to generate previews. Check console for details.');
+        hideLoading();
+      }
+    };
+    
+    // Poll for build status when generating all previews
+    let buildStatusPollInterval = null;
+    const pollBuildStatus = async () => {
+      // Clear any existing interval
+      if (buildStatusPollInterval) {
+        clearInterval(buildStatusPollInterval);
+      }
+      
+      const pollingStartTime = Date.now();
+      const POLLING_TIMEOUT = 5 * 60 * 1000; // 5 minutes timeout
+      
+      // Set up polling interval (every 2 seconds)
+      buildStatusPollInterval = setInterval(async () => {
+        try {
+          // Check if we've exceeded the timeout
+          if (Date.now() - pollingStartTime > POLLING_TIMEOUT) {
+            clearInterval(buildStatusPollInterval);
+            buildStatusPollInterval = null;
+            hideLoading();
+            console.warn('Build status polling timed out');
+            return;
+          }
+          
+          const response = await fetch(`${API_URL}/preview/build-status`, {
+            headers: {
+              'Workspace-Id': workspaceId.value
+            }
+          });
+          
+          // If the workspace doesn't have a build in progress
+          if (response.status === 404) {
+            clearInterval(buildStatusPollInterval);
+            buildStatusPollInterval = null;
+            hideLoading();
+            loadPreviewFiles(); // Still try to load previews that might be there
+            return;
+          }
+          
+          if (!response.ok) {
+            throw new Error('Failed to get build status');
+          }
+          
+          const data = await response.json();
+          
+          loadingMessage.value = getBuildStatusMessage(data.status, data.error);
+          
+          // Check if the build has completed or failed
+          if (data.status === 'completed') {
+            clearInterval(buildStatusPollInterval);
+            buildStatusPollInterval = null;
+            hideLoading();
+            loadPreviewFiles();
+          } else if (data.status === 'failed') {
+            clearInterval(buildStatusPollInterval);
+            buildStatusPollInterval = null;
+            hideLoading();
+            alert(`Build failed: ${data.error || 'Unknown error'}`);
+          }
+          
+        } catch (error) {
+          console.error('Error polling build status:', error);
+        }
+      }, 2000);
+    };
+    
+    // Get status message based on build status
+    const getBuildStatusMessage = (status, error) => {
+      switch (status) {
+        case 'starting':
+          return 'Preparing build environment...';
+        case 'in_progress':
+          return 'Building documents...';
+        case 'completed':
+          return 'Build completed successfully!';
+        case 'failed':
+          return `Build failed: ${error || 'Unknown error'}`;
+        default:
+          return `Build status: ${status}`;
+      }
+    };
+
     // Load available preview files
     const loadPreviewFiles = async () => {
       try {
+        // Remember the currently selected preview before reloading
+        const currentSelectedPreview = selectedPreview.value;
+        
         const response = await fetch(`${API_URL}/preview/list`, {
           headers: {
             'workspace-id': workspaceId.value
@@ -805,7 +935,14 @@ export default {
           previewFiles.value = data.previewFiles;
           
           if (previewFiles.value.length > 0) {
-            selectedPreview.value = previewFiles.value[0].name;
+            // If there was a previously selected preview and it's still in the list, keep it selected
+            if (currentSelectedPreview && 
+                previewFiles.value.some(file => file.name === currentSelectedPreview)) {
+              selectedPreview.value = currentSelectedPreview;
+            } else {
+              // Otherwise select the first one
+              selectedPreview.value = previewFiles.value[0].name;
+            }
             loadPreview();
           }
         } else {
@@ -926,6 +1063,10 @@ export default {
       }
     };
 
+    const handleBuildCompleted = () => {
+      loadPreviewFiles();
+    };
+
     onMounted(() => {
       const urlParams = new URLSearchParams(window.location.search);
       const urlWorkspaceId = urlParams.get('workspace');
@@ -937,7 +1078,14 @@ export default {
       
       if (workspaceId.value) {
         loadFileTree();
-        loadPreviewFiles();
+        // Generate all previews first, then load the preview files
+        generateAllPreviews().then(() => {
+          // loadPreviewFiles is already called within generateAllPreviews
+          // but we'll load them again after a delay to ensure they're loaded
+          setTimeout(() => {
+            loadPreviewFiles();
+          }, 1000);
+        });
         loadChangedFiles();
       }
       
@@ -1036,13 +1184,16 @@ export default {
       selectedPreview,
       previewContent,
       generatePreview,
+      generateAllPreviews,
       loadPreview,
+      handleBuildCompleted,
       
       // Layout
       leftPanelWidth,
       middlePanelWidth,
       startResizeLeft,
       startResizeMiddle,
+      previewPaneRef,
 
       // Loading
       isLoading,
