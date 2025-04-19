@@ -1,4 +1,5 @@
 /server/workspaces/*
+/server/database/workspaces.db
 
 # Logs
 logs

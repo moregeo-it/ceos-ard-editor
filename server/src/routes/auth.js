@@ -3,16 +3,22 @@ const passport = require('passport');
 const router = express.Router();
 require('dotenv').config();
 
-// Route to initiate GitHub authentication
+// Route to initiate GitHub authentication - scopes are defined in passport.js
 router.get('/github', 
-  passport.authenticate('github', { scope: ['user:email'] })
+  passport.authenticate('github')
 );
 
 // GitHub callback route
 router.get('/github/callback',
   passport.authenticate('github', { failureRedirect: '/api/auth/login-failed' }),
-  (req, res) => {
+  async (req, res) => {
+    // Store the access token in the session for API calls
+    if (req.user && req.authInfo && req.authInfo.accessToken) {
+      req.session.githubToken = req.authInfo.accessToken;
+    }
+    
     // Redirect to client application after successful authentication
+    // The client will handle checking for existing workspaces
     res.redirect(process.env.AUTH_SUCCESS_REDIRECT || 'http://localhost:5174');
   }
 );

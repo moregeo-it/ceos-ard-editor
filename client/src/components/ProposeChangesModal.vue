@@ -135,6 +135,9 @@ export default {
     const isOpen = ref(false);
     const currentStep = ref(1);
     
+    // Get current workspace ID from parent component
+    const workspaceId = ref('');
+    
     // Changes data
     const changedFiles = ref([]);
     const isLoadingChanges = ref(false);
@@ -158,6 +161,14 @@ export default {
     let resolvePromise = null;
 
     const show = () => {
+      // Get the current workspace ID from local storage
+      workspaceId.value = localStorage.getItem('workspaceId') || '';
+      
+      if (!workspaceId.value) {
+        console.error('No workspace ID found');
+        return Promise.resolve({ canceled: true });
+      }
+
       // Reset all state
       currentStep.value = 1;
       changedFiles.value = [];
@@ -191,15 +202,14 @@ export default {
       hasChanges.value = false;
       
       try {
-        const workspaceId = localStorage.getItem('workspaceId');
-        if (!workspaceId) {
+        if (!workspaceId.value) {
           throw new Error('No workspace ID found');
         }
         
         // Get git status using authenticated API
-        const response = await api.get(`/workspace/${workspaceId}/status`, {
+        const response = await api.get(`/workspace/${workspaceId.value}/status`, {
           headers: {
-            'workspace-id': workspaceId
+            'workspace-id': workspaceId.value
           }
         });
         
@@ -252,13 +262,12 @@ export default {
           
           // For modified files, fetch the diff using authenticated API
           try {
-            const workspaceId = localStorage.getItem('workspaceId');
             const response = await api.get(`/file/diff`, {
               params: {
                 filePath: filePath
               },
               headers: {
-                'workspace-id': workspaceId
+                'workspace-id': workspaceId.value
               }
             });
             
@@ -332,19 +341,18 @@ export default {
       try {
         emit('loading', 'Submitting proposal...');
         
-        const workspaceId = localStorage.getItem('workspaceId');
-        if (!workspaceId) {
+        if (!workspaceId.value) {
           throw new Error('No workspace ID found');
         }
         
         // Use authenticated API for proposal submission
-        const response = await api.post(`/workspace/propose`, {
+        const response = await api.post(`/workspace/${workspaceId.value}/propose`, {
           title: proposeChangesTitle.value,
           description: proposeChangesDescription.value
         }, {
           headers: {
             'Content-Type': 'application/json',
-            'workspace-id': workspaceId
+            'workspace-id': workspaceId.value
           }
         });
 
@@ -389,6 +397,7 @@ export default {
     return {
       isOpen,
       currentStep,
+      workspaceId,
       changedFiles,
       isLoadingChanges,
       hasChanges,

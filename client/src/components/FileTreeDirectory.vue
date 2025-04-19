@@ -239,7 +239,7 @@
 </template>
 
 <script>
-import { ref, computed, inject, onMounted, nextTick, watch } from 'vue';
+import { ref, computed, inject, onMounted, nextTick, watch, provide } from 'vue';
 import { API_URL } from '../config.js';
 import api from '../services/auth.js';
 
@@ -1042,6 +1042,17 @@ export default {
         expandToShowFile(newFilePath);
       }
     });
+
+    // Watch for changes in changedFiles from parent component
+    watch(() => parentChangedFiles, (newChangedFiles) => {
+      // When changedFiles is updated from parent, refresh the directory
+      if (Object.keys(newChangedFiles).length > 0) {
+        loadDirectory();
+      }
+    }, { deep: true });
+    
+    // Refresh directory on @refresh event from parent
+    provide('refreshDirectory', refreshDirectory);
     
     onMounted(() => {
       loadDirectory();

@@ -21,20 +21,58 @@
       <alert-modal ref="alertModal" :title="modalTitle" :message="modalMessage" />
       <confirm-modal ref="confirmModal" :title="modalTitle" :message="modalMessage" :confirm-text="modalConfirmText" />
       <propose-changes-modal ref="proposeChangesModal" @loading="showLoading" @done="hideLoading" />
+      <create-workspace-modal ref="createWorkspaceModal" @workspace-created="handleWorkspaceCreated" />
+
+      <!-- Workspace management -->
+      <div class="workspace-manager" v-if="!workspaceId && userWorkspaces.length > 0">
+        <h1>CEOS-ARD Editor</h1>
+        <div class="workspace-list">
+          <h2>Your Workspaces</h2>
+          <div class="workspace-items">
+            <div v-for="workspace in userWorkspaces" :key="workspace.id" class="workspace-item">
+              <div class="workspace-info">
+                <h3>{{ workspace.title || 'Untitled Workspace' }}</h3>
+                <p class="workspace-date">Created: {{ formatDate(workspace.createdAt) }}</p>
+                <p class="workspace-branch">Branch: {{ workspace.branchName }}</p>
+              </div>
+              <div class="workspace-actions">
+                <button @click="openWorkspace(workspace.id)" class="primary-button">Open</button>
+                <button @click="confirmDeleteWorkspace(workspace.id, workspace.title)" class="danger-button">Delete</button>
+              </div>
+            </div>
+          </div>
+          <div class="workspace-create-new">
+            <button @click="showCreateWorkspaceModal" class="create-workspace-btn">
+              Create New Workspace
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Loading while creating initial workspace -->
+      <div class="loading-initial-workspace" v-else-if="!workspaceId && isCreatingInitialWorkspace">
+        <div class="loading-spinner"></div>
+        <p>Setting up your workspace...</p>
+      </div>
 
       <!-- Workspace creation/management -->
-      <div class="workspace-controls" v-if="!workspaceId">
+      <div class="workspace-controls" v-if="!workspaceId && userWorkspaces.length === 0">
         <h1>CEOS-ARD Editor</h1>
-        <button @click="createWorkspace" :disabled="isCreatingWorkspace">
+        <button @click="showCreateWorkspaceModal" :disabled="isCreatingWorkspace">
           {{ isCreatingWorkspace ? 'Creating workspace...' : 'Create New Workspace' }}
         </button>
       </div>
 
       <!-- Main editor layout -->
-      <div class="editor-layout" v-else>
+      <div class="editor-layout" v-else-if="workspaceId">
         <!-- Top toolbar -->
         <div class="toolbar">
-          <h2>CEOS-ARD Editor</h2>
+          <div class="toolbar-left">
+            <h2>CEOS-ARD Editor</h2>
+            <div class="workspace-title" v-if="currentWorkspace">
+              <span>{{ currentWorkspace.title || 'Untitled Workspace' }}</span>
+            </div>
+          </div>
           <div class="actions">
             <button @click="copyWorkspaceUrl" class="copy-url">Copy URL</button>
             <button @click="proposeChanges" class="propose">Propose Changes</button>
@@ -139,6 +177,7 @@ import FileViewer from './components/FileViewer.vue';
 import AlertModal from './components/AlertModal.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
 import ProposeChangesModal from './components/ProposeChangesModal.vue';
+import CreateWorkspaceModal from './components/CreateWorkspaceModal.vue';
 import LoginPage from './components/LoginPage.vue';
 import { API_URL } from './config.js';
 import { AuthService } from './services/auth';
@@ -154,6 +193,7 @@ export default {
     AlertModal,
     ConfirmModal,
     ProposeChangesModal,
+    CreateWorkspaceModal,
     LoginPage
   },
   setup() {
@@ -172,7 +212,45 @@ export default {
       
       // If user is authenticated, proceed with workspace loading
       if (isAuthenticated.value) {
+        // Load all user workspaces
+        await loadUserWorkspaces();
+        
+        // Then check URL or localStorage for workspace ID
         loadWorkspaceFromUrlOrStorage();
+      }
+    };
+    
+    // Load all workspaces for the current user
+    const loadUserWorkspaces = async () => {
+      try {
+        showLoading('Loading workspaces...');
+        const response = await api.get('/workspace');
+        
+        if (response.data.success) {
+          userWorkspaces.value = response.data.workspaces;
+          
+          // Set current workspace if we have a workspace ID
+          if (workspaceId.value) {
+            currentWorkspace.value = userWorkspaces.value.find(ws => ws.id === workspaceId.value);
+            if (currentWorkspace.value) {
+              // If we found a matching workspace, load its content
+              await loadFileTree();
+              await generateAllPreviews();
+            } else {
+              // If the stored workspace ID doesn't match any existing workspace,
+              // clear it to show the workspace selection screen
+              workspaceId.value = '';
+              localStorage.removeItem('workspaceId');
+            }
+          }
+          
+          // Note: No longer automatically selecting the most recent workspace
+          // or creating a new one - user must explicitly choose
+        }
+      } catch (error) {
+        console.error('Error loading user workspaces:', error);
+      } finally {
+        hideLoading();
       }
     };
     
@@ -184,18 +262,22 @@ export default {
       if (urlWorkspaceId) {
         workspaceId.value = urlWorkspaceId;
         localStorage.setItem('workspaceId', urlWorkspaceId);
+        
+        // Update current workspace
+        currentWorkspace.value = userWorkspaces.value.find(ws => ws.id === urlWorkspaceId);
+        
+        if (currentWorkspace.value) {
+          loadFileTree();
+          generateAllPreviews().then(() => {
+            setTimeout(() => {
+              loadPreviewFiles();
+            }, 1000);
+          });
+        }
       }
-      
-      if (workspaceId.value) {
-        loadFileTree();
-        generateAllPreviews().then(() => {
-          setTimeout(() => {
-            loadPreviewFiles();
-          }, 1000);
-        });
-      }
+      // If no workspace ID in URL, user will see the workspace selection screen
     };
-    
+
     // Logout function
     const logout = async () => {
       await AuthService.logout();
@@ -210,6 +292,9 @@ export default {
     // Workspace state
     const workspaceId = ref(localStorage.getItem('workspaceId') || '');
     const isCreatingWorkspace = ref(false);
+    const isCreatingInitialWorkspace = ref(false);
+    const userWorkspaces = ref([]);
+    const currentWorkspace = ref(null);
 
     // File browser state
     const files = ref([]);
@@ -230,6 +315,7 @@ export default {
     const alertModal = ref(null);
     const confirmModal = ref(null);
     const proposeChangesModal = ref(null);
+    const createWorkspaceModal = ref(null);
     const modalTitle = ref('');
     const modalMessage = ref('');
     const modalConfirmText = ref('Confirm');
@@ -246,6 +332,10 @@ export default {
       modalMessage.value = message;
       modalConfirmText.value = confirmText;
       return confirmModal.value.show();
+    };
+
+    const showCreateWorkspaceModal = () => {
+      createWorkspaceModal.value.show();
     };
 
     // Propose changes function
@@ -328,35 +418,91 @@ export default {
       loadingMessage.value = '';
     };
 
-    // Create a new workspace
+    // Create a new workspace using our modal
     const createWorkspace = async () => {
       try {
+        showLoading('Creating workspace...');
         isCreatingWorkspace.value = true;
-        const response = await api.post('/workspace/create');
         
-        const data = response.data;
+        // Get the result from the modal's submit function
+        const modalRef = createWorkspaceModal.value;
+        const result = await modalRef.submit();
         
-        if (data.success) {
-          workspaceId.value = data.workspaceId;
-          localStorage.setItem('workspaceId', data.workspaceId);
+        if (result && result.success) {
+          // Update workspace ID and local storage
+          workspaceId.value = result.workspace.id;
+          localStorage.setItem('workspaceId', result.workspace.id);
+          
+          // Set current workspace
+          currentWorkspace.value = result.workspace;
+          
+          // Add to user workspaces if not already there
+          if (!userWorkspaces.value.some(ws => ws.id === result.workspace.id)) {
+            userWorkspaces.value.push(result.workspace);
+          }
           
           // Update URL with workspace ID for sharing
           const url = new URL(window.location.href);
-          url.searchParams.set('workspace', data.workspaceId);
+          url.searchParams.set('workspace', result.workspace.id);
           window.history.replaceState({}, '', url);
           
-          loadFileTree();
+          // Load the workspace content
+          await loadFileTree();
+          await generateAllPreviews();
         } else {
-          showAlert(`Failed to create workspace: ${data.message}`, 'Error');
+          showAlert('Failed to create workspace. Please try again.', 'Error');
         }
       } catch (error) {
         console.error('Error creating workspace:', error);
         showAlert('Failed to create workspace. Check console for details.', 'Error');
       } finally {
         isCreatingWorkspace.value = false;
+        hideLoading();
       }
     };
-    
+
+    // Create initial workspace automatically after login
+    const createInitialWorkspace = async () => {
+      // We no longer automatically create workspaces after login
+      // This function is kept for potential future use
+    };
+
+    // Open an existing workspace
+    const openWorkspace = async (id) => {
+      try {
+        showLoading('Opening workspace...');
+        
+        // Set the workspaceId
+        workspaceId.value = id;
+        localStorage.setItem('workspaceId', id);
+        
+        // Find the workspace in our list
+        currentWorkspace.value = userWorkspaces.value.find(ws => ws.id === id);
+        
+        if (!currentWorkspace.value) {
+          throw new Error(`Workspace with ID ${id} not found`);
+        }
+        
+        // Update URL with workspace ID for sharing
+        const url = new URL(window.location.href);
+        url.searchParams.set('workspace', id);
+        window.history.replaceState({}, '', url);
+        
+        // Load the workspace content
+        await loadFileTree();
+        await generateAllPreviews();
+      } catch (error) {
+        console.error('Error opening workspace:', error);
+        showAlert(`Failed to open workspace: ${error.message}`, 'Error');
+        
+        // Reset workspace data
+        workspaceId.value = '';
+        localStorage.removeItem('workspaceId');
+      } finally {
+        hideLoading();
+      }
+    };
+
     // Copy current workspace URL to clipboard for sharing
     const copyWorkspaceUrl = () => {
       const url = new URL(window.location.href);
@@ -371,47 +517,51 @@ export default {
         });
     };
 
-    // Close and delete the workspace
+    // Close the workspace
     const closeWorkspace = async () => {
-      const confirmed = await showConfirm(
-        'Are you sure you want to close this workspace? All changes will be lost if the changes were not proposed yet.',
-        'Close Workspace',
-        'Close'
-      );
+      workspaceId.value = '';
+      localStorage.removeItem('workspaceId');
+      currentFile.value = '';
+      fileContent.value = '';
+      files.value = [];
+      previewFiles.value = [];
+      selectedPreview.value = '';
+      previewContent.value = '';
       
-      if (!confirmed) {
-        return;
-      }
+      // Remove workspace ID from URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('workspace');
+      window.history.replaceState({}, '', url);
       
+      // Return to the workspaces selection view
+      await loadUserWorkspaces(); // Refresh the list of workspaces
+    };
+
+    // Delete a workspace
+    const deleteWorkspace = async (id) => {
       try {
-        const response = await api.delete(`/workspace/${workspaceId.value}`, {
-          headers: {
-            'workspace-id': workspaceId.value
-          }
-        });
-        
+        showLoading('Deleting workspace...');
+        const response = await api.delete(`/workspace/${id}`);
         const data = response.data;
-        
+
         if (data.success) {
-          workspaceId.value = '';
-          localStorage.removeItem('workspaceId');
-          currentFile.value = '';
-          fileContent.value = '';
-          files.value = [];
-          previewFiles.value = [];
-          selectedPreview.value = '';
-          previewContent.value = '';
-          
-          // Remove workspace ID from URL
-          const url = new URL(window.location.href);
-          url.searchParams.delete('workspace');
-          window.history.replaceState({}, '', url);
+          userWorkspaces.value = userWorkspaces.value.filter(ws => ws.id !== id);
+          showAlert('Workspace deleted successfully!', 'Success');
         } else {
-          showAlert(`Failed to close workspace: ${data.message}`, 'Error');
+          showAlert(`Failed to delete workspace: ${data.message}`, 'Error');
         }
       } catch (error) {
-        console.error('Error closing workspace:', error);
-        showAlert('Failed to close workspace. Check console for details.', 'Error');
+        console.error('Error deleting workspace:', error);
+        showAlert('Failed to delete workspace. Check console for details.', 'Error');
+      } finally {
+        hideLoading();
+      }
+    };
+
+    const confirmDeleteWorkspace = async (id, title) => {
+      const confirmed = await showConfirm(`Are you sure you want to delete the workspace "${title}"?`, 'Confirm Deletion');
+      if (confirmed) {
+        await deleteWorkspace(id);
       }
     };
 
@@ -490,6 +640,18 @@ export default {
         if (data.success) {
           // Clear the changedFiles cache to ensure fresh data on next load
           changedFiles.value = {};
+          
+          // Explicitly fetch latest file status information
+          const statusResponse = await api.get('/file/list', {
+            headers: {
+              'workspace-id': workspaceId.value
+            }
+          });
+          
+          if (statusResponse.data.success) {
+            files.value = statusResponse.data.files;
+            changedFiles.value = statusResponse.data.changedFiles || {};
+          }
           
           // Reload the entire file tree to update file statuses
           await loadFileTree();
@@ -747,6 +909,28 @@ export default {
       }
     };
 
+    const switchWorkspace = async () => {
+      const selectedWorkspace = userWorkspaces.value.find(workspace => workspace.id === workspaceId.value);
+      if (selectedWorkspace) {
+        currentWorkspace.value = selectedWorkspace;
+        await loadFileTree();
+        await generateAllPreviews();
+      }
+    };
+
+    const formatDate = (dateString) => {
+      const date = new Date(dateString);
+      return date.toLocaleDateString();
+    };
+
+    const handleWorkspaceCreated = async (workspace) => {
+      workspaceId.value = workspace.id;
+      localStorage.setItem('workspaceId', workspace.id);
+      currentWorkspace.value = workspace;
+      await loadFileTree();
+      await generateAllPreviews();
+    };
+
     onMounted(async () => {
       // First check if user is authenticated
       await checkAuth();
@@ -771,9 +955,17 @@ export default {
       // Workspace state
       workspaceId,
       isCreatingWorkspace,
+      isCreatingInitialWorkspace,
+      userWorkspaces,
+      currentWorkspace,
       createWorkspace,
+      createInitialWorkspace,
       closeWorkspace,
       copyWorkspaceUrl,
+      switchWorkspace,
+      openWorkspace,
+      formatDate,
+      confirmDeleteWorkspace,
       
       // File tree
       files,
@@ -816,12 +1008,15 @@ export default {
       alertModal,
       confirmModal,
       proposeChangesModal,
+      createWorkspaceModal,
       modalTitle,
       modalMessage,
       modalConfirmText,
       showAlert,
       showConfirm,
-      proposeChanges
+      showCreateWorkspaceModal,
+      proposeChanges,
+      handleWorkspaceCreated
     };
   }
 };
@@ -892,6 +1087,84 @@ body {
   margin-bottom: 2rem;
 }
 
+/* Workspace manager */
+.workspace-manager {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.workspace-list {
+  width: 100%;
+  max-width: 800px;
+}
+
+.workspace-items {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.workspace-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+}
+
+.workspace-info h3 {
+  margin: 0;
+}
+
+.workspace-info p {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.workspace-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.workspace-create-new {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.create-workspace-btn {
+  padding: 0.5rem 1rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.create-workspace-btn:hover {
+  background-color: #0069d9;
+}
+
+.create-workspace-btn:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+/* Loading initial workspace */
+.loading-initial-workspace {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 1rem;
+}
+
 /* Main editor layout */
 .editor-layout {
   display: flex;
@@ -906,6 +1179,23 @@ body {
   padding: 0.5rem 1rem;
   background-color: #f4f4f4;
   border-bottom: 1px solid #ddd;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.workspace-selector select {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+.workspace-title {
+  font-size: 1rem;
+  font-weight: bold;
 }
 
 .actions {
@@ -1171,6 +1461,14 @@ button.propose {
 
 button.propose:hover {
   background-color: #218838;
+}
+
+button.danger-button {
+  background-color: #dc3545;
+}
+
+button.danger-button:hover {
+  background-color: #c82333;
 }
 
 .small-button {

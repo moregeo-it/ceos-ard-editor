@@ -8,47 +8,227 @@ const { exec } = require('child_process');
 const util = require('util');
 const execAsync = util.promisify(exec);
 const axios = require('axios');
+const Datastore = require('@seald-io/nedb');
 
 // GitHub API configuration
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-if (!GITHUB_TOKEN) {
-  console.warn('Warning: GITHUB_TOKEN is not set. Push operations may fail if authentication is required.');
-}
-const DEFAULT_REPO_OWNER = process.env.GITHUB_REPO_OWNER || 'm-mohr'; // todo: change to ceos-org
+const DEFAULT_REPO_OWNER = process.env.GITHUB_REPO_OWNER || 'ceos-org';
 const DEFAULT_REPO_NAME = process.env.GITHUB_REPO_NAME || 'ceos-ard';
 
 // Base directory for workspaces
 const WORKSPACES_DIR = path.join(__dirname, '../../workspaces');
+const DB_DIR = path.join(__dirname, '../../database');
 const REPO_URL = `https://github.com/${DEFAULT_REPO_OWNER}/${DEFAULT_REPO_NAME}`;
+
+// Ensure the database directory exists
+fs.ensureDirSync(DB_DIR);
+
+// Set up the workspaces database
+const workspacesDB = new Datastore({
+  filename: path.join(DB_DIR, 'workspaces.db'),
+  autoload: true
+});
+
+// Create indexes to improve query performance
+workspacesDB.ensureIndex({ fieldName: 'id', unique: true });
+workspacesDB.ensureIndex({ fieldName: 'userId' });
 
 // Make sure all paths use forward slashes
 function normalizePath(filePath) {
   return filePath.replace(/\\/g, '/');
 }
 
+// Get all workspaces for the current user
+router.get('/', async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required'
+    });
+  }
+
+  try {
+    const userWorkspaces = await new Promise((resolve, reject) => {
+      workspacesDB.find({ userId: req.user.id }, (err, workspaces) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(workspaces);
+        }
+      });
+    });
+    
+    return res.status(200).json({
+      success: true,
+      workspaces: userWorkspaces
+    });
+  } catch (error) {
+    console.error('Error fetching workspaces:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch workspaces',
+      error: error.message
+    });
+  }
+});
+
 // Create a new workspace
 router.post('/create', async (req, res) => {
   try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    const { title = 'Untitled Workspace' } = req.body;
+    const userId = req.user.id;
+    const username = req.user.username;
+    const accessToken = req.session.githubToken;
+
+    if (!accessToken) {
+      return res.status(401).json({
+        success: false,
+        message: 'GitHub access token not found in session. Please log in again.'
+      });
+    }
+
     // Generate unique workspace ID
     const workspaceId = uuidv4();
     const workspacePath = path.join(WORKSPACES_DIR, workspaceId);
     
     // Create workspace directory
     await fs.ensureDir(workspacePath);
+
+    // Check if user already has a fork of the repository
+    let userRepoUrl;
+    let branchName = `edits/${uuidv4()}`;
+
+    try {
+      // Check if fork already exists
+      const checkForkResponse = await axios.get(
+        `https://api.github.com/repos/${username}/${DEFAULT_REPO_NAME}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/vnd.github.v3+json'
+          },
+          validateStatus: (status) => status < 500 // Accept 404 as valid response
+        }
+      );
+
+      if (checkForkResponse.status === 200) {
+        // Fork exists, use it
+        console.log(`Fork already exists for user ${username}`);
+        userRepoUrl = `https://oauth2:${accessToken}@github.com/${username}/${DEFAULT_REPO_NAME}.git`;
+      } else if (checkForkResponse.status === 404) {
+        // Fork doesn't exist, create it
+        console.log(`Creating new fork for user ${username}`);
+        const forkResponse = await axios.post(
+          `https://api.github.com/repos/${DEFAULT_REPO_OWNER}/${DEFAULT_REPO_NAME}/forks`,
+          {},
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/vnd.github.v3+json'
+            }
+          }
+        );
+        
+        if (forkResponse.status === 202) {
+          userRepoUrl = `https://oauth2:${accessToken}@github.com/${username}/${DEFAULT_REPO_NAME}.git`;
+          // Wait a few seconds for GitHub to complete the fork
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        } else {
+          throw new Error(`Failed to fork repository: ${forkResponse.statusText}`);
+        }
+      }
+    } catch (forkError) {
+      console.error('Error checking/creating fork:', forkError);
+      // Fall back to the default repository if fork creation fails
+      userRepoUrl = REPO_URL;
+    }
+    
+    // Create a temporary credentials helper script for Git authentication
+    const tmpDir = path.join(WORKSPACES_DIR, '.tmp');
+    await fs.ensureDir(tmpDir);
+    const credentialHelperPath = path.join(tmpDir, `cred-helper-${workspaceId}.js`);
+    const credentialHelperContent = `
+#!/usr/bin/env node
+console.log('username=oauth2');
+console.log('password=${accessToken}');
+process.exit(0);
+    `.trim();
+    
+    await fs.writeFile(credentialHelperPath, credentialHelperContent);
+    await fs.chmod(credentialHelperPath, '755'); // Make executable
+    
+    // Configure git to use the credential helper
+    const git = simpleGit();
+    await git.env('GIT_TERMINAL_PROMPT', '0'); // Disable interactive prompt
+    await git.addConfig('credential.helper', `"${credentialHelperPath.replace(/\\/g, '/')}"`, false);
     
     // Clone repository into workspace
-    const git = simpleGit();
-    await git.clone(REPO_URL, workspacePath);
+    await git.clone(userRepoUrl, workspacePath);
     
-    // Set up git config in the workspace to avoid warnings
+    // Set up git config in the workspace
     const workspaceGit = simpleGit(workspacePath);
-    await workspaceGit.addConfig('user.name', 'CEOS-ARD Editor User');
-    await workspaceGit.addConfig('user.email', 'ceos-ard-editor@example.com');
+    await workspaceGit.addConfig('user.name', req.user.displayName || req.user.username);
+    await workspaceGit.addConfig('user.email', req.user.emails?.[0]?.value || `${req.user.username}@users.noreply.github.com`);
+    await workspaceGit.addConfig('credential.helper', `"${credentialHelperPath.replace(/\\/g, '/')}"`, false);
     
-    // Return workspace ID as token
+    // Create and checkout a new branch that's synced with upstream main
+    try {
+      // Add upstream remote if we're using a fork
+      if (userRepoUrl !== REPO_URL) {
+        await workspaceGit.addRemote('upstream', REPO_URL);
+        
+        // Fetch from upstream
+        await workspaceGit.fetch('upstream', 'main');
+        
+        // Create new branch from upstream/main
+        await workspaceGit.checkout(['-b', branchName, 'upstream/main']);
+      } else {
+        // If we're not using a fork, just create a branch from the local main
+        await workspaceGit.checkout(['-b', branchName]);
+      }
+    } catch (branchError) {
+      console.error('Error setting up branch:', branchError);
+    }
+    
+    // Clean up credential helper file after clone is complete
+    try {
+      await fs.remove(credentialHelperPath);
+    } catch (cleanupError) {
+      console.warn('Warning: Unable to remove credential helper file:', cleanupError);
+    }
+
+    // Create workspace metadata
+    const workspace = {
+      id: workspaceId,
+      title,
+      userId,
+      username,
+      createdAt: new Date().toISOString(),
+      branchName,
+      repoUrl: userRepoUrl.replace(/https:\/\/oauth2:.*?@github\.com/, 'https://github.com') // Remove token from URL
+    };
+    
+    // Save workspace to database
+    await new Promise((resolve, reject) => {
+      workspacesDB.insert(workspace, (err, newWorkspace) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(newWorkspace);
+        }
+      });
+    });
+    
+    // Return workspace data
     return res.status(201).json({
       success: true,
-      workspaceId,
+      workspace,
       message: 'Workspace created successfully'
     });
   } catch (error) {
@@ -61,15 +241,95 @@ router.post('/create', async (req, res) => {
   }
 });
 
+// Get workspace details
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+    
+    // Find workspace in the database
+    const workspace = await new Promise((resolve, reject) => {
+      workspacesDB.findOne({ id, userId: req.user.id }, (err, workspace) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(workspace);
+        }
+      });
+    });
+    
+    if (!workspace) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workspace not found or not authorized'
+      });
+    }
+    
+    const workspacePath = path.join(WORKSPACES_DIR, id);
+    
+    // Check if workspace directory exists
+    if (!await fs.pathExists(workspacePath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workspace directory not found'
+      });
+    }
+    
+    return res.status(200).json({
+      success: true,
+      workspace
+    });
+  } catch (error) {
+    console.error('Error getting workspace:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get workspace',
+      error: error.message
+    });
+  }
+});
+
 // Close/delete a workspace
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+    
+    // Find and remove workspace from the database
+    const numRemoved = await new Promise((resolve, reject) => {
+      workspacesDB.remove({ id, userId: req.user.id }, {}, (err, numRemoved) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(numRemoved);
+        }
+      });
+    });
+    
+    if (numRemoved === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workspace not found or not authorized'
+      });
+    }
+    
     const workspacePath = path.join(WORKSPACES_DIR, id);
     
     // Check if workspace exists
     if (await fs.pathExists(workspacePath)) {
-    // Remove workspace directory
+      // Remove workspace directory
       await fs.remove(workspacePath);
     }
     
@@ -87,10 +347,104 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// Update workspace title
+router.patch('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title } = req.body;
+    
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+    
+    // Find and update workspace in the database
+    if (!title) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title is required for update'
+      });
+    }
+    
+    const numUpdated = await new Promise((resolve, reject) => {
+      workspacesDB.update(
+        { id, userId: req.user.id }, 
+        { $set: { title } },
+        {},
+        (err, numUpdated) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(numUpdated);
+          }
+        }
+      );
+    });
+    
+    if (numUpdated === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workspace not found or not authorized'
+      });
+    }
+    
+    // Get the updated workspace
+    const workspace = await new Promise((resolve, reject) => {
+      workspacesDB.findOne({ id, userId: req.user.id }, (err, workspace) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(workspace);
+        }
+      });
+    });
+    
+    return res.status(200).json({
+      success: true,
+      workspace,
+      message: 'Workspace updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating workspace:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update workspace',
+      error: error.message
+    });
+  }
+});
+
 // Get workspace status (git status)
 router.get('/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
+    
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+    
+    const workspace = await new Promise((resolve, reject) => {
+      workspacesDB.findOne({ id, userId: req.user.id }, (err, workspace) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(workspace);
+        }
+      });
+    });
+    
+    if (!workspace) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workspace not found or not authorized'
+      });
+    }
+    
     const workspacePath = path.join(WORKSPACES_DIR, id);
     
     // Check if workspace exists
@@ -161,7 +515,8 @@ router.get('/:id/status', async (req, res) => {
     
     return res.status(200).json({
       success: true,
-      files
+      files,
+      branchName: workspace.branchName
     });
   } catch (error) {
     console.error('Error getting workspace status:', error);
@@ -173,16 +528,33 @@ router.get('/:id/status', async (req, res) => {
   }
 });
 
-// POST /api/workspace/propose - Create a new branch, commit changes, and create a PR
-router.post('/propose', async (req, res) => {
+// POST /api/workspace/:id/propose - Commit changes and create a PR
+router.post('/:id/propose', async (req, res) => {
   try {
-    const workspaceId = req.headers['workspace-id'];
+    const { id } = req.params;
     const { title, description } = req.body;
 
-    if (!workspaceId) {
-      return res.status(400).json({
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({
         success: false,
-        message: 'Workspace ID is required'
+        message: 'Authentication required'
+      });
+    }
+    
+    const workspace = await new Promise((resolve, reject) => {
+      workspacesDB.findOne({ id, userId: req.user.id }, (err, workspace) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(workspace);
+        }
+      });
+    });
+    
+    if (!workspace) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workspace not found or not authorized'
       });
     }
 
@@ -193,142 +565,115 @@ router.post('/propose', async (req, res) => {
       });
     }
 
-    const workspacePath = path.join(WORKSPACES_DIR, workspaceId);
+    const workspacePath = path.join(WORKSPACES_DIR, id);
     
     if (!fs.existsSync(workspacePath)) {
       return res.status(404).json({
         success: false,
-        message: 'Workspace not found'
+        message: 'Workspace directory not found'
       });
     }
 
-    // Ensure we're in a git repository
+    const accessToken = req.session.githubToken;
+    if (!accessToken) {
+      return res.status(401).json({
+        success: false,
+        message: 'GitHub access token not found in session. Please log in again.'
+      });
+    }
+
     try {
-      await execAsync('git rev-parse --is-inside-work-tree', { cwd: workspacePath });
-    } catch (error) {
-      try {
-        // Initialize git if not already a repo
-        await execAsync('git init', { cwd: workspacePath });
-        // Configure git user for this repository
-        await execAsync('git config user.name "CEOS ARD Editor"', { cwd: workspacePath });
-        await execAsync('git config user.email "ceos-ard-editor@example.com"', { cwd: workspacePath });
-      } catch (initError) {
-        return res.status(500).json({
+      // Use simpleGit for all git operations to ensure consistency
+      const git = simpleGit(workspacePath);
+      
+      // Check git status
+      const status = await git.status();
+      if (!status.files.length) {
+        return res.status(400).json({
           success: false,
-          message: `Failed to initialize git repository: ${initError.message}`
+          message: 'No changes to propose'
         });
       }
-    }
-
-    // Check if there are any changes to commit
-    const { stdout: statusOutput } = await execAsync('git status --porcelain', { cwd: workspacePath });
-    if (!statusOutput.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'No changes to propose'
-      });
-    }
-
-    // Generate UUID for branch name
-    const branchUuid = uuidv4();
-    const finalBranchName = `proposal/${branchUuid}`;
-
-    try {
-      // Create and checkout a new branch
-      await execAsync(`git checkout -b ${finalBranchName}`, { cwd: workspacePath });
 
       // Add all files
-      await execAsync('git add .', { cwd: workspacePath });
+      await git.add('.');
 
       // Commit changes
-      await execAsync(`git commit -m "${title.replace(/"/g, '\\"')}"`, { cwd: workspacePath });
+      await git.commit(title);
       
-      // Check if the repository has a remote named "origin"
-      let remoteExistsResponse;
+      // Get current branch name if not already stored
+      const branchName = workspace.branchName || (await git.branch()).current;
+      
+      // Set up git credentials for push
+      // Configure a custom credential helper to avoid prompt
+      const credentialHelperPath = path.join(workspacePath, '.git-credentials-helper.js');
+      const credentialHelperContent = `
+#!/usr/bin/env node
+console.log('username=oauth2');
+console.log('password=${accessToken}');
+process.exit(0);
+      `.trim();
+      
+      await fs.writeFile(credentialHelperPath, credentialHelperContent);
+      await fs.chmod(credentialHelperPath, '755'); // Make executable
+      
+      // Set git configurations for the repository
+      await git.addConfig('credential.helper', `"${credentialHelperPath.replace(/\\/g, '/')}"`, false, 'local');
+      
+      // Add remote URL with token in case it wasn't set properly before
+      const remoteUrl = `https://oauth2:${accessToken}@github.com/${workspace.username}/${DEFAULT_REPO_NAME}.git`;
       try {
-        remoteExistsResponse = await execAsync('git remote get-url origin', { cwd: workspacePath });
+        // Try to update existing remote first
+        await git.remote(['set-url', 'origin', remoteUrl]);
       } catch (remoteError) {
-        // If no remote exists, check if we have a GitHub repository URL in environment
-        const githubRepoUrl = process.env.GITHUB_REPO_URL || `https://github.com/${DEFAULT_REPO_OWNER}/${DEFAULT_REPO_NAME}.git`;
-        try {
-          await execAsync(`git remote add origin ${githubRepoUrl}`, { cwd: workspacePath });
-          console.log(`Added remote origin: ${githubRepoUrl}`);
-        } catch (addRemoteError) {
-          return res.status(500).json({
-            success: false,
-            message: `Failed to add remote repository: ${addRemoteError.message}`
-          });
-        }
+        // If remote doesn't exist, add it
+        await git.remote(['add', 'origin', remoteUrl]);
       }
-
-      // Push to remote repository
-      let pushResult;
+      
+      // Push to remote
       try {
-        // Check if GitHub token is available
-        if (GITHUB_TOKEN) {
-          // Use token for authentication
-          const remoteUrl = (await execAsync('git remote get-url origin', { cwd: workspacePath })).stdout.trim();
-          const tokenizedUrl = remoteUrl.replace('https://', `https://${GITHUB_TOKEN}@`);
-          pushResult = await execAsync(`git push -u ${tokenizedUrl} ${finalBranchName}`, { 
-            cwd: workspacePath,
-            // Hide token from logs
-            stdio: ['ignore', 'pipe', 'pipe']
-          });
-        } else {
-          // Try without token (might work if SSH is set up or for public repos)
-          pushResult = await execAsync(`git push -u origin ${finalBranchName}`, { cwd: workspacePath });
-        }
+        await git.push(['--set-upstream', 'origin', branchName]);
         console.log('Successfully pushed to remote');
       } catch (pushError) {
+        console.error('Push error details:', pushError);
+        
+        // Clean up credential helper file
+        await fs.remove(credentialHelperPath);
+        
         return res.status(500).json({
           success: false,
           message: `Failed to push to remote repository: ${pushError.message}`
         });
       }
 
+      // Clean up credential helper file
+      await fs.remove(credentialHelperPath);
+
       // Create pull request using GitHub API
       let pullRequestUrl = '';
       try {
-        if (GITHUB_TOKEN) {
-          // Extract repository owner and name from the remote URL
-          let remoteUrl = (await execAsync('git remote get-url origin', { cwd: workspacePath })).stdout.trim();
-          
-          // Parse repo owner and name from URL
-          let repoOwner, repoName;
-          if (remoteUrl.includes('github.com')) {
-            const match = remoteUrl.match(/github\.com[:/]([^/]+)\/([^/.]+)(?:\.git)?$/);
-            if (match) {
-              repoOwner = match[1];
-              repoName = match[2];
-            } else {
-              repoOwner = DEFAULT_REPO_OWNER;
-              repoName = DEFAULT_REPO_NAME;
+        // Extract repository owner and name
+        const username = workspace.username;
+        const repoName = DEFAULT_REPO_NAME;
+        
+        // Create the pull request to the upstream repo
+        const response = await axios.post(
+          `https://api.github.com/repos/${DEFAULT_REPO_OWNER}/${DEFAULT_REPO_NAME}/pulls`,
+          {
+            title: title,
+            body: description || '',
+            head: `${username}:${branchName}`,
+            base: 'main'  // Target branch in upstream repo
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/vnd.github.v3+json'
             }
-          } else {
-            repoOwner = DEFAULT_REPO_OWNER;
-            repoName = DEFAULT_REPO_NAME;
           }
-
-          // Create the pull request
-          const response = await axios.post(
-            `https://api.github.com/repos/${repoOwner}/${repoName}/pulls`,
-            {
-              title: title,
-              body: description,
-              head: finalBranchName,
-              base: 'main'  // Target branch, usually main or master
-            },
-            {
-              headers: {
-                'Authorization': `token ${GITHUB_TOKEN}`,
-                'Accept': 'application/vnd.github.v3+json'
-              }
-            }
-          );
-          
-          pullRequestUrl = response.data.html_url;
-          console.log(`Created pull request: ${pullRequestUrl}`);
-        }
+        );
+        
+        pullRequestUrl = response.data.html_url;
       } catch (prError) {
         console.error('Failed to create pull request:', prError);
         // Continue without failing - we'll still return success for the push
@@ -339,7 +684,7 @@ router.post('/propose', async (req, res) => {
         return res.json({
           success: true,
           message: 'Changes proposed and pull request created successfully',
-          branchName: finalBranchName,
+          branchName: workspace.branchName,
           pullRequestUrl: pullRequestUrl,
           automaticPr: true
         });
@@ -347,12 +692,13 @@ router.post('/propose', async (req, res) => {
         return res.json({
           success: true,
           message: 'Changes proposed successfully',
-          branchName: finalBranchName,
+          branchName: workspace.branchName,
           automaticPr: false,
           instructions: 'Your changes have been pushed to the remote repository. To complete the process, please create a pull request manually from your Git hosting service.'
         });
       }
     } catch (gitError) {
+      console.error('Git operation failed:', gitError);
       return res.status(500).json({
         success: false, 
         message: `Git operation failed: ${gitError.message}`
