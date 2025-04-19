@@ -121,10 +121,10 @@
 
 <script>
 import Modal from './Modal.vue';
-import { ref, nextTick, onMounted } from 'vue';
-import { API_URL } from '../config.js';
+import { ref, nextTick } from 'vue';
 import { html, parse } from 'diff2html';
 import 'diff2html/bundles/css/diff2html.min.css';
+import api from '../services/auth.js';
 
 export default {
   name: 'ProposeChangesModal',
@@ -196,14 +196,14 @@ export default {
           throw new Error('No workspace ID found');
         }
         
-        // Get git status
-        const response = await fetch(`${API_URL}/workspace/${workspaceId}/status`, {
+        // Get git status using authenticated API
+        const response = await api.get(`/workspace/${workspaceId}/status`, {
           headers: {
             'workspace-id': workspaceId
           }
         });
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success && data.files) {
           // Check if there are any changes
@@ -250,16 +250,19 @@ export default {
             return;
           }
           
-          // For modified files, fetch the diff
+          // For modified files, fetch the diff using authenticated API
           try {
             const workspaceId = localStorage.getItem('workspaceId');
-            const response = await fetch(`${API_URL}/file/diff?filePath=${encodeURIComponent(filePath)}`, {
+            const response = await api.get(`/file/diff`, {
+              params: {
+                filePath: filePath
+              },
               headers: {
                 'workspace-id': workspaceId
               }
             });
             
-            const data = await response.json();
+            const data = response.data;
             
             if (data.success && data.diff) {
               // Format diff using diff2html
@@ -334,19 +337,18 @@ export default {
           throw new Error('No workspace ID found');
         }
         
-        const response = await fetch(`${API_URL}/workspace/propose`, {
-          method: 'POST',
+        // Use authenticated API for proposal submission
+        const response = await api.post(`/workspace/propose`, {
+          title: proposeChangesTitle.value,
+          description: proposeChangesDescription.value
+        }, {
           headers: {
             'Content-Type': 'application/json',
             'workspace-id': workspaceId
-          },
-          body: JSON.stringify({
-            title: proposeChangesTitle.value,
-            description: proposeChangesDescription.value
-          })
+          }
         });
 
-        const data = await response.json();
+        const data = response.data;
 
         if (data.success) {
           currentStep.value = 3;
@@ -367,7 +369,7 @@ export default {
         currentStep.value = 3;
         proposalSubmitted.value = true;
         proposalSuccess.value = false;
-        proposalErrorMessage.value = 'Failed to submit proposal. Check console for details.';
+        proposalErrorMessage.value = error.response?.data?.message || 'Failed to submit proposal. Check console for details.';
       } finally {
         emit('done');
       }

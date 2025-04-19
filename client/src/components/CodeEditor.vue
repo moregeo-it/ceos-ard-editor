@@ -27,7 +27,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { markdown } from '@codemirror/lang-markdown';
 import { yaml } from '@codemirror/lang-yaml';
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
-import { API_URL } from '../config.js';
+import api from '../services/auth.js';
 
 export default {
   name: 'CodeEditor',
@@ -106,16 +106,16 @@ export default {
         const workspaceId = localStorage.getItem('workspaceId');
         if (!workspaceId) return;
         
-        const response = await fetch(
-          `${API_URL}/file/pfs-references?requirementPath=${encodeURIComponent(props.filename)}`,
-          {
-            headers: {
-              'workspace-id': workspaceId
-            }
+        const response = await api.get(`/file/pfs-references`, {
+          params: {
+            requirementPath: props.filename
+          },
+          headers: {
+            'workspace-id': workspaceId
           }
-        );
+        });
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           pfsReferences.value = data.pfsDocuments || [];

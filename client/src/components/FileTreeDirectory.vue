@@ -241,6 +241,7 @@
 <script>
 import { ref, computed, inject, onMounted, nextTick, watch } from 'vue';
 import { API_URL } from '../config.js';
+import api from '../services/auth.js';
 
 export default {
   name: 'FileTreeDirectory',
@@ -323,13 +324,13 @@ export default {
           return;
         }
         
-        const response = await fetch(`${API_URL}/file/list?dir=${encodeURIComponent(props.path)}`, {
+        const response = await api.get(`/file/list?dir=${encodeURIComponent(props.path)}`, {
           headers: {
             'workspace-id': workspaceId
           }
         });
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           files.value = data.files;
@@ -435,18 +436,16 @@ export default {
         showLoading('Reverting file changes...');
         const workspaceId = localStorage.getItem('workspaceId');
         
-        const response = await fetch(`${API_URL}/file/revert`, {
-          method: 'POST',
+        const response = await api.post('/file/revert', {
+          filePath: selectedFile.value.path
+        }, {
           headers: {
             'Content-Type': 'application/json',
             'workspace-id': workspaceId
-          },
-          body: JSON.stringify({
-            filePath: selectedFile.value.path
-          })
+          }
         });
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           // Refresh the file tree to reflect the reverted changes
@@ -519,19 +518,17 @@ export default {
           fullPath = `${props.path}/${newFilePath.value}`;
         }
         
-        const response = await fetch(`${API_URL}/file/save`, {
-          method: 'POST',
+        const response = await api.post('/file/save', {
+          filePath: fullPath,
+          content: ''
+        }, {
           headers: {
             'Content-Type': 'application/json',
             'workspace-id': workspaceId
-          },
-          body: JSON.stringify({
-            filePath: fullPath,
-            content: ''
-          })
+          }
         });
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           showNewFileDialog.value = false;
@@ -592,19 +589,17 @@ export default {
         reader.onload = async (e) => {
           const content = e.target.result;
           
-          const response = await fetch(`${API_URL}/file/upload`, {
-            method: 'POST',
+          const response = await api.post('/file/upload', {
+            path: uploadPath.value,
+            content
+          }, {
             headers: {
               'Content-Type': 'application/json',
               'workspace-id': workspaceId
-            },
-            body: JSON.stringify({
-              path: uploadPath.value,
-              content
-            })
+            }
           });
           
-          const data = await response.json();
+          const data = response.data;
           if (data.success) {
             showUploadDialog.value = false;
             refreshDirectory();
@@ -660,19 +655,17 @@ export default {
           ? `${pathParts.join('/')}/${newFileName.value}`
           : newFileName.value;
         
-        const response = await fetch(`${API_URL}/file/rename`, {
-          method: 'POST',
+        const response = await api.post('/file/rename', {
+          oldPath,
+          newPath
+        }, {
           headers: {
             'Content-Type': 'application/json',
             'workspace-id': workspaceId
-          },
-          body: JSON.stringify({
-            oldPath,
-            newPath
-          })
+          }
         });
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           // If the renamed file is currently open, update the current file path
@@ -714,18 +707,16 @@ export default {
         showLoading('Deleting file...');
         const workspaceId = localStorage.getItem('workspaceId');
         
-        const response = await fetch(`${API_URL}/file/delete`, {
-          method: 'POST',
+        const response = await api.post('/file/delete', {
+          filePath: selectedFile.value.path
+        }, {
           headers: {
             'Content-Type': 'application/json',
             'workspace-id': workspaceId
-          },
-          body: JSON.stringify({
-            filePath: selectedFile.value.path
-          })
+          }
         });
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           // If the deleted file is currently open, close it
@@ -784,19 +775,17 @@ export default {
           destPath += selectedFile.value.name;
         }
         
-        const response = await fetch(`${API_URL}/file/move`, {
-          method: 'POST',
+        const response = await api.post('/file/move', {
+          sourcePath,
+          destPath
+        }, {
           headers: {
             'Content-Type': 'application/json',
             'workspace-id': workspaceId
-          },
-          body: JSON.stringify({
-            sourcePath,
-            destPath
-          })
+          }
         });
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           // If the moved file is currently open, update the current file path
@@ -854,19 +843,17 @@ export default {
           destPath += selectedFile.value.name;
         }
         
-        const response = await fetch(`${API_URL}/file/copy`, {
-          method: 'POST',
+        const response = await api.post('/file/copy', {
+          sourcePath,
+          destPath
+        }, {
           headers: {
             'Content-Type': 'application/json',
             'workspace-id': workspaceId
-          },
-          body: JSON.stringify({
-            sourcePath,
-            destPath
-          })
+          }
         });
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           // Copy successful, refresh file tree and changed files list
@@ -910,8 +897,8 @@ export default {
           return;
         }
         
-        const response = await fetch(
-          `${API_URL}/file/search?query=${encodeURIComponent(searchQuery.value)}`, 
+        const response = await api.get(
+          `/file/search?query=${encodeURIComponent(searchQuery.value)}`, 
           {
             headers: {
               'workspace-id': workspaceId
@@ -919,7 +906,7 @@ export default {
           }
         );
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           searchResults.value.results = data.results;

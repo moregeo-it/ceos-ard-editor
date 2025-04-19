@@ -1,115 +1,132 @@
 <template>
   <div class="app-container">
-    <!-- Loading overlay for async operations (moved to bottom right corner) -->
-    <div v-if="isLoading" class="loading-notification">
+    <!-- Loading state while checking authentication -->
+    <div v-if="isAuthLoading" class="auth-loading">
       <div class="loading-spinner"></div>
-      <div class="loading-text">{{ loadingMessage }}</div>
+      <div class="loading-text">Checking authentication...</div>
     </div>
+    
+    <!-- Show login page if user is not authenticated and not still loading -->
+    <login-page v-else-if="!isAuthenticated" />
 
-    <!-- Modal components -->
-    <alert-modal ref="alertModal" :title="modalTitle" :message="modalMessage" />
-    <confirm-modal ref="confirmModal" :title="modalTitle" :message="modalMessage" :confirm-text="modalConfirmText" />
-    <propose-changes-modal ref="proposeChangesModal" @loading="showLoading" @done="hideLoading" />
-
-    <!-- Workspace creation/management -->
-    <div class="workspace-controls" v-if="!workspaceId">
-      <h1>CEOS-ARD Editor</h1>
-      <button @click="createWorkspace" :disabled="isCreatingWorkspace">
-        {{ isCreatingWorkspace ? 'Creating workspace...' : 'Create New Workspace' }}
-      </button>
-    </div>
-
-    <!-- Main editor layout -->
-    <div class="editor-layout" v-else>
-      <!-- Top toolbar -->
-      <div class="toolbar">
-        <h2>CEOS-ARD Editor</h2>
-        <div class="actions">
-          <button @click="copyWorkspaceUrl" class="copy-url">Copy URL</button>
-          <button @click="proposeChanges" class="propose">Propose Changes</button>
-          <button @click="closeWorkspace" class="danger">Close Workspace</button>
-        </div>
+    <!-- Only show editor UI if authenticated -->
+    <template v-else>
+      <!-- Loading overlay for async operations -->
+      <div v-if="isLoading" class="loading-notification">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">{{ loadingMessage }}</div>
       </div>
 
-      <!-- Three-column layout -->
-      <div class="columns-container">
-        <!-- Left column: File tree -->
-        <div class="column file-tree" :style="{ 'flex-basis': panelWidth[0] + '%' }">
-          <div class="file-tree-header">
-            <h3>Files</h3>
+      <!-- Modal components -->
+      <alert-modal ref="alertModal" :title="modalTitle" :message="modalMessage" />
+      <confirm-modal ref="confirmModal" :title="modalTitle" :message="modalMessage" :confirm-text="modalConfirmText" />
+      <propose-changes-modal ref="proposeChangesModal" @loading="showLoading" @done="hideLoading" />
+
+      <!-- Workspace creation/management -->
+      <div class="workspace-controls" v-if="!workspaceId">
+        <h1>CEOS-ARD Editor</h1>
+        <button @click="createWorkspace" :disabled="isCreatingWorkspace">
+          {{ isCreatingWorkspace ? 'Creating workspace...' : 'Create New Workspace' }}
+        </button>
+      </div>
+
+      <!-- Main editor layout -->
+      <div class="editor-layout" v-else>
+        <!-- Top toolbar -->
+        <div class="toolbar">
+          <h2>CEOS-ARD Editor</h2>
+          <div class="actions">
+            <button @click="copyWorkspaceUrl" class="copy-url">Copy URL</button>
+            <button @click="proposeChanges" class="propose">Propose Changes</button>
+            <button @click="closeWorkspace" class="danger">Close Workspace</button>
           </div>
-          <div class="file-list">
-            <file-tree-directory 
-              path="" 
-              :currentOpenFile="currentFile"
-              @select-file="openFile" 
-              @refresh="loadFileTree" 
-              @update-current-file="handleFilePathUpdate"
-              @file-operation-loading="showLoading"
-              @file-operation-complete="hideLoading"
+          <div class="user-info" v-if="user">
+            <img v-if="user.avatar" :src="user.avatar" alt="User avatar" class="user-avatar" />
+            <span class="username">{{ user.username }}</span>
+            <button @click="logout" class="logout-btn">Logout</button>
+          </div>
+        </div>
+
+        <!-- Three-column layout -->
+        <div class="columns-container">
+          <!-- Left column: File tree -->
+          <div class="column file-tree" :style="{ 'flex-basis': panelWidth[0] + '%' }">
+            <div class="file-tree-header">
+              <h3>Files</h3>
+            </div>
+            <div class="file-list">
+              <file-tree-directory 
+                path="" 
+                :currentOpenFile="currentFile"
+                @select-file="openFile" 
+                @refresh="loadFileTree" 
+                @update-current-file="handleFilePathUpdate"
+                @file-operation-loading="showLoading"
+                @file-operation-complete="hideLoading"
+              />
+            </div>
+          </div>
+          
+          <!-- Resize handle for left panel -->
+          <div 
+            class="resize-handle"
+            @mousedown="(e) => startResize(0, e)"
+          ></div>
+
+          <!-- Middle column: Code editor -->
+          <div class="column code-editor" :style="{ 'flex-basis': panelWidth[1] + '%' }">
+            <code-editor 
+              v-if="currentFile && isFileEditable"
+              v-model="fileContent"
+              :filename="currentFile"
+              @save="saveFile"
+            />
+            <file-viewer 
+              v-else-if="currentFile && !isFileEditable"
+              :filename="currentFile"
+              :content="fileContent"
+            />
+            <div v-else class="no-file-selected">
+              Select a file to edit
+            </div>
+          </div>
+          
+          <!-- Resize handle for middle panel -->
+          <div 
+            class="resize-handle"
+            @mousedown="(e) => startResize(1, e)"
+          ></div>
+
+          <!-- Right column: Preview -->
+          <div class="column preview-pane" :style="{ 'flex-basis': panelWidth[2] + '%' }">
+            <div class="preview-header">
+              <h3>Preview</h3>
+              <div class="preview-selector">
+                <button @click="generateAllPreviews" title="Regenerate all">⟳</button>
+                &nbsp;
+                <select v-if="previewFiles.length > 0" v-model="selectedPreview" @change="loadPreview">
+                  <option v-for="file in previewFiles" :key="file.path" :value="file.name">
+                    {{ file.name.replace('.html', '') }}
+                  </option>
+                </select>
+              </div>
+            </div>
+            <div v-if="!previewFiles.length" class="no-preview">
+              No previews available. Save your changes to generate a preview.
+            </div>
+            <preview-pane 
+              v-if="selectedPreview"
+              :content="previewContent"
+              :selected-preview-name="selectedPreview"
+              :is-resizing="resizeState && resizeState.active"
+              @build-completed="handleBuildCompleted"
+              @open-file="openFile"
+              ref="previewPaneRef"
             />
           </div>
         </div>
-        
-        <!-- Resize handle for left panel -->
-        <div 
-          class="resize-handle"
-          @mousedown="(e) => startResize(0, e)"
-        ></div>
-
-        <!-- Middle column: Code editor -->
-        <div class="column code-editor" :style="{ 'flex-basis': panelWidth[1] + '%' }">
-          <code-editor 
-            v-if="currentFile && isFileEditable"
-            v-model="fileContent"
-            :filename="currentFile"
-            @save="saveFile"
-          />
-          <file-viewer 
-            v-else-if="currentFile && !isFileEditable"
-            :filename="currentFile"
-            :content="fileContent"
-          />
-          <div v-else class="no-file-selected">
-            Select a file to edit
-          </div>
-        </div>
-        
-        <!-- Resize handle for middle panel -->
-        <div 
-          class="resize-handle"
-          @mousedown="(e) => startResize(1, e)"
-        ></div>
-
-        <!-- Right column: Preview -->
-        <div class="column preview-pane" :style="{ 'flex-basis': panelWidth[2] + '%' }">
-          <div class="preview-header">
-            <h3>Preview</h3>
-            <div class="preview-selector">
-              <button @click="generateAllPreviews" title="Regenerate all">⟳</button>
-              &nbsp;
-              <select v-if="previewFiles.length > 0" v-model="selectedPreview" @change="loadPreview">
-                <option v-for="file in previewFiles" :key="file.path" :value="file.name">
-                  {{ file.name.replace('.html', '') }}
-                </option>
-              </select>
-            </div>
-          </div>
-          <div v-if="!previewFiles.length" class="no-preview">
-            No previews available. Save your changes to generate a preview.
-          </div>
-          <preview-pane 
-            v-if="selectedPreview"
-            :content="previewContent"
-            :selected-preview-name="selectedPreview"
-            :is-resizing="resizeState && resizeState.active"
-            @build-completed="handleBuildCompleted"
-            @open-file="openFile"
-            ref="previewPaneRef"
-          />
-        </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -122,7 +139,10 @@ import FileViewer from './components/FileViewer.vue';
 import AlertModal from './components/AlertModal.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
 import ProposeChangesModal from './components/ProposeChangesModal.vue';
+import LoginPage from './components/LoginPage.vue';
 import { API_URL } from './config.js';
+import { AuthService } from './services/auth';
+import api from './services/auth';
 
 export default {
   name: 'App',
@@ -133,9 +153,60 @@ export default {
     FileViewer,
     AlertModal,
     ConfirmModal,
-    ProposeChangesModal
+    ProposeChangesModal,
+    LoginPage
   },
   setup() {
+    // Authentication state
+    const isAuthenticated = ref(false);
+    const user = ref(null);
+    const isAuthLoading = ref(true);
+    
+    // Check authentication status
+    const checkAuth = async () => {
+      isAuthLoading.value = true;
+      const currentUser = await AuthService.getCurrentUser();
+      isAuthenticated.value = !!currentUser;
+      user.value = currentUser;
+      isAuthLoading.value = false;
+      
+      // If user is authenticated, proceed with workspace loading
+      if (isAuthenticated.value) {
+        loadWorkspaceFromUrlOrStorage();
+      }
+    };
+    
+    // Load workspace from URL or localStorage
+    const loadWorkspaceFromUrlOrStorage = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlWorkspaceId = urlParams.get('workspace');
+      
+      if (urlWorkspaceId) {
+        workspaceId.value = urlWorkspaceId;
+        localStorage.setItem('workspaceId', urlWorkspaceId);
+      }
+      
+      if (workspaceId.value) {
+        loadFileTree();
+        generateAllPreviews().then(() => {
+          setTimeout(() => {
+            loadPreviewFiles();
+          }, 1000);
+        });
+      }
+    };
+    
+    // Logout function
+    const logout = async () => {
+      await AuthService.logout();
+      isAuthenticated.value = false;
+      user.value = null;
+      
+      // Clear workspace data
+      workspaceId.value = '';
+      localStorage.removeItem('workspaceId');
+    };
+
     // Workspace state
     const workspaceId = ref(localStorage.getItem('workspaceId') || '');
     const isCreatingWorkspace = ref(false);
@@ -261,11 +332,9 @@ export default {
     const createWorkspace = async () => {
       try {
         isCreatingWorkspace.value = true;
-        const response = await fetch(`${API_URL}/workspace/create`, {
-          method: 'POST'
-        });
+        const response = await api.post('/workspace/create');
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           workspaceId.value = data.workspaceId;
@@ -315,14 +384,13 @@ export default {
       }
       
       try {
-        const response = await fetch(`${API_URL}/workspace/${workspaceId.value}`, {
-          method: 'DELETE',
+        const response = await api.delete(`/workspace/${workspaceId.value}`, {
           headers: {
             'workspace-id': workspaceId.value
           }
         });
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           workspaceId.value = '';
@@ -353,13 +421,13 @@ export default {
       fileTreeError.value = false;
       
       try {
-        const response = await fetch(`${API_URL}/file/list`, {
+        const response = await api.get('/file/list', {
           headers: {
             'workspace-id': workspaceId.value
           }
         });
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           files.value = data.files;
@@ -379,13 +447,13 @@ export default {
     const openFile = async (filePath) => {
       try {
         showLoading('Loading file...');
-        const response = await fetch(`${API_URL}/file/content?filePath=${encodeURIComponent(filePath)}`, {
+        const response = await api.get(`/file/content?filePath=${encodeURIComponent(filePath)}`, {
           headers: {
             'workspace-id': workspaceId.value
           }
         });
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           currentFile.value = filePath;
@@ -407,19 +475,17 @@ export default {
       
       try {
         showLoading('Saving file...');
-        const response = await fetch(`${API_URL}/file/save`, {
-          method: 'POST',
+        const response = await api.post('/file/save', {
+          filePath: currentFile.value,
+          content: fileContent.value
+        }, {
           headers: {
             'Content-Type': 'application/json',
             'workspace-id': workspaceId.value
-          },
-          body: JSON.stringify({
-            filePath: currentFile.value,
-            content: fileContent.value
-          })
+          }
         });
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           // Clear the changedFiles cache to ensure fresh data on next load
@@ -451,9 +517,8 @@ export default {
       try {
         showLoading('Generating preview...');
         
-        const response = await fetch(`${API_URL}/preview/build`, {
-          method: 'POST',
-          query: {
+        const response = await api.post('/preview/build', {}, {
+          params: {
             pfs: selectedPreview.value
           },
           headers: {
@@ -461,7 +526,7 @@ export default {
           }
         });
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           loadPreviewFiles();
@@ -482,15 +547,14 @@ export default {
         showLoading('Generating all previews...');
         
         // Use the unified build endpoint without a pfs parameter to build all files
-        const response = await fetch(`${API_URL}/preview/build`, {
-          method: 'POST',
+        const response = await api.post('/preview/build', {}, {
           headers: {
             'Content-Type': 'application/json',
             'Workspace-Id': workspaceId.value
           }
         });
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           // Start polling for build status
@@ -529,26 +593,14 @@ export default {
             return;
           }
           
-          const response = await fetch(`${API_URL}/preview/build-status`, {
+          const response = await api.get('/preview/build-status', {
             headers: {
               'Workspace-Id': workspaceId.value
             }
           });
           
-          // If the workspace doesn't have a build in progress
-          if (response.status === 404) {
-            clearInterval(buildStatusPollInterval);
-            buildStatusPollInterval = null;
-            hideLoading();
-            loadPreviewFiles(); // Still try to load previews that might be there
-            return;
-          }
-          
-          if (!response.ok) {
-            throw new Error('Failed to get build status');
-          }
-          
-          const data = await response.json();
+          // Process the response data
+          const data = response.data;
           
           loadingMessage.value = getBuildStatusMessage(data.status, data.error);
           
@@ -566,7 +618,33 @@ export default {
           }
           
         } catch (error) {
-          console.error('Error polling build status:', error);
+          // Handle different types of errors
+          if (error.response) {
+            // The request was made and the server responded with a status code outside of 2xx
+            if (error.response.status === 404) {
+              // If the workspace doesn't have a build in progress
+              clearInterval(buildStatusPollInterval);
+              buildStatusPollInterval = null;
+              hideLoading();
+              loadPreviewFiles(); // Still try to load previews that might be there
+              return;
+            }
+            console.error('Error response from build status API:', error.response.data);
+          } else if (error.request) {
+            // The request was made but no response was received
+            console.error('No response received for build status check:', error.request);
+          } else {
+            // Something happened in setting up the request that triggered an Error
+            console.error('Error polling build status:', error.message);
+          }
+          
+          // Don't flood the console with errors if polling continues
+          if (buildStatusPollInterval) {
+            // Only log once per minute to avoid console spam
+            if (Math.floor((Date.now() - pollingStartTime) / 60000) % 1 === 0) {
+              console.warn('Continuing to poll despite errors...');
+            }
+          }
         }
       }, 2000);
     };
@@ -593,13 +671,13 @@ export default {
         // Remember the currently selected preview before reloading
         const currentSelectedPreview = selectedPreview.value;
         
-        const response = await fetch(`${API_URL}/preview/list`, {
+        const response = await api.get('/preview/list', {
           headers: {
             'workspace-id': workspaceId.value
           }
         });
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           previewFiles.value = data.previewFiles;
@@ -629,13 +707,13 @@ export default {
       
       try {
         showLoading('Loading preview...');
-        const response = await fetch(`${API_URL}/preview/content/${encodeURIComponent(selectedPreview.value)}`, {
+        const response = await api.get(`/preview/content/${encodeURIComponent(selectedPreview.value)}`, {
           headers: {
             'workspace-id': workspaceId.value
           }
         });
         
-        const data = await response.json();
+        const data = response.data;
         
         if (data.success) {
           previewContent.value = data.content;
@@ -669,26 +747,11 @@ export default {
       }
     };
 
-    onMounted(() => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlWorkspaceId = urlParams.get('workspace');
+    onMounted(async () => {
+      // First check if user is authenticated
+      await checkAuth();
       
-      if (urlWorkspaceId) {
-        workspaceId.value = urlWorkspaceId;
-        localStorage.setItem('workspaceId', urlWorkspaceId);
-      }
-      
-      if (workspaceId.value) {
-        loadFileTree();
-        // Generate all previews first, then load the preview files
-        generateAllPreviews().then(() => {
-          // loadPreviewFiles is already called within generateAllPreviews
-          // but we'll load them again after a delay to ensure they're loaded
-          setTimeout(() => {
-            loadPreviewFiles();
-          }, 1000);
-        });
-      }
+      // The rest of the setup will happen in checkAuth if the user is authenticated
     });
     
     onUnmounted(() => {
@@ -699,6 +762,13 @@ export default {
     provide('changedFiles', changedFiles);
 
     return {
+      // Auth state
+      isAuthenticated,
+      isAuthLoading,
+      user,
+      logout,
+      
+      // Workspace state
       workspaceId,
       isCreatingWorkspace,
       createWorkspace,
@@ -776,6 +846,39 @@ body {
   flex-direction: column;
 }
 
+/* User info in toolbar */
+.user-info {
+  display: flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  background-color: #f0f0f0;
+}
+
+.user-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+}
+
+.username {
+  font-size: 0.9rem;
+  margin-right: 0.5rem;
+}
+
+.logout-btn {
+  background-color: #f8f8f8;
+  color: #333;
+  border: 1px solid #ddd;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.logout-btn:hover {
+  background-color: #e9e9e9;
+}
+
 /* Workspace creation screen */
 .workspace-controls {
   display: flex;
@@ -808,6 +911,8 @@ body {
 .actions {
   display: flex;
   gap: 0.5rem;
+  align-items: center;
+  font-size: 0.9rem;
 }
 
 /* Three-column layout */
@@ -1245,5 +1350,15 @@ select {
 .instructions {
   text-align: left;
   margin-top: 1rem;
+}
+
+/* Authentication loading styles */
+.auth-loading {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  gap: 1rem;
 }
 </style>

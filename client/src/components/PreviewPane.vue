@@ -31,6 +31,7 @@
 <script>
 import { ref, watch, onMounted, onUnmounted, inject } from 'vue';
 import { API_URL } from '../config.js';
+import api from '../services/auth.js';
 
 export default {
   name: 'PreviewPane',
@@ -95,20 +96,18 @@ export default {
         // Extract the PFS name from the filename (remove .html extension)
         const pfsName = previewName.replace('.html', '');
         
-        // Use the unified build endpoint with a PFS parameter
-        const response = await fetch(`${API_URL}/preview/build?pfs=${encodeURIComponent(pfsName)}`, {
-          method: 'POST',
+        // Use the authenticated API instance instead of direct fetch
+        const response = await api.post('/preview/build', {}, {
+          params: {
+            pfs: pfsName
+          },
           headers: {
             'Content-Type': 'application/json',
             'Workspace-Id': workspaceId
           }
         });
         
-        const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.message || 'Failed to start build');
-        }
+        const data = response.data;
         
         // If build started successfully, poll for status
         startStatusPolling(workspaceId);
@@ -116,9 +115,9 @@ export default {
       } catch (error) {
         console.error('Error generating preview:', error);
         buildStatus.value = 'failed';
-        buildStatusMessage.value = `Build failed: ${error.message}`;
+        buildStatusMessage.value = `Build failed: ${error.message || error.response?.data?.message || 'Unknown error'}`;
         isGenerating.value = false;
-        emit('build-completed', { success: false, error: error.message });
+        emit('build-completed', { success: false, error: error.message || error.response?.data?.message || 'Unknown error' });
       }
     };
     
@@ -146,26 +145,13 @@ export default {
             return;
           }
           
-          const response = await fetch(`${API_URL}/preview/build-status`, {
+          const response = await api.get('/preview/build-status', {
             headers: {
               'Workspace-Id': workspaceId
             }
           });
           
-          // If the workspace doesn't have a build in progress
-          if (response.status === 404) {
-            clearInterval(statusPollInterval);
-            statusPollInterval = null;
-            isGenerating.value = false;
-            emit('build-completed', { success: true });
-            return;
-          }
-          
-          if (!response.ok) {
-            throw new Error('Failed to get build status');
-          }
-          
-          const data = await response.json();
+          const data = response.data;
           buildStatus.value = data.status;
           
           // Update logs
@@ -211,8 +197,23 @@ export default {
               buildStatusMessage.value = `Build status: ${data.status}`;
           }
         } catch (error) {
-          console.error('Error polling build status:', error);
-          buildStatusMessage.value = `Error checking build status: ${error.message}`;
+          // Handle different types of errors
+          if (error.response) {
+            // The request was made and the server responded with a status code outside of 2xx
+            if (error.response.status === 404) {
+              // If the workspace doesn't have a build in progress
+              clearInterval(statusPollInterval);
+              statusPollInterval = null;
+              isGenerating.value = false;
+              emit('build-completed', { success: true });
+              return;
+            }
+            console.error('Error response from build status API:', error.response.data);
+            buildStatusMessage.value = `Error: ${error.response.data.message || 'Unknown error'}`;
+          } else {
+            console.error('Error polling build status:', error);
+            buildStatusMessage.value = `Error checking build status: ${error.message || 'Unknown error'}`;
+          }
         }
       }, 2000);
     };
