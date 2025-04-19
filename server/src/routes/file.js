@@ -8,6 +8,11 @@ const execPromise = util.promisify(exec);
 
 const WORKSPACES_DIR = path.join(__dirname, '../../workspaces');
 
+// Make sure all paths use forward slashes
+function normalizePath(filePath) {
+  return filePath.replace(/\\/g, '/');
+}
+
 // Middleware to validate workspace ID
 const validateWorkspace = async (req, res, next) => {
   try {
@@ -77,7 +82,7 @@ router.get('/list', async (req, res) => {
         if (status == '??') {
           status = 'A';
         }
-        const filePath = line.substring(3);
+        const filePath = normalizePath(line.substring(3));
         
         // Store the file's git status
         changedFiles[filePath] = status;
@@ -104,11 +109,11 @@ router.get('/list', async (req, res) => {
       })
       .map(async (item) => {
         const itemPath = path.join(dirPath, item);
-        const relativePath = path.relative(req.workspacePath, itemPath).replace(/\\/g, '/');
+        const relativePath = path.relative(req.workspacePath, itemPath);
         const stats = await fs.stat(itemPath);
         return {
           name: item,
-          path: relativePath,
+          path: normalizePath(relativePath),
           isDirectory: stats.isDirectory(),
           size: stats.size,
           modifiedTime: stats.mtime,
@@ -210,13 +215,13 @@ router.get('/search', async (req, res) => {
         if (item.endsWith('.git')) continue; // Skip git directory
 
         const itemPath = path.join(dirPath, item);
-        const itemRelativePath = path.join(relativePath, item).replace(/\\/g, '/');
+        const itemRelativePath = path.join(relativePath, item);
         const stats = await fs.stat(itemPath);
 
         // Check filename match
         if (item.toLowerCase().includes(query.toLowerCase())) {
           results.push({
-            path: itemRelativePath,
+            path: normalizePath(itemRelativePath),
             name: item,
             isDirectory: stats.isDirectory(),
             matchType: 'filename',
@@ -862,6 +867,83 @@ router.post('/revert', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to revert file changes',
+      error: error.message
+    });
+  }
+});
+
+// Get diff for a file
+router.get('/diff', async (req, res) => {
+  try {
+    const { filePath } = req.query;
+    
+    if (!filePath) {
+      return res.status(400).json({
+        success: false,
+        message: 'File path is required'
+      });
+    }
+
+    // Get the full path
+    const fullPath = path.join(req.workspacePath, filePath);
+    
+    // Check if path is within the workspace
+    if (!fullPath.startsWith(req.workspacePath)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid file path'
+      });
+    }
+    
+    // Get git status of the file to determine how to handle it
+    const gitStatusCmd = `git status --porcelain -- "${filePath}"`;
+    const { stdout: gitStatusOutput } = await execPromise(gitStatusCmd, { cwd: req.workspacePath });
+    
+    if (gitStatusOutput.trim() === '') {
+      // File not changed
+      return res.status(200).json({
+        success: true,
+        diff: 'No changes'
+      });
+    }
+    
+    // Git status output format is "XY filename" where X is staging status and Y is working tree status
+    const statusCode = gitStatusOutput.substring(0, 2).trim();
+    
+    // Handle different file statuses
+    if (statusCode === 'A' || statusCode === '??' || statusCode.startsWith('A')) {
+      // Added file - no diff needed
+      return res.status(200).json({
+        success: true,
+        diff: `New file: ${filePath}`
+      });
+    } else if (statusCode === 'D' || statusCode.includes('D')) {
+      // Deleted file - no diff needed
+      return res.status(200).json({
+        success: true,
+        diff: `File deleted: ${filePath}`
+      });
+    } else if (statusCode.includes('R')) {
+      // Renamed file
+      return res.status(200).json({
+        success: true,
+        diff: `File renamed: ${filePath}`
+      });
+    } else {
+      // Modified file - show diff
+      const gitDiffCmd = `git diff -- "${filePath}"`;
+      const { stdout: diffOutput } = await execPromise(gitDiffCmd, { cwd: req.workspacePath });
+      
+      return res.status(200).json({
+        success: true,
+        diff: diffOutput || 'No visible changes (possibly whitespace only)'
+      });
+    }
+  } catch (error) {
+    console.error('Error getting diff:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get diff',
       error: error.message
     });
   }

@@ -9,6 +9,7 @@
     <!-- Modal components -->
     <alert-modal ref="alertModal" :title="modalTitle" :message="modalMessage" />
     <confirm-modal ref="confirmModal" :title="modalTitle" :message="modalMessage" :confirm-text="modalConfirmText" />
+    <propose-changes-modal ref="proposeChangesModal" @loading="showLoading" @done="hideLoading" />
 
     <!-- Workspace creation/management -->
     <div class="workspace-controls" v-if="!workspaceId">
@@ -25,6 +26,7 @@
         <h2>CEOS-ARD Editor</h2>
         <div class="actions">
           <button @click="copyWorkspaceUrl" class="copy-url">Copy URL</button>
+          <button @click="proposeChanges" class="propose">Propose Changes</button>
           <button @click="closeWorkspace" class="danger">Close Workspace</button>
         </div>
       </div>
@@ -119,6 +121,7 @@ import PreviewPane from './components/PreviewPane.vue';
 import FileViewer from './components/FileViewer.vue';
 import AlertModal from './components/AlertModal.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
+import ProposeChangesModal from './components/ProposeChangesModal.vue';
 import { API_URL } from './config.js';
 
 export default {
@@ -129,7 +132,8 @@ export default {
     PreviewPane,
     FileViewer,
     AlertModal,
-    ConfirmModal
+    ConfirmModal,
+    ProposeChangesModal
   },
   setup() {
     // Workspace state
@@ -151,9 +155,10 @@ export default {
     const previewContent = ref('');
     const previewPaneRef = ref(null);
     
-    // Modal state
+    // Modal components
     const alertModal = ref(null);
     const confirmModal = ref(null);
+    const proposeChangesModal = ref(null);
     const modalTitle = ref('');
     const modalMessage = ref('');
     const modalConfirmText = ref('Confirm');
@@ -170,6 +175,11 @@ export default {
       modalMessage.value = message;
       modalConfirmText.value = confirmText;
       return confirmModal.value.show();
+    };
+
+    // Propose changes function
+    const proposeChanges = async () => {
+      return proposeChangesModal.value.show();
     };
 
     // Provide modal functions to child components
@@ -735,11 +745,13 @@ export default {
       // Modal system
       alertModal,
       confirmModal,
+      proposeChangesModal,
       modalTitle,
       modalMessage,
       modalConfirmText,
       showAlert,
-      showConfirm
+      showConfirm,
+      proposeChanges
     };
   }
 };
@@ -1048,6 +1060,14 @@ button.copy-url:hover {
   background-color: #5a6268;
 }
 
+button.propose {
+  background-color: #28a745;
+}
+
+button.propose:hover {
+  background-color: #218838;
+}
+
 .small-button {
   font-size: 0.8rem;
   padding: 0.25rem 0.5rem;
@@ -1097,5 +1117,133 @@ select {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* Modal styles */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1001;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 2rem;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.form-group textarea {
+  resize: none;
+}
+
+.helper-text {
+  font-size: 0.8rem;
+  color: #777;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.secondary-button {
+  background-color: #6c757d;
+}
+
+.secondary-button:hover {
+  background-color: #5a6268;
+}
+
+.primary-button {
+  background-color: #007bff;
+}
+
+.primary-button:hover {
+  background-color: #0069d9;
+}
+
+/* Proposal result styles */
+.proposal-result {
+  text-align: center;
+}
+
+.success-message {
+  color: #28a745;
+}
+
+.success-icon {
+  font-size: 2rem;
+}
+
+.pull-request-info {
+  margin-top: 1rem;
+}
+
+.pr-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pr-url {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.pr-url:hover {
+  text-decoration: underline;
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.icon-button:hover {
+  color: #0056b3;
+}
+
+.error-message {
+  color: #dc3545;
+}
+
+.error-icon {
+  font-size: 2rem;
+}
+
+.instructions {
+  text-align: left;
+  margin-top: 1rem;
 }
 </style>

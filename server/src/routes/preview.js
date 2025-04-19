@@ -9,6 +9,11 @@ const buildProcesses = new Map();
 
 const WORKSPACES_DIR = path.join(__dirname, '../../workspaces');
 
+// Make sure all paths use forward slashes
+function normalizePath(filePath) {
+  return filePath.replace(/\\/g, '/');
+}
+
 // Middleware to validate workspace ID
 const validateWorkspace = async (req, res, next) => {
   try {
@@ -244,7 +249,7 @@ router.get('/content/:filename', async (req, res) => {
     // Replace edit placeholders
     content = content.replace(
       /<!--\s*edit:\s*([\w\-\.\~\/\\]+)\s*-->/g,
-      (match, p1) => `<a name="${p1.replaceAll('\\', '/')}"></a><button class="edit" value="${p1.replaceAll('\\', '/')}">Edit</button>`
+      (match, p1) => `<a name="${normalizePath(p1)}"></a><button class="edit" value="${normalizePath(p1)}">Edit</button>`
     );
     
     return res.status(200).json({

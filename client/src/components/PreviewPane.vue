@@ -300,11 +300,11 @@ export default {
             btn.style.backgroundColor = '#007bff';
           });
           btn.style.float = 'right';
-          btn.style.margin = '0.5rem';
-          btn.style.padding = '0.5rem 1rem';
+          btn.style.margin = `0.1rem 0 0.5rem 0.5rem`;
+          btn.style.padding = '0.3rem 0.75rem';
           btn.style.backgroundColor = '#007bff';
           btn.style.color = 'white';
-          btn.style.border = 'none';
+          btn.style.border = '0';
           btn.style.borderRadius = '4px';
           btn.style.cursor = 'pointer';
         }
