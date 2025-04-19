@@ -240,8 +240,7 @@
 
 <script>
 import { ref, computed, inject, onMounted, nextTick, watch } from 'vue';
-
-const API_URL = 'http://localhost:3000/api';
+import { API_URL } from '../config.js';
 
 export default {
   name: 'FileTreeDirectory',
@@ -264,6 +263,10 @@ export default {
     
     // Get changedFiles from parent App component
     const parentChangedFiles = inject('changedFiles', {});
+    
+    // Inject modal functions from App.vue
+    const showAlert = inject('showAlert');
+    const showConfirm = inject('showConfirm');
     
     // File operations state
     const selectedFile = ref(null);
@@ -418,7 +421,13 @@ export default {
       if (!selectedFile.value) return;
       showFileMenu.value = false;
       
-      if (!confirm(`Are you sure you want to revert changes to ${selectedFile.value.name}? This will discard all your changes.`)) {
+      const confirmed = await showConfirm(
+        `Are you sure you want to revert changes to ${selectedFile.value.name}? This will discard all your changes.`,
+        'Revert Changes',
+        'Revert'
+      );
+      
+      if (!confirmed) {
         return;
       }
       
@@ -451,11 +460,11 @@ export default {
           // Clear the selected file
           selectedFile.value = null;
         } else {
-          alert(`Failed to revert file changes: ${data.message}`);
+          showAlert(`Failed to revert file changes: ${data.message}`, 'Error');
         }
       } catch (error) {
         console.error('Error reverting file changes:', error);
-        alert('Failed to revert file changes. Check console for details.');
+        showAlert('Failed to revert file changes. Check console for details.', 'Error');
       } finally {
         hideLoading();
       }
@@ -496,7 +505,7 @@ export default {
     
     const confirmNewFile = async () => {
       if (!newFilePath.value.trim()) {
-        alert('Please enter a file path');
+        showAlert('Please enter a file path', 'Error');
         return;
       }
       
@@ -530,11 +539,11 @@ export default {
           // Open the new file for editing
           emit('select-file', fullPath);
         } else {
-          alert(`Failed to create file: ${data.message}`);
+          showAlert(`Failed to create file: ${data.message}`, 'Error');
         }
       } catch (error) {
         console.error('Error creating file:', error);
-        alert('Failed to create file. Check console for details.');
+        showAlert('Failed to create file. Check console for details.', 'Error');
       } finally {
         hideLoading();
       }
@@ -571,7 +580,7 @@ export default {
     
     const confirmUpload = async () => {
       if (!uploadPath.value.trim() || !selectedFileToUpload.value) {
-        alert('Please select a file and enter a destination path');
+        showAlert('Please select a file and enter a destination path', 'Error');
         return;
       }
       
@@ -603,7 +612,7 @@ export default {
             // Open the uploaded file
             emit('select-file', uploadPath.value);
           } else {
-            alert(`Failed to upload file: ${data.message}`);
+            showAlert(`Failed to upload file: ${data.message}`, 'Error');
           }
           hideLoading();
         };
@@ -611,7 +620,7 @@ export default {
         reader.readAsText(selectedFileToUpload.value);
       } catch (error) {
         console.error('Error uploading file:', error);
-        alert('Failed to upload file. Check console for details.');
+        showAlert('Failed to upload file. Check console for details.', 'Error');
         hideLoading();
       }
     };
@@ -676,11 +685,11 @@ export default {
           showRenameDialog.value = false;
           newFileName.value = '';
         } else {
-          alert(`Failed to rename file: ${data.message}`);
+          showAlert(`Failed to rename file: ${data.message}`, 'Error');
         }
       } catch (error) {
         console.error('Error renaming file:', error);
-        alert('Failed to rename file. Check console for details.');
+        showAlert('Failed to rename file. Check console for details.', 'Error');
       } finally {
         hideLoading();
       }
@@ -691,7 +700,13 @@ export default {
       if (!selectedFile.value) return;
       showFileMenu.value = false;
       
-      if (!confirm(`Are you sure you want to delete ${selectedFile.value.name}?`)) {
+      const confirmed = await showConfirm(
+        `Are you sure you want to delete ${selectedFile.value.name}?`, 
+        'Delete File',
+        'Delete'
+      );
+      
+      if (!confirmed) {
         return;
       }
       
@@ -724,11 +739,11 @@ export default {
           // Clear the selected file
           selectedFile.value = null;
         } else {
-          alert(`Failed to delete file: ${data.message}`);
+          showAlert(`Failed to delete file: ${data.message}`, 'Error');
         }
       } catch (error) {
         console.error('Error deleting file:', error);
-        alert('Failed to delete file. Check console for details.');
+        showAlert('Failed to delete file. Check console for details.', 'Error');
       } finally {
         hideLoading();
       }
@@ -794,11 +809,11 @@ export default {
           showMoveDialog.value = false;
           destinationPath.value = '';
         } else {
-          alert(`Failed to move file: ${data.message}`);
+          showAlert(`Failed to move file: ${data.message}`, 'Error');
         }
       } catch (error) {
         console.error('Error moving file:', error);
-        alert('Failed to move file. Check console for details.');
+        showAlert('Failed to move file. Check console for details.', 'Error');
       } finally {
         hideLoading();
       }
@@ -866,11 +881,11 @@ export default {
             emit('select-file', newFilePath);
           }
         } else {
-          alert(`Failed to copy file: ${data.message}`);
+          showAlert(`Failed to copy file: ${data.message}`, 'Error');
         }
       } catch (error) {
         console.error('Error copying file:', error);
-        alert('Failed to copy file. Check console for details.');
+        showAlert('Failed to copy file. Check console for details.', 'Error');
       } finally {
         hideLoading();
       }

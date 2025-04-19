@@ -243,8 +243,8 @@ router.get('/content/:filename', async (req, res) => {
 
     // Replace edit placeholders
     content = content.replace(
-      /<!--\s*edit:\s*([\w\-\.\~\/]+)\s*-->/g,
-      (match, p1) =>  `<a name="${p1}"></a><button class="edit" value="${p1}">Edit</button>`
+      /<!--\s*edit:\s*([\w\-\.\~\/\\]+)\s*-->/g,
+      (match, p1) => `<a name="${p1.replaceAll('\\', '/')}"></a><button class="edit" value="${p1.replaceAll('\\', '/')}">Edit</button>`
     );
     
     return res.status(200).json({

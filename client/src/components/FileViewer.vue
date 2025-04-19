@@ -35,8 +35,7 @@
 
 <script>
 import { computed } from 'vue';
-
-const API_URL = 'http://localhost:3000/api';
+import { API_URL } from '../config.js';
 
 export default {
   name: 'FileViewer',

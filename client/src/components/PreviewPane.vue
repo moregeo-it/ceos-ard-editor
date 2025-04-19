@@ -29,7 +29,8 @@
 </template>
 
 <script>
-import { ref, watch, onMounted, onUnmounted } from 'vue';
+import { ref, watch, onMounted, onUnmounted, inject } from 'vue';
+import { API_URL } from '../config.js';
 
 export default {
   name: 'PreviewPane',
@@ -62,6 +63,9 @@ export default {
     const showLogs = ref(false);
     let statusPollInterval = null;
     
+    // Inject modal functions from App.vue
+    const showAlert = inject('showAlert');
+    
     // Watch for changes in content prop to update the iframe
     watch(() => props.content, () => {
       updateIframeContent();
@@ -69,11 +73,10 @@ export default {
 
     // Generate new preview for a specific file
     const generatePreview = async (previewName) => {
-      const API_URL = 'http://localhost:3000/api';
       const workspaceId = localStorage.getItem('workspaceId');
       
       if (!workspaceId) {
-        alert('No workspace selected');
+        showAlert('No workspace selected', 'Error');
         return;
       }
       
@@ -121,8 +124,6 @@ export default {
     
     // Poll for build status
     const startStatusPolling = (workspaceId) => {
-      const API_URL = 'http://localhost:3000/api';
-      
       // Clear any existing interval
       if (statusPollInterval) {
         clearInterval(statusPollInterval);
@@ -249,7 +250,6 @@ export default {
     
     // Helper to fix relative URLs in the iframe
     const enhanceDoc = (iframeDoc) => {
-      const API_URL = 'http://localhost:3000/api';
       const workspaceId = localStorage.getItem('workspaceId');
       
       if (!workspaceId) return;

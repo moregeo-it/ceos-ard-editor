@@ -6,6 +6,10 @@
       <div class="loading-text">{{ loadingMessage }}</div>
     </div>
 
+    <!-- Modal components -->
+    <alert-modal ref="alertModal" :title="modalTitle" :message="modalMessage" />
+    <confirm-modal ref="confirmModal" :title="modalTitle" :message="modalMessage" :confirm-text="modalConfirmText" />
+
     <!-- Workspace creation/management -->
     <div class="workspace-controls" v-if="!workspaceId">
       <h1>CEOS-ARD Editor</h1>
@@ -28,7 +32,7 @@
       <!-- Three-column layout -->
       <div class="columns-container">
         <!-- Left column: File tree -->
-        <div class="column file-tree" :style="{ width: leftPanelWidth + 'px' }">
+        <div class="column file-tree" :style="{ 'flex-basis': panelWidth[0] + '%' }">
           <div class="file-tree-header">
             <h3>Files</h3>
           </div>
@@ -48,11 +52,11 @@
         <!-- Resize handle for left panel -->
         <div 
           class="resize-handle"
-          @mousedown="(e) => startResize('left', e)"
+          @mousedown="(e) => startResize(0, e)"
         ></div>
 
         <!-- Middle column: Code editor -->
-        <div class="column code-editor">
+        <div class="column code-editor" :style="{ 'flex-basis': panelWidth[1] + '%' }">
           <code-editor 
             v-if="currentFile && isFileEditable"
             v-model="fileContent"
@@ -69,14 +73,14 @@
           </div>
         </div>
         
-        <!-- Resize handle for right panel -->
+        <!-- Resize handle for middle panel -->
         <div 
           class="resize-handle"
-          @mousedown="(e) => startResize('right', e)"
+          @mousedown="(e) => startResize(1, e)"
         ></div>
 
         <!-- Right column: Preview -->
-        <div class="column preview-pane" :style="{ width: rightPanelWidth + 'px' }">
+        <div class="column preview-pane" :style="{ 'flex-basis': panelWidth[2] + '%' }">
           <div class="preview-header">
             <h3>Preview</h3>
             <div class="preview-selector">
@@ -108,13 +112,14 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted, nextTick, provide } from 'vue';
+import { ref, onMounted, onUnmounted, provide } from 'vue';
 import FileTreeDirectory from './components/FileTreeDirectory.vue';
 import CodeEditor from './components/CodeEditor.vue';
 import PreviewPane from './components/PreviewPane.vue';
 import FileViewer from './components/FileViewer.vue';
-
-const API_URL = 'http://localhost:3000/api';
+import AlertModal from './components/AlertModal.vue';
+import ConfirmModal from './components/ConfirmModal.vue';
+import { API_URL } from './config.js';
 
 export default {
   name: 'App',
@@ -122,7 +127,9 @@ export default {
     FileTreeDirectory,
     CodeEditor,
     PreviewPane,
-    FileViewer
+    FileViewer,
+    AlertModal,
+    ConfirmModal
   },
   setup() {
     // Workspace state
@@ -144,14 +151,38 @@ export default {
     const previewContent = ref('');
     const previewPaneRef = ref(null);
     
+    // Modal state
+    const alertModal = ref(null);
+    const confirmModal = ref(null);
+    const modalTitle = ref('');
+    const modalMessage = ref('');
+    const modalConfirmText = ref('Confirm');
+
+    // Helper functions for modal usage
+    const showAlert = (message, title = 'Alert') => {
+      modalTitle.value = title;
+      modalMessage.value = message;
+      return alertModal.value.show();
+    };
+
+    const showConfirm = (message, title = 'Confirm', confirmText = 'Confirm') => {
+      modalTitle.value = title;
+      modalMessage.value = message;
+      modalConfirmText.value = confirmText;
+      return confirmModal.value.show();
+    };
+
+    // Provide modal functions to child components
+    provide('showAlert', showAlert);
+    provide('showConfirm', showConfirm);
+    
     // Panel resize state
-    const leftPanelWidth = ref(window.innerWidth * 0.2);
-    const rightPanelWidth = ref(window.innerWidth * 0.4);
+    const panelWidth = ref([20,40,40]);
     const resizeState = ref({
       active: false,
-      panel: null, // 'left' or 'right'
+      panel: null,
       startX: 0,
-      startWidth: 0
+      startWidth: panelWidth.value.slice(0)
     });
 
     // Reusable resize handlers
@@ -159,9 +190,9 @@ export default {
       // Store starting position and current width
       resizeState.value = {
         active: true,
-        panel: panel,
+        panel,
         startX: e.clientX,
-        startWidth: panel === 'left' ? leftPanelWidth.value : rightPanelWidth.value
+        startWidth: panelWidth.value.slice(0)
       };
       
       // Add visual indicator to the resize handle
@@ -177,14 +208,15 @@ export default {
     
     const handleMouseMove = (e) => {
       if (!resizeState.value.active) return;
-      
-      const movementX = e.clientX - resizeState.value.startX;
-      
-      if (resizeState.value.panel === 'left') {
-        leftPanelWidth.value = resizeState.value.startWidth + movementX;
-      } else {
-        rightPanelWidth.value = resizeState.value.startWidth - movementX;
-      }
+
+      const { panel, startWidth, startX } = resizeState.value;
+      const base = 100 / window.innerWidth;
+      const movementX = base * (e.clientX - startX);
+      const [l, r, o] = [panel, panel+1, (panel+2)%3];
+
+      panelWidth.value[l] = Math.max(0, startWidth[l] + movementX);
+      panelWidth.value[r] = Math.max(0, startWidth[r] - movementX);
+      panelWidth.value[o] = Math.max(0, 100 - (panelWidth.value[l] + panelWidth.value[r]));
     };
     
     const stopResize = () => {
@@ -236,11 +268,11 @@ export default {
           
           loadFileTree();
         } else {
-          alert(`Failed to create workspace: ${data.message}`);
+          showAlert(`Failed to create workspace: ${data.message}`, 'Error');
         }
       } catch (error) {
         console.error('Error creating workspace:', error);
-        alert('Failed to create workspace. Check console for details.');
+        showAlert('Failed to create workspace. Check console for details.', 'Error');
       } finally {
         isCreatingWorkspace.value = false;
       }
@@ -252,17 +284,23 @@ export default {
       url.searchParams.set('workspace', workspaceId.value);
       navigator.clipboard.writeText(url.toString())
         .then(() => {
-          alert('Workspace URL copied to clipboard!');
+          showAlert('Workspace URL copied to clipboard!', 'Success');
         })
         .catch(err => {
           console.error('Could not copy URL: ', err);
-          alert('Failed to copy URL. You can manually share this URL.');
+          showAlert('Failed to copy URL. You can manually share this URL.', 'Error');
         });
     };
 
     // Close and delete the workspace
     const closeWorkspace = async () => {
-      if (!confirm('Are you sure you want to close this workspace? All changes will be lost.')) {
+      const confirmed = await showConfirm(
+        'Are you sure you want to close this workspace? All changes will be lost if the changes were not proposed yet.',
+        'Close Workspace',
+        'Close'
+      );
+      
+      if (!confirmed) {
         return;
       }
       
@@ -291,11 +329,11 @@ export default {
           url.searchParams.delete('workspace');
           window.history.replaceState({}, '', url);
         } else {
-          alert(`Failed to close workspace: ${data.message}`);
+          showAlert(`Failed to close workspace: ${data.message}`, 'Error');
         }
       } catch (error) {
         console.error('Error closing workspace:', error);
-        alert('Failed to close workspace. Check console for details.');
+        showAlert('Failed to close workspace. Check console for details.', 'Error');
       }
     };
 
@@ -317,7 +355,7 @@ export default {
           files.value = data.files;
         } else {
           fileTreeError.value = true;
-          alert(`Failed to load file tree: ${data.message}`);
+          showAlert(`Failed to load file tree: ${data.message}`, 'Error');
         }
       } catch (error) {
         fileTreeError.value = true;
@@ -344,7 +382,7 @@ export default {
           fileContent.value = data.content;
           isFileEditable.value = data.isEditable;
         } else {
-          alert(`Failed to open file: ${data.message}`);
+          showAlert(`Failed to open file: ${data.message}`, 'Error');
         }
       } catch (error) {
         console.error('Error opening file:', error);
@@ -388,11 +426,11 @@ export default {
             await generateAllPreviews();
           }
         } else {
-          alert(`Failed to save file: ${data.message}`);
+          showAlert(`Failed to save file: ${data.message}`, 'Error');
         }
       } catch (error) {
         console.error('Error saving file:', error);
-        alert('Failed to save file. Check console for details.');
+        showAlert('Failed to save file. Check console for details.', 'Error');
       } finally {
         hideLoading();
       }
@@ -418,11 +456,11 @@ export default {
         if (data.success) {
           loadPreviewFiles();
         } else {
-          alert(`Failed to generate preview: ${data.message}`);
+          showAlert(`Failed to generate preview: ${data.message}`, 'Error');
         }
       } catch (error) {
         console.error('Error generating preview:', error);
-        alert('Failed to generate preview. Check console for details.');
+        showAlert('Failed to generate preview. Check console for details.', 'Error');
       } finally {
         hideLoading();
       }
@@ -448,12 +486,12 @@ export default {
           // Start polling for build status
           pollBuildStatus();
         } else {
-          alert(`Failed to generate previews: ${data.message}`);
+          showAlert(`Failed to generate previews: ${data.message}`, 'Error');
           hideLoading();
         }
       } catch (error) {
         console.error('Error generating previews:', error);
-        alert('Failed to generate previews. Check console for details.');
+        showAlert('Failed to generate previews. Check console for details.', 'Error');
         hideLoading();
       }
     };
@@ -514,7 +552,7 @@ export default {
             clearInterval(buildStatusPollInterval);
             buildStatusPollInterval = null;
             hideLoading();
-            alert(`Build failed: ${data.error || 'Unknown error'}`);
+            showAlert(`Build failed: ${data.error || 'Unknown error'}`, 'Build Failed');
           }
           
         } catch (error) {
@@ -680,8 +718,7 @@ export default {
       handleBuildCompleted,
       
       // Layout
-      leftPanelWidth,
-      rightPanelWidth,
+      panelWidth,
       startResize,
       resizeState,
       previewPaneRef,
@@ -693,7 +730,16 @@ export default {
       hideLoading,
       
       // File path update handler for operations done in FileTreeDirectory
-      handleFilePathUpdate
+      handleFilePathUpdate,
+      
+      // Modal system
+      alertModal,
+      confirmModal,
+      modalTitle,
+      modalMessage,
+      modalConfirmText,
+      showAlert,
+      showConfirm
     };
   }
 };
@@ -773,8 +819,6 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  width: 20%;
-  min-width: 250px;
 }
 
 .file-tree-header {
@@ -893,17 +937,13 @@ body {
 
 /* Middle column - Code Editor */
 .code-editor {
-  flex-grow: 1;
   overflow: hidden;
-  min-width: 250px;
 }
 
 /* Right column - Preview Pane */
 .preview-pane {
   display: flex;
   flex-direction: column;
-  width: 40%;
-  min-width: 250px;
   overflow: hidden;
 }
 

@@ -27,8 +27,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { markdown } from '@codemirror/lang-markdown';
 import { yaml } from '@codemirror/lang-yaml';
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
-
-const API_URL = 'http://localhost:3000/api';
+import { API_URL } from '../config.js';
 
 export default {
   name: 'CodeEditor',
