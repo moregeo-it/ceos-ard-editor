@@ -88,6 +88,129 @@ const validateWorkspace = async (req, res, next) => {
 // Apply middleware to all routes
 router.use(validateWorkspace);
 
+// Unified file operations endpoint (create file, create folder, upload)
+router.post('/operations', async (req, res) => {
+  try {
+    const { operation, filePath, folderPath, content } = req.body;
+    
+    if (!operation) {
+      return res.status(400).json({
+        success: false,
+        message: 'Operation type is required'
+      });
+    }
+
+    // Handle different operation types
+    switch (operation) {
+      case 'create-file': {
+        if (!filePath) {
+          return res.status(400).json({
+            success: false,
+            message: 'File path is required'
+          });
+        }
+
+        const safePath = sanitizePath(filePath);
+        const fullPath = path.join(req.workspacePath, safePath);
+        
+        // Check if path is within the workspace
+        if (!fullPath.startsWith(req.workspacePath)) {
+          return res.status(403).json({
+            success: false,
+            message: 'Invalid file path'
+          });
+        }
+
+        // Ensure directory exists
+        await fs.ensureDir(path.dirname(fullPath));
+        
+        // Write empty file content (or provided content)
+        await fs.writeFile(fullPath, content || '', 'utf-8');
+        
+        return res.status(200).json({
+          success: true,
+          message: 'File created successfully',
+          filePath: safePath
+        });
+      }
+
+      case 'create-folder': {
+        if (!folderPath) {
+          return res.status(400).json({
+            success: false,
+            message: 'Folder path is required'
+          });
+        }
+
+        const safePath = sanitizePath(folderPath);
+        const fullPath = path.join(req.workspacePath, safePath);
+        
+        // Check if path is within the workspace
+        if (!fullPath.startsWith(req.workspacePath)) {
+          return res.status(403).json({
+            success: false,
+            message: 'Invalid folder path'
+          });
+        }
+
+        // Create the directory
+        await fs.ensureDir(fullPath);
+        
+        return res.status(200).json({
+          success: true,
+          message: 'Folder created successfully',
+          folderPath: safePath
+        });
+      }
+
+      case 'upload': {
+        if (!filePath) {
+          return res.status(400).json({
+            success: false,
+            message: 'File path is required'
+          });
+        }
+
+        const safePath = sanitizePath(filePath);
+        const fullPath = path.join(req.workspacePath, safePath);
+        
+        // Check if path is within the workspace
+        if (!fullPath.startsWith(req.workspacePath)) {
+          return res.status(403).json({
+            success: false,
+            message: 'Invalid file path'
+          });
+        }
+
+        // Ensure directory exists
+        await fs.ensureDir(path.dirname(fullPath));
+        
+        // Write file content
+        await fs.writeFile(fullPath, content || '', 'utf-8');
+        
+        return res.status(200).json({
+          success: true,
+          message: 'File uploaded successfully',
+          filePath: safePath
+        });
+      }
+
+      default:
+        return res.status(400).json({
+          success: false,
+          message: 'Unknown operation type'
+        });
+    }
+  } catch (error) {
+    console.error('Error in file operations:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to perform file operation',
+      error: error.message
+    });
+  }
+});
+
 // List files in a directory
 router.get('/list', async (req, res) => {
   try {
@@ -547,8 +670,8 @@ router.post('/rename', async (req, res) => {
     // Ensure destination directory exists
     await fs.ensureDir(path.dirname(fullNewPath));
     
-    // Rename/move file
-    await fs.move(fullOldPath, fullNewPath);
+    // Rename file
+    await fs.rename(fullOldPath, fullNewPath);
     
     return res.status(200).json({
       success: true,

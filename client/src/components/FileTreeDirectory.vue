@@ -58,9 +58,9 @@
     
     <!-- Show controls for all directories when not searching -->
     <div v-if="!isSearchActive" class="directory-controls">
-      <base-button @click="createNewFile" size="small" variant="outline">New File</base-button>
-      <base-button @click="createNewFolder" size="small" variant="outline">New Folder</base-button>
-      <base-button @click="uploadFile" size="small" variant="outline">Upload</base-button>
+      <base-button @click="showFileOperationModal" size="small" variant="outline" title="Create folder, create file, or upload file">
+        Add File/Folder
+      </base-button>
       <base-button @click="refreshDirectory" size="small" variant="outline" title="Reload">⟳</base-button>
     </div>
     
@@ -128,7 +128,7 @@
         <button @click="moveFile" class="menu-item">Move</button>
       </div>
     </div>
-    
+
     <!-- Rename File Dialog -->
     <div class="modal" v-if="showRenameDialog">
       <div class="modal-content">
@@ -195,88 +195,22 @@
       </div>
     </div>
     
-    <!-- New File Dialog -->
-    <div class="modal" v-if="showNewFileDialog">
-      <div class="modal-content">
-        <h3>Create New File</h3>
-        <div class="form-group">
-          <label class="form-label">File Path:</label>
-          <input 
-            type="text" 
-            v-model="newFilePath" 
-            placeholder="e.g., filename.yml" 
-            class="form-control"
-            ref="newFileInput"
-            @keyup.enter="confirmNewFile"
-          />
-        </div>
-        <div class="d-flex justify-content-end gap-2">
-          <base-button @click="cancelNewFile" variant="secondary">Cancel</base-button>
-          <base-button @click="confirmNewFile" variant="primary">Create</base-button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- New Folder Dialog -->
-    <div class="modal" v-if="showNewFolderDialog">
-      <div class="modal-content">
-        <h3>Create New Folder</h3>
-        <div class="form-group">
-          <label class="form-label">Folder Path:</label>
-          <input 
-            type="text" 
-            v-model="newFolderPath" 
-            placeholder="e.g., new-folder" 
-            class="form-control"
-            ref="newFolderInput"
-            @keyup.enter="confirmNewFolder"
-          />
-        </div>
-        <div class="d-flex justify-content-end gap-2">
-          <base-button @click="cancelNewFolder" variant="secondary">Cancel</base-button>
-          <base-button @click="confirmNewFolder" variant="primary">Create</base-button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- File Upload Dialog -->
-    <div class="modal" v-if="showUploadDialog">
-      <div class="modal-content">
-        <h3>Upload File</h3>
-        <div class="form-group">
-          <label class="form-label">Destination Path:</label>
-          <input 
-            type="text" 
-            v-model="uploadPath" 
-            placeholder="e.g., images/file.jpg" 
-            class="form-control"
-            ref="uploadPathInput"
-            @keyup.enter="confirmUpload"
-          />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Select File:</label>
-          <input type="file" @change="handleFileSelected" ref="fileInput" class="form-control" />
-        </div>
-        <div class="d-flex justify-content-end gap-2">
-          <base-button @click="cancelUpload" variant="secondary">Cancel</base-button>
-          <base-button @click="confirmUpload" variant="primary" :disabled="!selectedFileToUpload">Upload</base-button>
-        </div>
-      </div>
-    </div>
+    <!-- Unified file operation modal -->
+    <file-operation-modal ref="fileOperationModal" />
   </div>
 </template>
 
 <script>
 import { ref, computed, inject, onMounted, nextTick, watch, provide } from 'vue';
-import { API_URL } from '../config.js';
 import api from '../services/auth.js';
 import BaseButton from './BaseButton.vue';
+import FileOperationModal from './FileOperationModal.vue';
 
 export default {
   name: 'FileTreeDirectory',
   components: {
-    BaseButton
+    BaseButton,
+    FileOperationModal
   },
   props: {
     path: {
@@ -310,21 +244,14 @@ export default {
     const selectedFile = ref(null);
     const showFileMenu = ref(false);
     const fileMenuPosition = ref({ top: '0px', left: '0px' });
-    const showNewFileDialog = ref(false);
-    const showUploadDialog = ref(false);
     const showRenameDialog = ref(false);
     const showMoveDialog = ref(false);
     const showCopyDialog = ref(false);
-    const showNewFolderDialog = ref(false);
-    
-    // Form values
-    const newFilePath = ref('');
-    const uploadPath = ref('');
-    const selectedFileToUpload = ref(null);
-    const fileInput = ref(null);
     const newFileName = ref('');
     const destinationPath = ref('');
-    const newFolderPath = ref('');
+    
+    // File Operation Modal
+    const fileOperationModal = ref(null);
     
     // Search functionality
     const searchQuery = ref('');
@@ -522,25 +449,32 @@ export default {
       });
     };
     
-    // New file handlers
-    const newFileInput = ref(null);
-    const createNewFile = () => {
-      showNewFileDialog.value = true;
-      newFilePath.value = props.path ? props.path + '/' : '';
-      nextTick(() => {
-        if (newFileInput.value) {
-          newFileInput.value.focus();
-        }
-      });
+    // Show the unified file operation modal
+    const showFileOperationModal = async (event, mode = 'file') => {
+      if (!fileOperationModal.value) return;
+      
+      const initialPath = props.path ? props.path + '/' : '';
+      const result = await fileOperationModal.value.show(mode, initialPath);
+      
+      if (result.canceled) return;
+      
+      // Handle the result based on operation type
+      switch (result.mode) {
+        case 'file':
+          await createNewFile(result.path);
+          break;
+        case 'folder':
+          await createNewFolder(result.path);
+          break;
+        case 'upload':
+          await handleFileUpload(result.path, result.content);
+          break;
+      }
     };
     
-    const cancelNewFile = () => {
-      showNewFileDialog.value = false;
-      newFilePath.value = '';
-    };
-    
-    const confirmNewFile = async () => {
-      if (!newFilePath.value.trim()) {
+    // Create new file handler
+    const createNewFile = async (filePath) => {
+      if (!filePath.trim()) {
         showAlert('Please enter a file path', 'Error');
         return;
       }
@@ -549,12 +483,13 @@ export default {
         showLoading('Creating file...');
         
         // Prepend current directory path to new file path if not an absolute path
-        let fullPath = newFilePath.value;
-        if (!newFilePath.value.startsWith('/') && props.path && !fullPath.includes('/')) {
-          fullPath = `${props.path}/${newFilePath.value}`;
+        let fullPath = filePath;
+        if (!filePath.startsWith('/') && props.path && !fullPath.includes('/')) {
+          fullPath = `${props.path}/${filePath}`;
         }
         
-        const response = await api.post('/file/save', {
+        const response = await api.post('/file/operations', {
+          operation: 'create-file',
           filePath: fullPath,
           content: ''
         }, {
@@ -567,7 +502,6 @@ export default {
         const data = response.data;
         
         if (data.success) {
-          showNewFileDialog.value = false;
           refreshDirectory();
           // Open the new file for editing
           emit('select-file', fullPath);
@@ -582,25 +516,9 @@ export default {
       }
     };
     
-    // New folder handlers
-    const newFolderInput = ref(null);
-    const createNewFolder = () => {
-      showNewFolderDialog.value = true;
-      newFolderPath.value = props.path ? props.path + '/' : '';
-      nextTick(() => {
-        if (newFolderInput.value) {
-          newFolderInput.value.focus();
-        }
-      });
-    };
-    
-    const cancelNewFolder = () => {
-      showNewFolderDialog.value = false;
-      newFolderPath.value = '';
-    };
-    
-    const confirmNewFolder = async () => {
-      if (!newFolderPath.value.trim()) {
+    // Create new folder handler
+    const createNewFolder = async (folderPath) => {
+      if (!folderPath.trim()) {
         showAlert('Please enter a folder path', 'Error');
         return;
       }
@@ -609,12 +527,13 @@ export default {
         showLoading('Creating folder...');
         
         // Prepend current directory path to new folder path if not an absolute path
-        let fullPath = newFolderPath.value;
-        if (!newFolderPath.value.startsWith('/') && props.path && !fullPath.includes('/')) {
-          fullPath = `${props.path}/${newFolderPath.value}`;
+        let fullPath = folderPath;
+        if (!folderPath.startsWith('/') && props.path && !fullPath.includes('/')) {
+          fullPath = `${props.path}/${folderPath}`;
         }
         
-        const response = await api.post('/file/create-folder', {
+        const response = await api.post('/file/operations', {
+          operation: 'create-folder',
           folderPath: fullPath
         }, {
           headers: {
@@ -626,7 +545,6 @@ export default {
         const data = response.data;
         
         if (data.success) {
-          showNewFolderDialog.value = false;
           refreshDirectory();
         } else {
           showAlert(`Failed to create folder: ${data.message}`, 'Error');
@@ -639,79 +557,44 @@ export default {
       }
     };
     
-    // File upload handlers
-    const uploadPathInput = ref(null);
-    const uploadFile = () => {
-      showUploadDialog.value = true;
-      uploadPath.value = props.path ? props.path + '/' : '';
-      selectedFileToUpload.value = null;
-      nextTick(() => {
-        if (uploadPathInput.value) {
-          uploadPathInput.value.focus();
-        }
-      });
-    };
-    
-    const cancelUpload = () => {
-      showUploadDialog.value = false;
-      uploadPath.value = '';
-      selectedFileToUpload.value = null;
-    };
-    
-    const handleFileSelected = (event) => {
-      const file = event.target.files[0];
-      selectedFileToUpload.value = file || null;
-      
-      // Auto-fill uploadPath with the filename if not provided
-      if (file && uploadPath.value.endsWith('/')) {
-        uploadPath.value += file.name;
-      }
-    };
-    
-    const confirmUpload = async () => {
-      if (!uploadPath.value.trim() || !selectedFileToUpload.value) {
-        showAlert('Please select a file and enter a destination path', 'Error');
+    // Handle file upload
+    const handleFileUpload = async (filePath, content) => {
+      if (!filePath.trim()) {
+        showAlert('Please enter a destination path', 'Error');
         return;
       }
       
       try {
         showLoading('Uploading file...');
         
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          const content = e.target.result;
-          
-          const response = await api.post('/file/upload', {
-            path: uploadPath.value,
-            content
-          }, {
-            headers: {
-              'Content-Type': 'application/json',
-              'workspace-id': props.workspaceId
-            }
-          });
-          
-          const data = response.data;
-          if (data.success) {
-            showUploadDialog.value = false;
-            refreshDirectory();
-            
-            // Open the uploaded file
-            emit('select-file', uploadPath.value);
-          } else {
-            showAlert(`Failed to upload file: ${data.message}`, 'Error');
+        const response = await api.post('/file/operations', {
+          operation: 'upload',
+          filePath: filePath,
+          content: content
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'workspace-id': props.workspaceId
           }
-          hideLoading();
-        };
+        });
         
-        reader.readAsText(selectedFileToUpload.value);
+        const data = response.data;
+        if (data.success) {
+          refreshDirectory();
+          
+          // Open the uploaded file
+          emit('select-file', filePath);
+        } else {
+          showAlert(`Failed to upload file: ${data.message}`, 'Error');
+        }
       } catch (error) {
         console.error('Error uploading file:', error);
         showAlert('Failed to upload file. Check console for details.', 'Error');
+      } finally {
         hideLoading();
       }
     };
-    
+
     // Rename file handlers
     const renameInput = ref(null);
     const renameFile = () => {
@@ -1165,59 +1048,23 @@ export default {
       showFileMenu,
       fileMenuPosition,
       showFileOptions,
-      
-      // New file
-      showNewFileDialog,
-      newFilePath,
-      newFileInput,
-      createNewFile,
-      cancelNewFile,
-      confirmNewFile,
-      
-      // New folder
-      showNewFolderDialog,
-      newFolderPath,
-      newFolderInput,
-      createNewFolder,
-      cancelNewFolder,
-      confirmNewFolder,
-      
-      // Upload file
-      showUploadDialog,
-      uploadPath,
-      selectedFileToUpload,
-      fileInput,
-      uploadPathInput,
-      uploadFile,
-      cancelUpload,
-      handleFileSelected,
-      confirmUpload,
-      
-      // Rename file
+      showFileOperationModal,
+      fileOperationModal,
       showRenameDialog,
-      newFileName,
-      renameInput,
-      renameFile,
-      cancelRename,
-      confirmRename,
-      
-      // Move file
       showMoveDialog,
-      destinationPath,
-      moveInput,
-      moveFile,
-      cancelMove,
-      confirmMove,
-      
-      // Copy file
       showCopyDialog,
-      copyInput,
-      copyFile,
-      cancelCopy,
-      confirmCopy,
-      
-      // Delete file
       deleteFile,
+      renameFile,
+      moveFile,
+      copyFile,
+      cancelRename,
+      cancelMove,
+      cancelCopy,
+      confirmRename,
+      confirmMove,
+      confirmCopy,
+      newFileName,
+      destinationPath,
       
       // Changed files
       isFileChanged,
@@ -1246,8 +1093,7 @@ export default {
 }
 
 .directory-controls {
-  display: flex;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.25rem;
   gap: 0.2rem;
 }
 
