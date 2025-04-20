@@ -20,7 +20,7 @@
 </template>
 
 <script>
-import { ref, watch, onMounted, onBeforeUnmount, nextTick, computed } from 'vue';
+import { ref, watch, onMounted, onBeforeUnmount, nextTick, computed, inject } from 'vue';
 import { EditorState, Compartment } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
@@ -45,6 +45,9 @@ export default {
   setup(props, { emit }) {
     const editorContainer = ref(null);
     let view = null;
+    
+    // Inject workspaceId from App.vue
+    const workspaceId = inject('workspaceId', ref(''));
     
     // References to PFS documents
     const pfsReferences = ref([]);
@@ -103,15 +106,14 @@ export default {
       }
       
       try {
-        const workspaceId = localStorage.getItem('workspaceId');
-        if (!workspaceId) return;
+        if (!workspaceId.value) return;
         
         const response = await api.get(`/file/pfs-references`, {
           params: {
             requirementPath: props.filename
           },
           headers: {
-            'workspace-id': workspaceId
+            'workspace-id': workspaceId.value
           }
         });
         

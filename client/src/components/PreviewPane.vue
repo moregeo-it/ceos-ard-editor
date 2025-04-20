@@ -32,6 +32,7 @@
 import { ref, watch, onMounted, onUnmounted, inject } from 'vue';
 import { API_URL } from '../config.js';
 import api from '../services/auth.js';
+import buildService from '../services/BuildService.js';
 
 export default {
   name: 'PreviewPane',
@@ -51,6 +52,10 @@ export default {
     isResizing: {
       type: Boolean,
       default: false
+    },
+    workspaceId: {
+      type: String,
+      required: true
     }
   },
   emits: ['preview-change', 'build-started', 'build-completed', 'open-file'],
@@ -58,11 +63,10 @@ export default {
     const previewFrame = ref(null);
     const scrollPosition = ref({ x: 0, y: 0 });
     const isGenerating = ref(false);
-    const buildStatus = ref('');
     const buildStatusMessage = ref('Preparing build...');
     const buildLogs = ref('');
     const showLogs = ref(false);
-    let statusPollInterval = null;
+    let statusListenerUnsubscribe = null;
     
     // Inject modal functions from App.vue
     const showAlert = inject('showAlert');
@@ -74,9 +78,7 @@ export default {
 
     // Generate new preview for a specific file
     const generatePreview = async (previewName) => {
-      const workspaceId = localStorage.getItem('workspaceId');
-      
-      if (!workspaceId) {
+      if (!props.workspaceId) {
         showAlert('No workspace selected', 'Error');
         return;
       }
@@ -88,7 +90,6 @@ export default {
       
       try {
         isGenerating.value = true;
-        buildStatus.value = 'starting';
         buildStatusMessage.value = 'Regenerating document...';
         buildLogs.value = '';
         emit('build-started');
@@ -96,126 +97,59 @@ export default {
         // Extract the PFS name from the filename (remove .html extension)
         const pfsName = previewName.replace('.html', '');
         
-        // Use the authenticated API instance instead of direct fetch
-        const response = await api.post('/preview/build', {}, {
-          params: {
-            pfs: pfsName
-          },
-          headers: {
-            'Content-Type': 'application/json',
-            'Workspace-Id': workspaceId
-          }
-        });
+        // Use the buildService to start the build and monitor status
+        const result = await buildService.startBuild(props.workspaceId, pfsName);
         
-        const data = response.data;
-        
-        // If build started successfully, poll for status
-        startStatusPolling(workspaceId);
-        
+        if (result.success) {
+          startStatusMonitoring();
+        } else {
+          isGenerating.value = false;
+          buildStatusMessage.value = `Build failed: ${result.error || 'Unknown error'}`;
+          emit('build-completed', { success: false, error: result.error || 'Unknown error' });
+        }
       } catch (error) {
         console.error('Error generating preview:', error);
-        buildStatus.value = 'failed';
         buildStatusMessage.value = `Build failed: ${error.message || error.response?.data?.message || 'Unknown error'}`;
         isGenerating.value = false;
         emit('build-completed', { success: false, error: error.message || error.response?.data?.message || 'Unknown error' });
       }
     };
     
-    // Poll for build status
-    const startStatusPolling = (workspaceId) => {
-      // Clear any existing interval
-      if (statusPollInterval) {
-        clearInterval(statusPollInterval);
+    // Monitor build status using the buildService
+    const startStatusMonitoring = () => {
+      // Clean up any existing listeners
+      if (statusListenerUnsubscribe) {
+        statusListenerUnsubscribe();
       }
       
-      const pollingStartTime = Date.now();
-      const POLLING_TIMEOUT = 5 * 60 * 1000; // 5 minutes timeout
-      
-      // Set up polling interval (every 2 seconds)
-      statusPollInterval = setInterval(async () => {
-        try {
-          // Check if we've exceeded the timeout
-          if (Date.now() - pollingStartTime > POLLING_TIMEOUT) {
-            clearInterval(statusPollInterval);
-            statusPollInterval = null;
-            isGenerating.value = false;
-            buildStatusMessage.value = 'Build timed out after 5 minutes';
-            emit('build-completed', { success: false, error: 'Build timed out' });
-            console.warn('Build status polling timed out');
-            return;
+      // Register a new listener for build status changes
+      statusListenerUnsubscribe = buildService.addStatusListener((statusData) => {
+        // Update UI based on status
+        if (statusData.status) {
+          // Update status message
+          buildStatusMessage.value = buildService.getStatusMessage();
+          
+          // Update logs if available
+          if (statusData.logs) {
+            buildLogs.value = statusData.logs;
           }
           
-          const response = await api.get('/preview/build-status', {
-            headers: {
-              'Workspace-Id': workspaceId
-            }
-          });
-          
-          const data = response.data;
-          buildStatus.value = data.status;
-          
-          // Update logs
-          if (data.logs && data.logs.length > 0) {
-            buildLogs.value = data.logs.map(log => log.text).join('');
-          }
-          
-          // Update status message based on build status
-          switch (data.status) {
-            case 'starting':
-              buildStatusMessage.value = 'Preparing build environment...';
-              break;
-            case 'in_progress':
-              buildStatusMessage.value = 'Building documents...';
-              break;
-            case 'completed':
-              buildStatusMessage.value = 'Build completed successfully!';
-              // Stop polling and refresh the preview list
-              clearInterval(statusPollInterval);
-              statusPollInterval = null;
-              
-              // Wait a moment before hiding the generating indicator to ensure
-              // the user sees the success message
-              setTimeout(() => {
-                isGenerating.value = false;
-                emit('build-completed', { success: true });
-              }, 1000);
-              break;
-            case 'failed':
-              buildStatusMessage.value = `Build failed: ${data.error || 'Unknown error'}`;
-              // Stop polling
-              clearInterval(statusPollInterval);
-              statusPollInterval = null;
-              
-              // Wait a moment before hiding the generating indicator to ensure
-              // the user sees the error message
-              setTimeout(() => {
-                isGenerating.value = false;
-                emit('build-completed', { success: false, error: data.error });
-              }, 1000);
-              break;
-            default:
-              buildStatusMessage.value = `Build status: ${data.status}`;
-          }
-        } catch (error) {
-          // Handle different types of errors
-          if (error.response) {
-            // The request was made and the server responded with a status code outside of 2xx
-            if (error.response.status === 404) {
-              // If the workspace doesn't have a build in progress
-              clearInterval(statusPollInterval);
-              statusPollInterval = null;
+          // Handle completion
+          if (statusData.status === 'completed') {
+            setTimeout(() => {
               isGenerating.value = false;
               emit('build-completed', { success: true });
-              return;
-            }
-            console.error('Error response from build status API:', error.response.data);
-            buildStatusMessage.value = `Error: ${error.response.data.message || 'Unknown error'}`;
-          } else {
-            console.error('Error polling build status:', error);
-            buildStatusMessage.value = `Error checking build status: ${error.message || 'Unknown error'}`;
+            }, 1000);
+          } 
+          // Handle failure
+          else if (statusData.status === 'failed') {
+            setTimeout(() => {
+              isGenerating.value = false;
+              emit('build-completed', { success: false, error: statusData.error });
+            }, 1000);
           }
         }
-      }, 2000);
+      });
     };
     
     // Update iframe content when the content prop changes
@@ -251,16 +185,14 @@ export default {
     
     // Helper to fix relative URLs in the iframe
     const enhanceDoc = (iframeDoc) => {
-      const workspaceId = localStorage.getItem('workspaceId');
-      
-      if (!workspaceId) return;
+      if (!props.workspaceId) return;
       
       // Fix relative links
       const links = iframeDoc.querySelectorAll('a[href]');
       links.forEach(link => {
         const href = link.getAttribute('href');
         if (href && !href.startsWith('http') && !href.startsWith('#')) {
-          link.setAttribute('href', `${API_URL}/preview/static/${href}?workspace-id=${workspaceId}`);
+          link.setAttribute('href', `${API_URL}/preview/static/${href}?workspace-id=${props.workspaceId}`);
         }
       });
       
@@ -269,7 +201,7 @@ export default {
       images.forEach(img => {
         const src = img.getAttribute('src');
         if (src && !src.startsWith('http')) {
-          img.setAttribute('src', `${API_URL}/preview/static/${src}?workspace-id=${workspaceId}`);
+          img.setAttribute('src', `${API_URL}/preview/static/${src}?workspace-id=${props.workspaceId}`);
         }
       });
       
@@ -278,7 +210,7 @@ export default {
       stylesheets.forEach(sheet => {
         const href = sheet.getAttribute('href');
         if (href && !href.startsWith('http')) {
-          sheet.setAttribute('href', `${API_URL}/preview/static/${href}?workspace-id=${workspaceId}`);
+          sheet.setAttribute('href', `${API_URL}/preview/static/${href}?workspace-id=${props.workspaceId}`);
         }
       });
       
@@ -328,8 +260,8 @@ export default {
     
     // Clean up on unmount
     onUnmounted(() => {
-      if (statusPollInterval) {
-        clearInterval(statusPollInterval);
+      if (statusListenerUnsubscribe) {
+        statusListenerUnsubscribe();
       }
     });
     

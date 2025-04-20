@@ -10,6 +10,7 @@ const execAsync = util.promisify(exec);
 const axios = require('axios');
 const Datastore = require('@seald-io/nedb');
 const { startBuild } = require('../utils/build');
+const { sanitizePath, sanitizeString, sanitizeWorkspaceId } = require('../utils/sanitize');
 
 // GitHub API configuration
 const DEFAULT_REPO_OWNER = process.env.GITHUB_REPO_OWNER || 'ceos-org';
@@ -266,7 +267,7 @@ process.exit(0);
 // Get workspace details
 router.get('/:id', async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = sanitizeWorkspaceId(req.params.id);
     
     if (!req.isAuthenticated()) {
       return res.status(401).json({
@@ -320,7 +321,7 @@ router.get('/:id', async (req, res) => {
 // Close/delete a workspace
 router.delete('/:id', async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = sanitizeWorkspaceId(req.params.id);
     
     if (!req.isAuthenticated()) {
       return res.status(401).json({
@@ -372,8 +373,8 @@ router.delete('/:id', async (req, res) => {
 // Update workspace title
 router.patch('/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    const { title } = req.body;
+    const id = sanitizeWorkspaceId(req.params.id);
+    const title = sanitizeString(req.body.title);
     
     if (!req.isAuthenticated()) {
       return res.status(401).json({
@@ -441,7 +442,7 @@ router.patch('/:id', async (req, res) => {
 // Get workspace status (git status)
 router.get('/:id/status', async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = sanitizeWorkspaceId(req.params.id);
     
     if (!req.isAuthenticated()) {
       return res.status(401).json({
@@ -553,8 +554,9 @@ router.get('/:id/status', async (req, res) => {
 // POST /api/workspace/:id/propose - Commit changes and create a PR
 router.post('/:id/propose', async (req, res) => {
   try {
-    const { id } = req.params;
-    const { title, description } = req.body;
+    const id = sanitizeWorkspaceId(req.params.id);
+    const title = sanitizeString(req.body.title);
+    const description = sanitizeString(req.body.description || '');
 
     if (!req.isAuthenticated()) {
       return res.status(401).json({
@@ -683,7 +685,7 @@ process.exit(0);
           `https://api.github.com/repos/${DEFAULT_REPO_OWNER}/${DEFAULT_REPO_NAME}/pulls`,
           {
             title: title,
-            body: description || '',
+            body: description,
             head: `${username}:${branchName}`,
             base: 'main'  // Target branch in upstream repo
           },

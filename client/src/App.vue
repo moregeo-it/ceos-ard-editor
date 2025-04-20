@@ -101,6 +101,7 @@
               <file-tree-directory 
                 path="" 
                 :currentOpenFile="currentFile"
+                :workspaceId="workspaceId"
                 @select-file="openFile" 
                 @refresh="loadFileTree" 
                 @update-current-file="handleFilePathUpdate"
@@ -154,14 +155,11 @@
                 </select>
               </div>
             </div>
-            <div v-if="!previewFiles.length" class="no-preview">
-              No previews available. Save your changes to generate a preview.
-            </div>
             <preview-pane 
-              v-if="selectedPreview"
               :content="previewContent"
               :selected-preview-name="selectedPreview"
               :is-resizing="resizeState && resizeState.active"
+              :workspaceId="workspaceId"
               @build-completed="handleBuildCompleted"
               @open-file="openFile"
               ref="previewPaneRef"
@@ -188,6 +186,7 @@ import BaseButton from './components/BaseButton.vue';
 import { API_URL } from './config.js';
 import { AuthService } from './services/auth';
 import api from './services/auth';
+import buildService from './services/BuildService';
 
 export default {
   name: 'App',
@@ -222,17 +221,13 @@ export default {
         // Load all user workspaces
         await loadUserWorkspaces();
         
-        // Only load from URL if present, not from localStorage
+        // Only load from URL if present
         const urlParams = new URLSearchParams(window.location.search);
         const urlWorkspaceId = urlParams.get('workspace');
         
         if (urlWorkspaceId) {
           // Only open workspace if explicitly specified in URL
           openWorkspace(urlWorkspaceId);
-        } else {
-          // Clear any stored workspaceId from localStorage to prevent automatic opening
-          localStorage.removeItem('workspaceId');
-          workspaceId.value = '';
         }
       }
     };
@@ -246,7 +241,7 @@ export default {
         if (response.data.success) {
           userWorkspaces.value = response.data.workspaces;
           
-          // Set current workspace if we have a workspace ID
+          // Set current workspace if we have a workspace ID in URL
           if (workspaceId.value) {
             currentWorkspace.value = userWorkspaces.value.find(ws => ws.id === workspaceId.value);
             if (currentWorkspace.value) {
@@ -254,15 +249,11 @@ export default {
               await loadFileTree();
               await generateAllPreviews();
             } else {
-              // If the stored workspace ID doesn't match any existing workspace,
+              // If the workspace ID doesn't match any existing workspace,
               // clear it to show the workspace selection screen
               workspaceId.value = '';
-              localStorage.removeItem('workspaceId');
             }
           }
-          
-          // Note: No longer automatically selecting the most recent workspace
-          // or creating a new one - user must explicitly choose
         }
       } catch (error) {
         console.error('Error loading user workspaces:', error);
@@ -279,11 +270,10 @@ export default {
       
       // Clear workspace data
       workspaceId.value = '';
-      localStorage.removeItem('workspaceId');
     };
 
     // Workspace state
-    const workspaceId = ref(localStorage.getItem('workspaceId') || '');
+    const workspaceId = ref('');
     const isCreatingWorkspace = ref(false);
     const isCreatingInitialWorkspace = ref(false);
     const userWorkspaces = ref([]);
@@ -423,9 +413,8 @@ export default {
         const result = await modalRef.submit();
         
         if (result && result.success) {
-          // Update workspace ID and local storage
+          // Update workspace ID
           workspaceId.value = result.workspace.id;
-          localStorage.setItem('workspaceId', result.workspace.id);
           
           // Set current workspace
           currentWorkspace.value = result.workspace;
@@ -466,7 +455,6 @@ export default {
       try {
         showLoading('Opening workspace...');
         workspaceId.value = id;
-        localStorage.setItem('workspaceId', id);
         currentWorkspace.value = userWorkspaces.value.find(ws => ws.id === id);
         if (!currentWorkspace.value) {
           throw new Error(`Workspace with ID ${id} not found`);
@@ -488,7 +476,6 @@ export default {
         console.error('Error opening workspace:', error);
         showAlert(`Failed to open workspace: ${error.message}`, 'Error');
         workspaceId.value = '';
-        localStorage.removeItem('workspaceId');
         hideLoading();
       }
     };
@@ -496,7 +483,6 @@ export default {
     // Close the workspace
     const closeWorkspace = async () => {
       workspaceId.value = '';
-      localStorage.removeItem('workspaceId');
       currentFile.value = '';
       fileContent.value = '';
       files.value = [];
@@ -655,26 +641,24 @@ export default {
       try {
         showLoading('Generating preview...');
         
-        const response = await api.post('/preview/build', {}, {
-          params: {
-            pfs: selectedPreview.value
-          },
-          headers: {
-            'workspace-id': workspaceId.value
-          }
-        });
+        // Use buildService to start a build for the selected PFS
+        const result = await buildService.startBuild(workspaceId.value, selectedPreview.value.replace('.html', ''));
         
-        const data = response.data;
-        
-        if (data.success) {
-          loadPreviewFiles();
+        if (result.success) {
+          // Set up listener for build status changes
+          const unsubscribe = buildService.addStatusListener((status) => {
+            if (status.status === 'completed' || status.status === 'failed') {
+              loadPreviewFiles();
+              unsubscribe(); // Clean up the listener
+            }
+          });
         } else {
-          showAlert(`Failed to generate preview: ${data.message}`, 'Error');
+          showAlert(`Failed to generate preview: ${result.error}`, 'Error');
+          hideLoading();
         }
       } catch (error) {
         console.error('Error generating preview:', error);
         showAlert('Failed to generate preview. Check console for details.', 'Error');
-      } finally {
         hideLoading();
       }
     };
@@ -684,42 +668,30 @@ export default {
       try {
         showLoading('Checking build status...');
         
-        // First, check if a build is already in progress
-        const statusResponse = await api.get('/preview/build-status', {
-          headers: {
-            'Workspace-Id': workspaceId.value
+        // Check if a build is already in progress using the buildService
+        try {
+          const status = await buildService.checkBuildStatus(workspaceId.value);
+          
+          // If there's already a build in progress, just start monitoring it
+          if (status.status === 'in_progress' || status.status === 'starting') {
+            console.log('Build already in progress, monitoring existing build');
+            loadingMessage.value = 'Build already in progress...';
+            setupBuildStatusMonitoring();
+            return;
           }
-        });
-        
-        // If there's already a build in progress or recently completed from auto-build,
-        // just start polling for status instead of starting a new build
-        if (statusResponse.data.status && 
-            (statusResponse.data.status === 'in_progress' || 
-             statusResponse.data.status === 'starting')) {
-          console.log('Build already in progress, starting to poll for status');
-          loadingMessage.value = 'Build already in progress...';
-          pollBuildStatus();
-          return;
+        } catch (error) {
+          // If no build is in progress, proceed with starting a new one
+          console.log('No build in progress, starting a new one');
         }
         
-        // No build in progress, start a new one
+        // Start a new build for all PFS files
         showLoading('Generating all previews...');
+        const result = await buildService.startBuild(workspaceId.value);
         
-        // Use the unified build endpoint without a pfs parameter to build all files
-        const response = await api.post('/preview/build', {}, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Workspace-Id': workspaceId.value
-          }
-        });
-        
-        const data = response.data;
-        
-        if (data.success) {
-          // Start polling for build status
-          pollBuildStatus();
+        if (result.success) {
+          setupBuildStatusMonitoring();
         } else {
-          showAlert(`Failed to generate previews: ${data.message}`, 'Error');
+          showAlert(`Failed to generate previews: ${result.error}`, 'Error');
           hideLoading();
         }
       } catch (error) {
@@ -729,105 +701,29 @@ export default {
       }
     };
     
-    // Poll for build status when generating all previews
-    let buildStatusPollInterval = null;
-    const pollBuildStatus = async () => {
-      // Clear any existing interval
-      if (buildStatusPollInterval) {
-        clearInterval(buildStatusPollInterval);
-      }
-      
-      const pollingStartTime = Date.now();
-      const POLLING_TIMEOUT = 5 * 60 * 1000; // 5 minutes timeout
-      
-      // Set up polling interval (every 2 seconds)
-      buildStatusPollInterval = setInterval(async () => {
-        try {
-          // Check if we've exceeded the timeout
-          if (Date.now() - pollingStartTime > POLLING_TIMEOUT) {
-            clearInterval(buildStatusPollInterval);
-            buildStatusPollInterval = null;
-            hideLoading();
-            console.warn('Build status polling timed out');
-            return;
-          }
+    // Setup monitoring for build status changes
+    const setupBuildStatusMonitoring = () => {
+      // Update loading message based on build status
+      const unsubscribe = buildService.addStatusListener((statusData) => {
+        if (statusData.status) {
+          loadingMessage.value = buildService.getStatusMessage();
           
-          const response = await api.get('/preview/build-status', {
-            headers: {
-              'Workspace-Id': workspaceId.value
-            }
-          });
-          
-          // Process the response data
-          const data = response.data;
-          
-          loadingMessage.value = getBuildStatusMessage(data.status, data.error);
-          
-          // Check if the build has completed or failed
-          if (data.status === 'completed') {
-            clearInterval(buildStatusPollInterval);
-            buildStatusPollInterval = null;
+          if (statusData.status === 'completed') {
             hideLoading();
             loadPreviewFiles();
-          } else if (data.status === 'failed') {
-            clearInterval(buildStatusPollInterval);
-            buildStatusPollInterval = null;
+            unsubscribe(); // Clean up the listener when done
+          } else if (statusData.status === 'failed') {
             hideLoading();
-            showAlert(`Build failed: ${data.error || 'Unknown error'}`, 'Build Failed');
-          }
-          
-        } catch (error) {
-          // Handle different types of errors
-          if (error.response) {
-            // The request was made and the server responded with a status code outside of 2xx
-            if (error.response.status === 404) {
-              // If the workspace doesn't have a build in progress
-              clearInterval(buildStatusPollInterval);
-              buildStatusPollInterval = null;
-              hideLoading();
-              loadPreviewFiles(); // Still try to load previews that might be there
-              return;
-            }
-            console.error('Error response from build status API:', error.response.data);
-          } else if (error.request) {
-            // The request was made but no response was received
-            console.error('No response received for build status check:', error.request);
-          } else {
-            // Something happened in setting up the request that triggered an Error
-            console.error('Error polling build status:', error.message);
-          }
-          
-          // Don't flood the console with errors if polling continues
-          if (buildStatusPollInterval) {
-            // Only log once per minute to avoid console spam
-            if (Math.floor((Date.now() - pollingStartTime) / 60000) % 1 === 0) {
-              console.warn('Continuing to poll despite errors...');
-            }
+            showAlert(`Build failed: ${statusData.error || 'Unknown error'}`, 'Build Failed');
+            unsubscribe(); // Clean up the listener when done
           }
         }
-      }, 2000);
-    };
-    
-    // Get status message based on build status
-    const getBuildStatusMessage = (status, error) => {
-      switch (status) {
-        case 'starting':
-          return 'Preparing build environment...';
-        case 'in_progress':
-          return 'Building documents...';
-        case 'completed':
-          return 'Build completed successfully!';
-        case 'failed':
-          return `Build failed: ${error || 'Unknown error'}`;
-        default:
-          return `Build status: ${status}`;
-      }
+      });
     };
 
     // Load available preview files
     const loadPreviewFiles = async () => {
       try {
-        const currentSelectedPreview = selectedPreview.value;
         const response = await api.get('/preview/list', {
           headers: {
             'workspace-id': workspaceId.value
@@ -913,7 +809,6 @@ export default {
 
     const handleWorkspaceCreated = async (workspace) => {
       workspaceId.value = workspace.id;
-      localStorage.setItem('workspaceId', workspace.id);
       currentWorkspace.value = workspace;
       defaultPfs.value = workspace.defaultPfs || '';
       await loadFileTree();
@@ -930,9 +825,12 @@ export default {
     onUnmounted(() => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', stopResize);
+      buildService.dispose(); // Clean up any active polling
     });
 
     provide('changedFiles', changedFiles);
+    provide('buildService', buildService); // Provide buildService to all child components
+    provide('workspaceId', workspaceId); // Provide workspaceId to all child components
 
     return {
       // Auth state
@@ -1367,12 +1265,6 @@ body {
 
 .preview-selector {
   flex-shrink: 0;
-}
-
-.no-preview {
-  margin: 2rem 0;
-  color: #777;
-  text-align: center;
 }
 
 h3 {

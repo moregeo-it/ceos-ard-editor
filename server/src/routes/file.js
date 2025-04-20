@@ -6,6 +6,7 @@ const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
 const axios = require('axios');
+const { sanitizePath, sanitizeString, sanitizeQuery, sanitizeWorkspaceId } = require('../utils/sanitize');
 
 const WORKSPACES_DIR = path.join(__dirname, '../../workspaces');
 
@@ -19,10 +20,11 @@ function normalizePath(filePath) {
 // List all available PFS folders (fetched directly from GitHub)
 router.get('/list-pfs', async (req, res) => {
   try {
-    const { owner = process.env.GITHUB_REPO_OWNER || 'ceos-org', repo = process.env.GITHUB_REPO_NAME || 'ceos-ard', branch = 'main' } = req.query;
+    const sanitizedQuery = sanitizeQuery(req.query);
+    const { owner = process.env.GITHUB_REPO_OWNER || 'ceos-org', repo = process.env.GITHUB_REPO_NAME || 'ceos-ard', branch = 'main' } = sanitizedQuery;
     
     // Use GitHub API to get contents of the pfs directory
-    const githubApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/pfs?ref=${branch}`;
+    const githubApiUrl = `https://api.github.com/repos/${sanitizeString(owner)}/${sanitizeString(repo)}/contents/pfs?ref=${sanitizeString(branch)}`;
     
     // Make request to GitHub API
     const response = await axios.get(githubApiUrl, {
@@ -56,7 +58,7 @@ router.get('/list-pfs', async (req, res) => {
 const validateWorkspace = async (req, res, next) => {
   try {
     // Accept workspace ID from either headers or query parameters
-    const workspaceId = req.headers['workspace-id'] || req.query['workspace-id'];
+    const workspaceId = sanitizeWorkspaceId(req.headers['workspace-id'] || req.query['workspace-id']);
     if (!workspaceId) {
       return res.status(401).json({
         success: false,
@@ -89,8 +91,10 @@ router.use(validateWorkspace);
 // List files in a directory
 router.get('/list', async (req, res) => {
   try {
-    const { dir = '' } = req.query;
-    const dirPath = path.join(req.workspacePath, dir);
+    const sanitizedQuery = sanitizeQuery(req.query);
+    const { dir = '' } = sanitizedQuery;
+    const safeDir = sanitizePath(dir);
+    const dirPath = path.join(req.workspacePath, safeDir);
 
     // Check if directory exists and is within the workspace
     if (!await fs.pathExists(dirPath) || !dirPath.startsWith(req.workspacePath)) {
@@ -142,7 +146,7 @@ router.get('/list', async (req, res) => {
         if (item.endsWith('.pdf')) return false;
         
         // Hide build folder only at the top level
-        if (['templates', 'build', 'LICENSE'].includes(item) && dir === '') return false;
+        if (['templates', 'build', 'LICENSE'].includes(item) && safeDir === '') return false;
         
         return true;
       })
@@ -162,9 +166,9 @@ router.get('/list', async (req, res) => {
       }));
 
     // Add deleted files that belong in this directory
-    if (dir) {
+    if (safeDir) {
       // For subdirectories, only include deleted files within this directory
-      const dirPrefix = dir.endsWith('/') ? dir : dir + '/';
+      const dirPrefix = safeDir.endsWith('/') ? safeDir : safeDir + '/';
       
       deletedFiles.forEach(filePath => {
         // Filter deleted files to only those that belong in this directory
@@ -225,9 +229,11 @@ router.get('/list', async (req, res) => {
 // Search files (both filenames and content)
 router.get('/search', async (req, res) => {
   try {
-    const { query = '' } = req.query;
+    const sanitizedQuery = sanitizeQuery(req.query);
+    const { query = '' } = sanitizedQuery;
+    const safeQuery = sanitizeString(query);
     
-    if (!query.trim()) {
+    if (!safeQuery.trim()) {
       return res.status(400).json({
         success: false,
         message: 'Search query is required'
@@ -258,7 +264,7 @@ router.get('/search', async (req, res) => {
         const stats = await fs.stat(itemPath);
 
         // Check filename match
-        if (item.toLowerCase().includes(query.toLowerCase())) {
+        if (item.toLowerCase().includes(safeQuery.toLowerCase())) {
           results.push({
             path: normalizePath(itemRelativePath),
             name: item,
@@ -283,13 +289,13 @@ router.get('/search', async (req, res) => {
             try {
               const content = await fs.readFile(itemPath, 'utf-8');
               const lowerContent = content.toLowerCase();
-              const lowerQuery = query.toLowerCase();
+              const lowerQuery = safeQuery.toLowerCase();
               
               if (lowerContent.includes(lowerQuery)) {
                 // Extract context around the match
                 const matchIndex = lowerContent.indexOf(lowerQuery);
                 const extractStart = Math.max(0, matchIndex - 40);
-                const extractEnd = Math.min(content.length, matchIndex + query.length + 40);
+                const extractEnd = Math.min(content.length, matchIndex + safeQuery.length + 40);
                 
                 let extractText = content.substring(extractStart, extractEnd);
                 
@@ -341,7 +347,9 @@ router.get('/search', async (req, res) => {
 // Get file content
 router.get('/content', async (req, res) => {
   try {
-    const { filePath } = req.query;
+    const sanitizedQuery = sanitizeQuery(req.query);
+    const { filePath } = sanitizedQuery;
+    
     if (!filePath) {
       return res.status(400).json({
         success: false,
@@ -349,7 +357,8 @@ router.get('/content', async (req, res) => {
       });
     }
 
-    const fullPath = path.join(req.workspacePath, filePath);
+    const safePath = sanitizePath(filePath);
+    const fullPath = path.join(req.workspacePath, safePath);
     
     // Check if file exists and is within the workspace
     if (!await fs.pathExists(fullPath) || !fullPath.startsWith(req.workspacePath)) {
@@ -379,7 +388,7 @@ router.get('/content', async (req, res) => {
       return res.status(200).json({
         success: true,
         content: '',
-        filePath,
+        filePath: safePath,
         isEditable: false
       });
     }
@@ -390,7 +399,7 @@ router.get('/content', async (req, res) => {
     return res.status(200).json({
       success: true,
       content,
-      filePath,
+      filePath: safePath,
       isEditable: true
     });
   } catch (error) {
@@ -415,7 +424,8 @@ router.post('/save', async (req, res) => {
       });
     }
 
-    const fullPath = path.join(req.workspacePath, filePath);
+    const safePath = sanitizePath(filePath);
+    const fullPath = path.join(req.workspacePath, safePath);
     
     // Check if path is within the workspace
     if (!fullPath.startsWith(req.workspacePath)) {
@@ -434,7 +444,7 @@ router.post('/save', async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'File saved successfully',
-      filePath
+      filePath: safePath
     });
   } catch (error) {
     console.error('Error saving file:', error);
@@ -458,7 +468,8 @@ router.post('/delete', async (req, res) => {
       });
     }
 
-    const fullPath = path.join(req.workspacePath, filePath);
+    const safePath = sanitizePath(filePath);
+    const fullPath = path.join(req.workspacePath, safePath);
     
     // Check if path is within the workspace
     if (!fullPath.startsWith(req.workspacePath)) {
@@ -482,7 +493,7 @@ router.post('/delete', async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'File deleted successfully',
-      filePath
+      filePath: safePath
     });
   } catch (error) {
     console.error('Error deleting file:', error);

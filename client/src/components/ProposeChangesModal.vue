@@ -123,7 +123,7 @@
 <script>
 import Modal from './Modal.vue';
 import BaseButton from './BaseButton.vue';
-import { ref, nextTick } from 'vue';
+import { ref, nextTick, inject } from 'vue';
 import { html, parse } from 'diff2html';
 import 'diff2html/bundles/css/diff2html.min.css';
 import api from '../services/auth.js';
@@ -138,7 +138,7 @@ export default {
     const currentStep = ref(1);
     
     // Get current workspace ID from parent component
-    const workspaceId = ref('');
+    const workspaceId = inject('workspaceId', ref(''));
     
     // Changes data
     const changedFiles = ref([]);
@@ -163,9 +163,6 @@ export default {
     let resolvePromise = null;
 
     const show = () => {
-      // Get the current workspace ID from local storage
-      workspaceId.value = localStorage.getItem('workspaceId') || '';
-      
       if (!workspaceId.value) {
         console.error('No workspace ID found');
         return Promise.resolve({ canceled: true });

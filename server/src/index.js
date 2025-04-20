@@ -30,23 +30,39 @@ app.use(cors({
   credentials: true
 }));
 app.use(morgan('dev'));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+
+// Set request size limits to prevent abuse
+app.use(bodyParser.json({ limit: '2mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '2mb' }));
+
+// File upload security settings
 app.use(fileUpload({
   createParentPath: true,
-  limits: { fileSize: (parseInt(process.env.MAX_FILE_SIZE) || 50) * 1024 * 1024 } // Default: 50MB
+  limits: { 
+    fileSize: (parseInt(process.env.MAX_FILE_SIZE) || 50) * 1024 * 1024,
+    files: 1 // Maximum number of files allowed per request
+  },
+  abortOnLimit: true,
+  useTempFiles: true,
+  tempFileDir: path.join(__dirname, '../.tmp/'),
+  safeFileNames: true, // Removes special characters
+  preserveExtension: true
 }));
 
-// Session configuration
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'keyboard cat',
+// Session configuration with secure settings
+const sessionConfig = {
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
-    maxAge: 30 * 24 * 60 * 60 * 1000
+    httpOnly: true, // Prevents client-side JS from reading the cookie
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    sameSite: 'lax' // Provides some CSRF protection
   }
-}));
+};
+
+app.use(session(sessionConfig));
 
 // Initialize Passport and session
 app.use(passport.initialize());
@@ -60,9 +76,9 @@ app.use('/api/workspace', ensureAuthenticated, workspaceRoutes);
 app.use('/api/file', ensureAuthenticated, fileRoutes);
 app.use('/api/preview', ensureAuthenticated, previewRoutes);
 
-// Create workspaces directory if it doesn't exist
-const workspacesDir = path.join(__dirname, '../workspaces');
-fs.ensureDirSync(workspacesDir);
+for (const folder of ['../workspaces', '../tmp']) {
+  fs.ensureDirSync(path.join(__dirname, folder));
+}
 
 // Start server
 app.listen(PORT, () => {

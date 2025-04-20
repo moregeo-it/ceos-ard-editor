@@ -3,6 +3,7 @@ const router = express.Router();
 const path = require('path');
 const fs = require('fs-extra');
 const { startBuild, getBuildStatus } = require('../utils/build');
+const { sanitizePath, sanitizeString, sanitizeWorkspaceId } = require('../utils/sanitize');
 
 const WORKSPACES_DIR = path.join(__dirname, '../../workspaces');
 
@@ -15,7 +16,7 @@ function normalizePath(filePath) {
 const validateWorkspace = async (req, res, next) => {
   try {
     // Accept workspace ID from either headers or query parameters
-    const workspaceId = req.headers['workspace-id'] || req.query['workspace-id'];
+    const workspaceId = sanitizeWorkspaceId(req.headers['workspace-id'] || req.query['workspace-id']);
     if (!workspaceId) {
       return res.status(401).json({
         success: false,
@@ -49,7 +50,7 @@ router.use(validateWorkspace);
 // Unified build endpoint that handles both all files and specific PFS builds
 router.post('/build', async (req, res) => {
   try {
-    const pfs = req.query.pfs; // Optional PFS parameter
+    const pfs = sanitizeString(req.query.pfs); // Optional PFS parameter
     
     // Start build using the shared utility
     startBuild(req.workspacePath, req.workspaceId, pfs);
@@ -76,10 +77,9 @@ router.get('/build-status', async (req, res) => {
     const buildInfo = getBuildStatus(req.workspaceId);
     
     if (!buildInfo) {
-      return res.status(404).json({
+      return res.status(200).json({
         success: false,
         message: 'No build process found for this workspace',
-        status: 'not_found'
       });
     }
     
@@ -119,8 +119,8 @@ router.get('/list', async (req, res) => {
     const htmlFiles = files
       .filter(file => file.endsWith('.html'))
       .map(file => ({
-        name: file,
-        path: `build/${file}`
+        name: sanitizeString(file),
+        path: sanitizePath(`build/${file}`)
       }));
     
     return res.status(200).json({
@@ -140,7 +140,7 @@ router.get('/list', async (req, res) => {
 // Get specific preview file content
 router.get('/content/:filename', async (req, res) => {
   try {
-    const { filename } = req.params;
+    const filename = sanitizeString(req.params.filename);
     const filePath = path.join(req.workspacePath, 'build', filename);
     
     // Check if file exists and is within the workspace/build directory
@@ -159,7 +159,7 @@ router.get('/content/:filename', async (req, res) => {
     // Replace edit placeholders
     content = content.replace(
       /<!--\s*edit:\s*([\w\-\.\~\/\\]+)\s*-->/g,
-      (match, p1) => `<a name="${normalizePath(p1)}"></a><button class="edit" value="${normalizePath(p1)}">Edit</button>`
+      (match, p1) => `<a name="${normalizePath(sanitizePath(p1))}"></a><button class="edit" value="${normalizePath(sanitizePath(p1))}">Edit</button>`
     );
     
     return res.status(200).json({
@@ -180,7 +180,7 @@ router.get('/content/:filename', async (req, res) => {
 // Serve static preview files (for images, styles, etc.)
 router.get('/static/:path(*)', async (req, res) => {
   try {
-    const requestPath = req.params.path;
+    const requestPath = sanitizePath(req.params.path);
     const basePath = path.resolve(path.join(req.workspacePath, 'build'));
     const filePath = path.join(basePath, requestPath);
 
@@ -192,6 +192,10 @@ router.get('/static/:path(*)', async (req, res) => {
     if (!await fs.pathExists(filePath)) {
       return res.status(404).send('File not found');
     }
+    
+    // Set Cross-Origin headers to allow resources to be displayed in iframe
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Allow-Origin', '*');
     
     // Send file
     return res.sendFile(filePath);

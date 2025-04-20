@@ -105,6 +105,7 @@
           <div v-if="file.isDirectory && expandedDirs[file.path]" class="subdirectory">
             <file-tree-directory
               :path="file.path"
+              :workspaceId="workspaceId"
               :currentOpenFile="currentOpenFile"
               @select-file="$emit('select-file', $event)"
               @refresh="refreshDirectory"
@@ -285,6 +286,10 @@ export default {
     currentOpenFile: {
       type: String,
       default: ''
+    },
+    workspaceId: {
+      type: String,
+      required: true
     }
   },
   emits: ['select-file', 'refresh', 'update-current-file', 'file-operation-loading', 'file-operation-complete'],
@@ -352,15 +357,14 @@ export default {
       error.value = false;
       
       try {
-        const workspaceId = localStorage.getItem('workspaceId');
-        if (!workspaceId) {
+        if (!props.workspaceId) {
           error.value = true;
           return;
         }
         
         const response = await api.get(`/file/list?dir=${encodeURIComponent(props.path)}`, {
           headers: {
-            'workspace-id': workspaceId
+            'workspace-id': props.workspaceId
           }
         });
         
@@ -468,14 +472,13 @@ export default {
       
       try {
         showLoading('Reverting file changes...');
-        const workspaceId = localStorage.getItem('workspaceId');
         
         const response = await api.post('/file/revert', {
           filePath: selectedFile.value.path
         }, {
           headers: {
             'Content-Type': 'application/json',
-            'workspace-id': workspaceId
+            'workspace-id': props.workspaceId
           }
         });
         
@@ -544,7 +547,6 @@ export default {
       
       try {
         showLoading('Creating file...');
-        const workspaceId = localStorage.getItem('workspaceId');
         
         // Prepend current directory path to new file path if not an absolute path
         let fullPath = newFilePath.value;
@@ -558,7 +560,7 @@ export default {
         }, {
           headers: {
             'Content-Type': 'application/json',
-            'workspace-id': workspaceId
+            'workspace-id': props.workspaceId
           }
         });
         
@@ -605,7 +607,6 @@ export default {
       
       try {
         showLoading('Creating folder...');
-        const workspaceId = localStorage.getItem('workspaceId');
         
         // Prepend current directory path to new folder path if not an absolute path
         let fullPath = newFolderPath.value;
@@ -618,7 +619,7 @@ export default {
         }, {
           headers: {
             'Content-Type': 'application/json',
-            'workspace-id': workspaceId
+            'workspace-id': props.workspaceId
           }
         });
         
@@ -675,7 +676,6 @@ export default {
       
       try {
         showLoading('Uploading file...');
-        const workspaceId = localStorage.getItem('workspaceId');
         
         const reader = new FileReader();
         reader.onload = async (e) => {
@@ -687,7 +687,7 @@ export default {
           }, {
             headers: {
               'Content-Type': 'application/json',
-              'workspace-id': workspaceId
+              'workspace-id': props.workspaceId
             }
           });
           
@@ -737,7 +737,6 @@ export default {
       
       try {
         showLoading('Renaming file...');
-        const workspaceId = localStorage.getItem('workspaceId');
         
         // Get old file path and new file path
         const oldPath = selectedFile.value.path;
@@ -753,7 +752,7 @@ export default {
         }, {
           headers: {
             'Content-Type': 'application/json',
-            'workspace-id': workspaceId
+            'workspace-id': props.workspaceId
           }
         });
         
@@ -797,14 +796,13 @@ export default {
       
       try {
         showLoading('Deleting file...');
-        const workspaceId = localStorage.getItem('workspaceId');
         
         const response = await api.post('/file/delete', {
           filePath: selectedFile.value.path
         }, {
           headers: {
             'Content-Type': 'application/json',
-            'workspace-id': workspaceId
+            'workspace-id': props.workspaceId
           }
         });
         
@@ -857,7 +855,6 @@ export default {
       
       try {
         showLoading('Moving file...');
-        const workspaceId = localStorage.getItem('workspaceId');
         
         const sourcePath = selectedFile.value.path;
         let destPath = destinationPath.value;
@@ -873,7 +870,7 @@ export default {
         }, {
           headers: {
             'Content-Type': 'application/json',
-            'workspace-id': workspaceId
+            'workspace-id': props.workspaceId
           }
         });
         
@@ -925,7 +922,6 @@ export default {
       
       try {
         showLoading('Copying file...');
-        const workspaceId = localStorage.getItem('workspaceId');
         
         const sourcePath = selectedFile.value.path;
         let destPath = destinationPath.value;
@@ -941,7 +937,7 @@ export default {
         }, {
           headers: {
             'Content-Type': 'application/json',
-            'workspace-id': workspaceId
+            'workspace-id': props.workspaceId
           }
         });
         
@@ -983,8 +979,7 @@ export default {
       searchResults.value.results = [];
       
       try {
-        const workspaceId = localStorage.getItem('workspaceId');
-        if (!workspaceId) {
+        if (!props.workspaceId) {
           searchResults.value.error = 'No workspace selected';
           return;
         }
@@ -993,7 +988,7 @@ export default {
           `/file/search?query=${encodeURIComponent(searchQuery.value)}`, 
           {
             headers: {
-              'workspace-id': workspaceId
+              'workspace-id': props.workspaceId
             }
           }
         );

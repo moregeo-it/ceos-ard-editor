@@ -34,7 +34,7 @@
 </template>
 
 <script>
-import { computed } from 'vue';
+import { computed, inject } from 'vue';
 import { API_URL } from '../config.js';
 
 export default {
@@ -46,12 +46,14 @@ export default {
     }
   },
   setup(props) {
+    // Inject workspaceId from App.vue instead of using localStorage
+    const workspaceId = inject('workspaceId', '');
+    
     // Generate URL for the file
     const fileUrl = computed(() => {
-      const workspaceId = localStorage.getItem('workspaceId');
-      if (!workspaceId || !props.filename) return '';
+      if (!workspaceId.value || !props.filename) return '';
       
-      return `${API_URL}/file/view/${encodeURIComponent(props.filename)}?workspace-id=${workspaceId}`;
+      return `${API_URL}/file/view/${encodeURIComponent(props.filename)}?workspace-id=${workspaceId.value}`;
     });
     
     // File type checks
