@@ -72,7 +72,6 @@
             <h4>Pull Request Created:</h4>
             <div class="pr-link">
               <a :href="pullRequestUrl" target="_blank" class="pr-url">{{ pullRequestUrl }}</a>
-              <button @click="copyPrUrl" class="icon-button" title="Copy URL">📋</button>
             </div>
           </div>
           
@@ -383,17 +382,6 @@ export default {
       }
     };
 
-    const copyPrUrl = () => {
-      navigator.clipboard.writeText(pullRequestUrl.value)
-        .then(() => {
-          alert('Pull Request URL copied to clipboard!');
-        })
-        .catch(err => {
-          console.error('Could not copy URL: ', err);
-          alert('Failed to copy URL. You can manually share this URL.');
-        });
-    };
-
     return {
       isOpen,
       currentStep,
@@ -418,8 +406,7 @@ export default {
       goToPreviousStep,
       cancel,
       close,
-      submitProposal,
-      copyPrUrl
+      submitProposal
     };
   }
 }

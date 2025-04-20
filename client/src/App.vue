@@ -74,7 +74,6 @@
             </div>
           </div>
           <div class="actions">
-            <button @click="copyWorkspaceUrl" class="copy-url">Copy URL</button>
             <button @click="proposeChanges" class="propose">Propose Changes</button>
             <button @click="closeWorkspace" class="danger">Close Workspace</button>
           </div>
@@ -210,13 +209,23 @@ export default {
       user.value = currentUser;
       isAuthLoading.value = false;
       
-      // If user is authenticated, proceed with workspace loading
+      // If user is authenticated, load workspaces but don't automatically open any
       if (isAuthenticated.value) {
         // Load all user workspaces
         await loadUserWorkspaces();
         
-        // Then check URL or localStorage for workspace ID
-        loadWorkspaceFromUrlOrStorage();
+        // Only load from URL if present, not from localStorage
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlWorkspaceId = urlParams.get('workspace');
+        
+        if (urlWorkspaceId) {
+          // Only open workspace if explicitly specified in URL
+          openWorkspace(urlWorkspaceId);
+        } else {
+          // Clear any stored workspaceId from localStorage to prevent automatic opening
+          localStorage.removeItem('workspaceId');
+          workspaceId.value = '';
+        }
       }
     };
     
@@ -254,30 +263,6 @@ export default {
       }
     };
     
-    // Load workspace from URL or localStorage
-    const loadWorkspaceFromUrlOrStorage = () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlWorkspaceId = urlParams.get('workspace');
-      
-      if (urlWorkspaceId) {
-        workspaceId.value = urlWorkspaceId;
-        localStorage.setItem('workspaceId', urlWorkspaceId);
-        
-        // Update current workspace
-        currentWorkspace.value = userWorkspaces.value.find(ws => ws.id === urlWorkspaceId);
-        
-        if (currentWorkspace.value) {
-          loadFileTree();
-          generateAllPreviews().then(() => {
-            setTimeout(() => {
-              loadPreviewFiles();
-            }, 1000);
-          });
-        }
-      }
-      // If no workspace ID in URL, user will see the workspace selection screen
-    };
-
     // Logout function
     const logout = async () => {
       await AuthService.logout();
@@ -295,6 +280,7 @@ export default {
     const isCreatingInitialWorkspace = ref(false);
     const userWorkspaces = ref([]);
     const currentWorkspace = ref(null);
+    const defaultPfs = ref('');  // Store the default PFS for the workspace
 
     // File browser state
     const files = ref([]);
@@ -503,20 +489,6 @@ export default {
       }
     };
 
-    // Copy current workspace URL to clipboard for sharing
-    const copyWorkspaceUrl = () => {
-      const url = new URL(window.location.href);
-      url.searchParams.set('workspace', workspaceId.value);
-      navigator.clipboard.writeText(url.toString())
-        .then(() => {
-          showAlert('Workspace URL copied to clipboard!', 'Success');
-        })
-        .catch(err => {
-          console.error('Could not copy URL: ', err);
-          showAlert('Failed to copy URL. You can manually share this URL.', 'Error');
-        });
-    };
-
     // Close the workspace
     const closeWorkspace = async () => {
       workspaceId.value = '';
@@ -581,6 +553,9 @@ export default {
         
         if (data.success) {
           files.value = data.files;
+          
+          // After loading the file tree, fetch available PFS folders
+          fetchAvailablePfsFolders();
         } else {
           fileTreeError.value = true;
           showAlert(`Failed to load file tree: ${data.message}`, 'Error');
@@ -590,6 +565,31 @@ export default {
         console.error('Error loading file tree:', error);
       } finally {
         loadingFiles.value = false;
+      }
+    };
+
+    // Fetch available PFS folders from GitHub API
+    const fetchAvailablePfsFolders = async () => {
+      try {
+        const response = await api.get('/file/list-pfs');
+        
+        if (response.data.success && response.data.pfsFolders.length > 0) {
+          // Store PFS folders for use in preview selection
+          const pfsFolders = response.data.pfsFolders;
+          
+          // Update the preview files to include the PFS names
+          // This will be useful when selecting the default PFS
+          if (previewFiles.value.length > 0) {
+            previewFiles.value.forEach(file => {
+              // Extract PFS name from file name (e.g., "NLSR.html" -> "NLSR")
+              const pfsName = file.name.replace('.html', '');
+              file.pfsName = pfsName;
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching PFS folders from GitHub:', error);
+        // Don't attempt to set any default PFS on error
       }
     };
 
@@ -845,12 +845,18 @@ export default {
           previewFiles.value = data.previewFiles;
           
           if (previewFiles.value.length > 0) {
+            // If there's a default PFS set for this workspace, use it
+            if (defaultPfs.value && 
+                previewFiles.value.some(file => file.name === `${defaultPfs.value}.html`)) {
+              selectedPreview.value = `${defaultPfs.value}.html`;
+            }
             // If there was a previously selected preview and it's still in the list, keep it selected
-            if (currentSelectedPreview && 
+            else if (currentSelectedPreview && 
                 previewFiles.value.some(file => file.name === currentSelectedPreview)) {
               selectedPreview.value = currentSelectedPreview;
-            } else {
-              // Otherwise select the first one
+            } 
+            // Otherwise select the first one
+            else {
               selectedPreview.value = previewFiles.value[0].name;
             }
             loadPreview();
@@ -927,6 +933,7 @@ export default {
       workspaceId.value = workspace.id;
       localStorage.setItem('workspaceId', workspace.id);
       currentWorkspace.value = workspace;
+      defaultPfs.value = workspace.defaultPfs || 'NLSR';
       await loadFileTree();
       await generateAllPreviews();
     };
@@ -958,10 +965,10 @@ export default {
       isCreatingInitialWorkspace,
       userWorkspaces,
       currentWorkspace,
+      defaultPfs,
       createWorkspace,
       createInitialWorkspace,
       closeWorkspace,
-      copyWorkspaceUrl,
       switchWorkspace,
       openWorkspace,
       formatDate,
@@ -1445,14 +1452,6 @@ button.danger {
 
 button.danger:hover {
   background-color: #c82333;
-}
-
-button.copy-url {
-  background-color: #6c757d;
-}
-
-button.copy-url:hover {
-  background-color: #5a6268;
 }
 
 button.propose {

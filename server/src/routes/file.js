@@ -5,6 +5,7 @@ const fs = require('fs-extra');
 const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
+const axios = require('axios');
 
 const WORKSPACES_DIR = path.join(__dirname, '../../workspaces');
 
@@ -12,6 +13,44 @@ const WORKSPACES_DIR = path.join(__dirname, '../../workspaces');
 function normalizePath(filePath) {
   return filePath.replace(/\\/g, '/');
 }
+
+// Place any routes that don't require workspace validation before the middleware
+
+// List all available PFS folders (fetched directly from GitHub)
+router.get('/list-pfs', async (req, res) => {
+  try {
+    const { owner = process.env.GITHUB_REPO_OWNER || 'ceos-org', repo = process.env.GITHUB_REPO_NAME || 'ceos-ard', branch = 'main' } = req.query;
+    
+    // Use GitHub API to get contents of the pfs directory
+    const githubApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/pfs?ref=${branch}`;
+    
+    // Make request to GitHub API
+    const response = await axios.get(githubApiUrl, {
+      headers: {
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'CEOS-ARD-Editor'
+      }
+    });
+    
+    // Filter the response to only get directories
+    const pfsFolders = response.data
+      .filter(item => item.type === 'dir')
+      .map(item => item.name)
+      .filter(name => !name.startsWith('.'));  // Filter out hidden folders
+    
+    return res.status(200).json({
+      success: true,
+      pfsFolders
+    });
+  } catch (error) {
+    console.error('Error fetching PFS folders from GitHub:', error);
+    return res.status(500).json({
+      success: false, 
+      message: 'Failed to fetch PFS folders from GitHub',
+      error: error.message
+    });
+  }
+});
 
 // Middleware to validate workspace ID
 const validateWorkspace = async (req, res, next) => {
@@ -103,7 +142,7 @@ router.get('/list', async (req, res) => {
         if (item.endsWith('.pdf')) return false;
         
         // Hide build folder only at the top level
-        if (['templates', 'build'].includes(item) && dir === '') return false;
+        if (['templates', 'build', 'LICENSE'].includes(item) && dir === '') return false;
         
         return true;
       })

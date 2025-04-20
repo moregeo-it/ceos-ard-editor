@@ -81,7 +81,7 @@ router.post('/create', async (req, res) => {
       });
     }
 
-    const { title = 'Untitled Workspace' } = req.body;
+    const { title = 'Untitled Workspace', defaultPfs = 'NLSR' } = req.body;
     const userId = req.user.id;
     const username = req.user.username;
     const accessToken = req.session.githubToken;
@@ -209,6 +209,7 @@ process.exit(0);
       title,
       userId,
       username,
+      defaultPfs,
       createdAt: new Date().toISOString(),
       branchName,
       repoUrl: userRepoUrl.replace(/https:\/\/oauth2:.*?@github\.com/, 'https://github.com') // Remove token from URL

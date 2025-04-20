@@ -11,6 +11,13 @@
           @keyup.enter="submit"
         >
       </div>
+      <div v-if="availablePfs.length > 0" class="form-group">
+        <label for="defaultPfs">Default PFS</label>
+        <select id="defaultPfs" v-model="defaultPfs">
+          <option v-for="pfs in availablePfs" :key="pfs" :value="pfs">{{ pfs }}</option>
+        </select>
+        <div class="helper-text">This PFS will be selected by default in the preview pane.</div>
+      </div>
       <div class="form-description">
         <p>A new workspace will be created with a fork of the CEOS-ARD repository.</p>
       </div>
@@ -25,7 +32,7 @@
 </template>
 
 <script>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import Modal from './Modal.vue';
 import api from '../services/auth';
 
@@ -39,14 +46,43 @@ export default {
     const isVisible = ref(false);
     const workspaceTitle = ref('');
     const isSubmitting = ref(false);
+    const availablePfs = ref([]);
+    const defaultPfs = ref('');
+    const isLoadingPfs = ref(false);
 
     const show = () => {
       workspaceTitle.value = ''; // Reset title when showing modal
       isVisible.value = true;
+      loadPfsFolders();
     };
 
     const close = () => {
       isVisible.value = false;
+    };
+
+    const loadPfsFolders = async () => {
+      isLoadingPfs.value = true;
+      
+      try {
+        // Use the list-pfs endpoint that now fetches directly from GitHub
+        const response = await api.get('/file/list-pfs');
+        
+        if (response.data.success && response.data.pfsFolders.length > 0) {
+          availablePfs.value = response.data.pfsFolders;
+          defaultPfs.value = availablePfs.value[0];
+        } else {
+          // If no PFS folders found or error occurred, don't show the selection
+          availablePfs.value = [];
+          defaultPfs.value = '';
+        }
+      } catch (error) {
+        console.error('Error loading PFS folders:', error);
+        // Don't show any selection on error
+        availablePfs.value = [];
+        defaultPfs.value = '';
+      } finally {
+        isLoadingPfs.value = false;
+      }
     };
 
     const submit = async () => {
@@ -57,7 +93,8 @@ export default {
       isSubmitting.value = true;
       try {
         const response = await api.post('/workspace/create', {
-          title: workspaceTitle.value
+          title: workspaceTitle.value,
+          defaultPfs: defaultPfs.value
         });
         
         if (response.data.success) {
@@ -77,10 +114,18 @@ export default {
       }
     };
 
+    // Load PFS folders when component is mounted
+    onMounted(() => {
+      loadPfsFolders();
+    });
+
     return {
       isVisible,
       workspaceTitle,
+      defaultPfs,
+      availablePfs,
       isSubmitting,
+      isLoadingPfs,
       show,
       close,
       submit
@@ -145,5 +190,24 @@ export default {
 .primary-button:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
+}
+
+select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.helper-text {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 0.25rem;
+}
+
+.error-text {
+  font-size: 0.8rem;
+  color: red;
+  margin-top: 0.25rem;
 }
 </style>
