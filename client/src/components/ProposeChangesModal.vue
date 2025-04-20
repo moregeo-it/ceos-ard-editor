@@ -42,19 +42,21 @@
       <!-- Step 2: Form for submitting PR info -->
       <div v-else-if="currentStep === 2" class="modal-inner">
         <div class="form-group">
-          <label>Title (short summary):</label>
+          <label class="form-label">Title (short summary):</label>
           <input 
             type="text" 
             v-model="proposeChangesTitle" 
+            class="form-control"
             placeholder="Brief summary of your changes"
             ref="proposeTitleInput"
             @keyup.enter="submitProposal"
           />
         </div>
         <div class="form-group">
-          <label>Description:</label>
+          <label class="form-label">Description:</label>
           <textarea 
             v-model="proposeChangesDescription" 
+            class="form-control"
             placeholder="Detailed description of what you changed and why"
             rows="5"
           ></textarea>
@@ -89,29 +91,29 @@
     </div>
     
     <template #footer>
-      <div class="form-actions">
+      <div class="d-flex justify-content-end gap-2">
         <template v-if="currentStep === 1">
-          <button @click="cancel" class="modal-button cancel-button">Cancel</button>
-          <button 
+          <base-button variant="secondary" @click="cancel">Cancel</base-button>
+          <base-button 
+            variant="success" 
             @click="goToNextStep" 
-            class="modal-button submit-button"
             :disabled="!hasChanges"
           >
             Next
-          </button>
+          </base-button>
         </template>
         <template v-else-if="currentStep === 2">
-          <button @click="goToPreviousStep" class="modal-button cancel-button">Back</button>
-          <button 
+          <base-button variant="secondary" @click="goToPreviousStep">Back</base-button>
+          <base-button 
+            variant="success" 
             @click="submitProposal" 
-            class="modal-button submit-button"
             :disabled="!proposeChangesTitle.trim()"
           >
             Submit
-          </button>
+          </base-button>
         </template>
         <template v-else>
-          <button @click="close" class="modal-button primary-button">Close</button>
+          <base-button variant="primary" @click="close">Close</base-button>
         </template>
       </div>
     </template>
@@ -120,6 +122,7 @@
 
 <script>
 import Modal from './Modal.vue';
+import BaseButton from './BaseButton.vue';
 import { ref, nextTick } from 'vue';
 import { html, parse } from 'diff2html';
 import 'diff2html/bundles/css/diff2html.min.css';
@@ -127,7 +130,7 @@ import api from '../services/auth.js';
 
 export default {
   name: 'ProposeChangesModal',
-  components: { Modal },
+  components: { Modal, BaseButton },
   emits: ['loading', 'done'],
   setup(props, { emit }) {
     // Modal state
@@ -424,138 +427,6 @@ export default {
 }
 </style>
 <style scoped>
-.form-group {
-  margin-bottom: 1rem;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: bold;
-}
-
-.form-group input,
-.form-group textarea {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
-.form-group textarea {
-  resize: vertical;
-  min-height: 150px;
-}
-
-.modal-button {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-
-.cancel-button {
-  background-color: #6c757d;
-  color: white;
-}
-
-.cancel-button:hover {
-  background-color: #5a6268;
-}
-
-.submit-button {
-  background-color: #28a745;
-  color: white;
-}
-
-.submit-button:hover {
-  background-color: #218838;
-}
-
-.submit-button:disabled {
-  background-color: #cccccc;
-  cursor: not-allowed;
-}
-
-.primary-button {
-  background-color: #007bff;
-  color: white;
-}
-
-.primary-button:hover {
-  background-color: #0069d9;
-}
-
-/* Proposal result styles */
-.proposal-result {
-  text-align: center;
-}
-
-.success-message {
-  color: #28a745;
-}
-
-.success-icon {
-  font-size: 2rem;
-}
-
-.pull-request-info {
-  margin-top: 1rem;
-}
-
-.pr-link {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-}
-
-.pr-url {
-  color: #007bff;
-  text-decoration: none;
-  word-break: break-all;
-}
-
-.pr-url:hover {
-  text-decoration: underline;
-}
-
-.icon-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1rem;
-}
-
-.icon-button:hover {
-  color: #0056b3;
-}
-
-.error-message {
-  color: #dc3545;
-}
-
-.error-icon {
-  font-size: 2rem;
-}
-
-.instructions {
-  text-align: left;
-  margin-top: 1rem;
-}
-
-.instructions pre {
-  white-space: pre-wrap;
-  background-color: #f8f8f8;
-  padding: 1rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  max-height: 200px;
-  overflow-y: auto;
-  text-align: left;
-}
-
 /* Changed files diff styles */
 .diff-container {
   max-height: 700px; /* Increased to allow for better diff viewing */
@@ -748,12 +619,65 @@ export default {
   font-style: italic;
 }
 
-.form-actions {
+.modal-inner {
+  height: 100%;
+}
+
+/* Proposal result styles */
+.proposal-result {
+  text-align: center;
+}
+
+.success-message {
+  color: #28a745;
+}
+
+.success-icon {
+  font-size: 2rem;
+}
+
+.pull-request-info {
+  margin-top: 1rem;
+}
+
+.pr-link {
   display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 0.5rem;
 }
 
-.modal-inner {
-  height: 100%;
+.pr-url {
+  color: #007bff;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.pr-url:hover {
+  text-decoration: underline;
+}
+
+.error-message {
+  color: #dc3545;
+}
+
+.error-icon {
+  font-size: 2rem;
+}
+
+.instructions {
+  text-align: left;
+  margin-top: 1rem;
+}
+
+.instructions pre {
+  white-space: pre-wrap;
+  background-color: #f8f8f8;
+  padding: 1rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  max-height: 200px;
+  overflow-y: auto;
+  text-align: left;
 }
 </style>

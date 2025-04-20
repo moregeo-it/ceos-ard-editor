@@ -6,7 +6,7 @@
         type="text" 
         v-model="searchQuery" 
         placeholder="Search files..." 
-        class="search-input" 
+        class="form-control search-input" 
         @keyup.enter="performSearch"
       />
       <button @click="performSearch" class="search-button">
@@ -58,9 +58,9 @@
     
     <!-- Show controls for all directories when not searching -->
     <div v-if="!isSearchActive" class="directory-controls">
-      <button @click="createNewFile" class="small-button">New File</button>
-      <button @click="uploadFile" class="small-button">Upload</button>
-      <button @click="refreshDirectory" title="Reload" class="small-button">⟳</button>
+      <base-button @click="createNewFile" size="small" variant="outline">New File</base-button>
+      <base-button @click="uploadFile" size="small" variant="outline">Upload</base-button>
+      <base-button @click="refreshDirectory" size="small" variant="outline" title="Reload">⟳</base-button>
     </div>
     
     <!-- Regular file tree (shown when not searching or for non-root levels) -->
@@ -132,18 +132,19 @@
       <div class="modal-content">
         <h3>Rename {{ selectedFile ? selectedFile.name : '' }}</h3>
         <div class="form-group">
-          <label>New name:</label>
+          <label class="form-label">New name:</label>
           <input 
             type="text" 
             v-model="newFileName" 
             placeholder="Enter new name" 
+            class="form-control"
             ref="renameInput"
             @keyup.enter="confirmRename"
           />
         </div>
-        <div class="form-actions">
-          <button @click="cancelRename" class="secondary-button">Cancel</button>
-          <button @click="confirmRename" class="primary-button">Rename</button>
+        <div class="d-flex justify-content-end gap-2">
+          <base-button @click="cancelRename" variant="secondary">Cancel</base-button>
+          <base-button @click="confirmRename" variant="primary">Rename</base-button>
         </div>
       </div>
     </div>
@@ -153,18 +154,19 @@
       <div class="modal-content">
         <h3>Move {{ selectedFile ? selectedFile.name : '' }}</h3>
         <div class="form-group">
-          <label>Destination path:</label>
+          <label class="form-label">Destination path:</label>
           <input 
             type="text" 
             v-model="destinationPath" 
             placeholder="e.g., folder/" 
+            class="form-control"
             ref="moveInput"
             @keyup.enter="confirmMove"
           />
         </div>
-        <div class="form-actions">
-          <button @click="cancelMove" class="secondary-button">Cancel</button>
-          <button @click="confirmMove" class="primary-button">Move</button>
+        <div class="d-flex justify-content-end gap-2">
+          <base-button @click="cancelMove" variant="secondary">Cancel</base-button>
+          <base-button @click="confirmMove" variant="primary">Move</base-button>
         </div>
       </div>
     </div>
@@ -174,18 +176,19 @@
       <div class="modal-content">
         <h3>Copy {{ selectedFile ? selectedFile.name : '' }}</h3>
         <div class="form-group">
-          <label>Destination path:</label>
+          <label class="form-label">Destination path:</label>
           <input 
             type="text" 
             v-model="destinationPath" 
             placeholder="e.g., folder/newname.yml" 
+            class="form-control"
             ref="copyInput"
             @keyup.enter="confirmCopy"
           />
         </div>
-        <div class="form-actions">
-          <button @click="cancelCopy" class="secondary-button">Cancel</button>
-          <button @click="confirmCopy" class="primary-button">Copy</button>
+        <div class="d-flex justify-content-end gap-2">
+          <base-button @click="cancelCopy" variant="secondary">Cancel</base-button>
+          <base-button @click="confirmCopy" variant="primary">Copy</base-button>
         </div>
       </div>
     </div>
@@ -195,18 +198,19 @@
       <div class="modal-content">
         <h3>Create New File</h3>
         <div class="form-group">
-          <label>File Path:</label>
+          <label class="form-label">File Path:</label>
           <input 
             type="text" 
             v-model="newFilePath" 
             placeholder="e.g., filename.yml" 
+            class="form-control"
             ref="newFileInput"
             @keyup.enter="confirmNewFile"
           />
         </div>
-        <div class="form-actions">
-          <button @click="cancelNewFile" class="secondary-button">Cancel</button>
-          <button @click="confirmNewFile" class="primary-button">Create</button>
+        <div class="d-flex justify-content-end gap-2">
+          <base-button @click="cancelNewFile" variant="secondary">Cancel</base-button>
+          <base-button @click="confirmNewFile" variant="primary">Create</base-button>
         </div>
       </div>
     </div>
@@ -216,22 +220,23 @@
       <div class="modal-content">
         <h3>Upload File</h3>
         <div class="form-group">
-          <label>Destination Path:</label>
+          <label class="form-label">Destination Path:</label>
           <input 
             type="text" 
             v-model="uploadPath" 
             placeholder="e.g., images/file.jpg" 
+            class="form-control"
             ref="uploadPathInput"
             @keyup.enter="confirmUpload"
           />
         </div>
         <div class="form-group">
-          <label>Select File:</label>
-          <input type="file" @change="handleFileSelected" ref="fileInput" />
+          <label class="form-label">Select File:</label>
+          <input type="file" @change="handleFileSelected" ref="fileInput" class="form-control" />
         </div>
-        <div class="form-actions">
-          <button @click="cancelUpload" class="secondary-button">Cancel</button>
-          <button @click="confirmUpload" class="primary-button" :disabled="!selectedFileToUpload">Upload</button>
+        <div class="d-flex justify-content-end gap-2">
+          <base-button @click="cancelUpload" variant="secondary">Cancel</base-button>
+          <base-button @click="confirmUpload" variant="primary" :disabled="!selectedFileToUpload">Upload</base-button>
         </div>
       </div>
     </div>
@@ -242,9 +247,13 @@
 import { ref, computed, inject, onMounted, nextTick, watch, provide } from 'vue';
 import { API_URL } from '../config.js';
 import api from '../services/auth.js';
+import BaseButton from './BaseButton.vue';
 
 export default {
   name: 'FileTreeDirectory',
+  components: {
+    BaseButton
+  },
   props: {
     path: {
       type: String,
@@ -1269,11 +1278,6 @@ export default {
   color: #d73a49;
 }
 
-.small-button {
-  font-size: 0.8rem;
-  padding: 0.25rem 0.5rem;
-}
-
 /* File operations menu */
 .file-menu-modal {
   position: fixed;
@@ -1348,37 +1352,26 @@ export default {
   border-radius: 4px;
 }
 
-.form-actions {
+/* Update form input styles to match utility classes */
+.search-input {
+  flex-grow: 1;
+  padding: 0.4rem 2rem 0.4rem 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  width: auto;
+}
+
+.d-flex {
   display: flex;
+}
+
+.justify-content-end {
   justify-content: flex-end;
+}
+
+.gap-2 {
   gap: 0.5rem;
-  margin-top: 1rem;
-}
-
-.secondary-button {
-  background-color: #6c757d;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-}
-
-.secondary-button:hover {
-  background-color: #5a6268;
-}
-
-.primary-button {
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-}
-
-.primary-button:hover {
-  background-color: #0069d9;
 }
 
 .directory-tree {

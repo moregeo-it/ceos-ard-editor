@@ -301,13 +301,14 @@ export default {
             btn.style.backgroundColor = '#007bff';
           });
           btn.style.float = 'right';
-          btn.style.margin = `0.1rem 0 0.5rem 0.5rem`;
-          btn.style.padding = '0.3rem 0.75rem';
+          btn.style.margin = `0 0 0.5rem 0.5rem`;
+          btn.style.padding = '0.3rem 0.8rem';
           btn.style.backgroundColor = '#007bff';
           btn.style.color = 'white';
-          btn.style.border = '0';
+          btn.style.border = 0;
           btn.style.borderRadius = '4px';
           btn.style.cursor = 'pointer';
+          btn.style.transition = 'all 0.2s ease';
         }
       });
     };
@@ -366,21 +367,6 @@ export default {
   background-color: white;
   color: #000;
   font-size: 0.9rem;
-}
-
-.generate-btn {
-  padding: 0.25rem 0.5rem;
-  background-color: #007acc;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-
-.generate-btn:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
 }
 
 .preview-frame {

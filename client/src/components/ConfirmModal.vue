@@ -2,18 +2,21 @@
   <Modal v-model="isOpen" :title="title">
     <div class="confirm-message">{{ message }}</div>
     <template #footer>
-      <button class="modal-button cancel-button" @click="cancel">Cancel</button>
-      <button class="modal-button confirm-button" @click="confirm">{{ confirmText }}</button>
+      <div class="d-flex justify-content-end gap-2">
+        <base-button variant="secondary" @click="cancel">Cancel</base-button>
+        <base-button variant="danger" @click="confirm">{{ confirmText }}</base-button>
+      </div>
     </template>
   </Modal>
 </template>
 
 <script>
 import Modal from './Modal.vue';
+import BaseButton from './BaseButton.vue';
 
 export default {
   name: 'ConfirmModal',
-  components: { Modal },
+  components: { Modal, BaseButton },
   props: {
     title: {
       type: String,
@@ -60,32 +63,5 @@ export default {
 .confirm-message {
   margin-bottom: 10px;
   white-space: pre-line;
-}
-
-.modal-button {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.cancel-button {
-  background-color: #6c757d;
-  color: white;
-}
-
-.cancel-button:hover {
-  background-color: #5a6268;
-}
-
-.confirm-button {
-  background-color: #dc3545;
-  color: white;
-  margin-left: 10px;
-}
-
-.confirm-button:hover {
-  background-color: #c82333;
 }
 </style>

@@ -9,6 +9,7 @@ const util = require('util');
 const execAsync = util.promisify(exec);
 const axios = require('axios');
 const Datastore = require('@seald-io/nedb');
+const { startBuild } = require('../utils/build');
 
 // GitHub API configuration
 const DEFAULT_REPO_OWNER = process.env.GITHUB_REPO_OWNER || 'ceos-org';
@@ -81,7 +82,7 @@ router.post('/create', async (req, res) => {
       });
     }
 
-    const { title = 'Untitled Workspace', defaultPfs = 'NLSR' } = req.body;
+    const { title = 'Untitled Workspace', defaultPfs = '' } = req.body;
     const userId = req.user.id;
     const username = req.user.username;
     const accessToken = req.session.githubToken;
@@ -119,7 +120,6 @@ router.post('/create', async (req, res) => {
 
       if (checkForkResponse.status === 200) {
         // Fork exists, use it
-        console.log(`Fork already exists for user ${username}`);
         userRepoUrl = `https://oauth2:${accessToken}@github.com/${username}/${DEFAULT_REPO_NAME}.git`;
       } else if (checkForkResponse.status === 404) {
         // Fork doesn't exist, create it
@@ -226,12 +226,33 @@ process.exit(0);
       });
     });
     
-    // Return workspace data
-    return res.status(201).json({
+    // Return workspace data immediately - don't wait for build
+    const response = {
       success: true,
       workspace,
       message: 'Workspace created successfully'
-    });
+    };
+    
+    res.status(201).json(response);
+    
+    // Automatically start the build process after response is sent
+    // This is safely outside of the response cycle
+    setTimeout(() => {
+      try {
+        console.log(`Starting automated build for workspace ${workspaceId}`);
+        // Start a build for the specific PFS if one is provided, or build all if not
+        startBuild(workspacePath, workspaceId);
+        
+        // Add metadata to track that build was initiated automatically
+        workspace.buildInitiated = true;
+        workspacesDB.update({ id: workspaceId }, { $set: { buildInitiated: true } });
+        
+      } catch (buildError) {
+        // Log the error but the workspace is already created successfully
+        console.error(`Automatic build initiation failed for workspace ${workspaceId}:`, buildError);
+      }
+    }, 100); // Small delay to ensure response is sent first
+    
   } catch (error) {
     console.error('Error creating workspace:', error);
     return res.status(500).json({

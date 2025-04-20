@@ -34,17 +34,18 @@
                 <h3>{{ workspace.title || 'Untitled Workspace' }}</h3>
                 <p class="workspace-date">Created: {{ formatDate(workspace.createdAt) }}</p>
                 <p class="workspace-branch">Branch: {{ workspace.branchName }}</p>
+                <p v-if="workspace.defaultPfs" class="workspace-pfs">Selected PFS: <strong>{{ workspace.defaultPfs }}</strong></p>
               </div>
               <div class="workspace-actions">
-                <button @click="openWorkspace(workspace.id)" class="primary-button">Open</button>
-                <button @click="confirmDeleteWorkspace(workspace.id, workspace.title)" class="danger-button">Delete</button>
+                <base-button @click="openWorkspace(workspace.id)" variant="primary">Open</base-button>
+                <base-button @click="confirmDeleteWorkspace(workspace.id, workspace.title)" variant="danger">Delete</base-button>
               </div>
             </div>
           </div>
           <div class="workspace-create-new">
-            <button @click="showCreateWorkspaceModal" class="create-workspace-btn">
+            <base-button @click="showCreateWorkspaceModal" variant="success" class="create-workspace-btn">
               Create New Workspace
-            </button>
+            </base-button>
           </div>
         </div>
       </div>
@@ -58,9 +59,13 @@
       <!-- Workspace creation/management -->
       <div class="workspace-controls" v-if="!workspaceId && userWorkspaces.length === 0">
         <h1>CEOS-ARD Editor</h1>
-        <button @click="showCreateWorkspaceModal" :disabled="isCreatingWorkspace">
+        <base-button 
+          @click="showCreateWorkspaceModal" 
+          :disabled="isCreatingWorkspace"
+          variant="primary"
+        >
           {{ isCreatingWorkspace ? 'Creating workspace...' : 'Create New Workspace' }}
-        </button>
+        </base-button>
       </div>
 
       <!-- Main editor layout -->
@@ -74,13 +79,13 @@
             </div>
           </div>
           <div class="actions">
-            <button @click="proposeChanges" class="propose">Propose Changes</button>
-            <button @click="closeWorkspace" class="danger">Close Workspace</button>
+            <base-button @click="proposeChanges" variant="success" class="mr-1">Propose Changes</base-button>
+            <base-button @click="closeWorkspace" variant="danger">Close Workspace</base-button>
           </div>
           <div class="user-info" v-if="user">
             <img v-if="user.avatar" :src="user.avatar" alt="User avatar" class="user-avatar" />
             <span class="username">{{ user.username }}</span>
-            <button @click="logout" class="logout-btn">Logout</button>
+            <base-button @click="logout" variant="outline" size="small" class="logout-btn">Logout</base-button>
           </div>
         </div>
 
@@ -139,9 +144,9 @@
             <div class="preview-header">
               <h3>Preview</h3>
               <div class="preview-selector">
-                <button @click="generateAllPreviews" title="Regenerate all">⟳</button>
+                <base-button @click="generateAllPreviews" variant="outline" size="small" title="Regenerate all">⟳</base-button>
                 &nbsp;
-                <select v-if="previewFiles.length > 0" v-model="selectedPreview" @change="loadPreview">
+                <select v-if="previewFiles.length > 0" v-model="selectedPreview" @change="loadPreview" class="form-control">
                   <option v-for="file in previewFiles" :key="file.path" :value="file.name">
                     {{ file.name.replace('.html', '') }}
                   </option>
@@ -178,6 +183,7 @@ import ConfirmModal from './components/ConfirmModal.vue';
 import ProposeChangesModal from './components/ProposeChangesModal.vue';
 import CreateWorkspaceModal from './components/CreateWorkspaceModal.vue';
 import LoginPage from './components/LoginPage.vue';
+import BaseButton from './components/BaseButton.vue';
 import { API_URL } from './config.js';
 import { AuthService } from './services/auth';
 import api from './services/auth';
@@ -193,7 +199,8 @@ export default {
     ConfirmModal,
     ProposeChangesModal,
     CreateWorkspaceModal,
-    LoginPage
+    LoginPage,
+    BaseButton
   },
   setup() {
     // Authentication state
@@ -457,34 +464,30 @@ export default {
     const openWorkspace = async (id) => {
       try {
         showLoading('Opening workspace...');
-        
-        // Set the workspaceId
         workspaceId.value = id;
         localStorage.setItem('workspaceId', id);
-        
-        // Find the workspace in our list
         currentWorkspace.value = userWorkspaces.value.find(ws => ws.id === id);
-        
         if (!currentWorkspace.value) {
           throw new Error(`Workspace with ID ${id} not found`);
         }
-        
-        // Update URL with workspace ID for sharing
+        defaultPfs.value = currentWorkspace.value.defaultPfs || '';
+        // Preselect defaultPfs only when opening workspace
+        if (defaultPfs.value) {
+          selectedPreview.value = `${defaultPfs.value}.html`;
+        } else {
+          selectedPreview.value = '';
+        }
         const url = new URL(window.location.href);
         url.searchParams.set('workspace', id);
         window.history.replaceState({}, '', url);
-        
-        // Load the workspace content
         await loadFileTree();
-        await generateAllPreviews();
+        await loadPreviewFiles();
+        hideLoading();
       } catch (error) {
         console.error('Error opening workspace:', error);
         showAlert(`Failed to open workspace: ${error.message}`, 'Error');
-        
-        // Reset workspace data
         workspaceId.value = '';
         localStorage.removeItem('workspaceId');
-      } finally {
         hideLoading();
       }
     };
@@ -553,9 +556,6 @@ export default {
         
         if (data.success) {
           files.value = data.files;
-          
-          // After loading the file tree, fetch available PFS folders
-          fetchAvailablePfsFolders();
         } else {
           fileTreeError.value = true;
           showAlert(`Failed to load file tree: ${data.message}`, 'Error');
@@ -565,31 +565,6 @@ export default {
         console.error('Error loading file tree:', error);
       } finally {
         loadingFiles.value = false;
-      }
-    };
-
-    // Fetch available PFS folders from GitHub API
-    const fetchAvailablePfsFolders = async () => {
-      try {
-        const response = await api.get('/file/list-pfs');
-        
-        if (response.data.success && response.data.pfsFolders.length > 0) {
-          // Store PFS folders for use in preview selection
-          const pfsFolders = response.data.pfsFolders;
-          
-          // Update the preview files to include the PFS names
-          // This will be useful when selecting the default PFS
-          if (previewFiles.value.length > 0) {
-            previewFiles.value.forEach(file => {
-              // Extract PFS name from file name (e.g., "NLSR.html" -> "NLSR")
-              const pfsName = file.name.replace('.html', '');
-              file.pfsName = pfsName;
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching PFS folders from GitHub:', error);
-        // Don't attempt to set any default PFS on error
       }
     };
 
@@ -706,6 +681,27 @@ export default {
     // Generate all previews (initial load)
     const generateAllPreviews = async () => {
       try {
+        showLoading('Checking build status...');
+        
+        // First, check if a build is already in progress
+        const statusResponse = await api.get('/preview/build-status', {
+          headers: {
+            'Workspace-Id': workspaceId.value
+          }
+        });
+        
+        // If there's already a build in progress or recently completed from auto-build,
+        // just start polling for status instead of starting a new build
+        if (statusResponse.data.status && 
+            (statusResponse.data.status === 'in_progress' || 
+             statusResponse.data.status === 'starting')) {
+          console.log('Build already in progress, starting to poll for status');
+          loadingMessage.value = 'Build already in progress...';
+          pollBuildStatus();
+          return;
+        }
+        
+        // No build in progress, start a new one
         showLoading('Generating all previews...');
         
         // Use the unified build endpoint without a pfs parameter to build all files
@@ -830,33 +826,18 @@ export default {
     // Load available preview files
     const loadPreviewFiles = async () => {
       try {
-        // Remember the currently selected preview before reloading
         const currentSelectedPreview = selectedPreview.value;
-        
         const response = await api.get('/preview/list', {
           headers: {
             'workspace-id': workspaceId.value
           }
         });
-        
         const data = response.data;
-        
         if (data.success) {
           previewFiles.value = data.previewFiles;
-          
           if (previewFiles.value.length > 0) {
-            // If there's a default PFS set for this workspace, use it
-            if (defaultPfs.value && 
-                previewFiles.value.some(file => file.name === `${defaultPfs.value}.html`)) {
-              selectedPreview.value = `${defaultPfs.value}.html`;
-            }
-            // If there was a previously selected preview and it's still in the list, keep it selected
-            else if (currentSelectedPreview && 
-                previewFiles.value.some(file => file.name === currentSelectedPreview)) {
-              selectedPreview.value = currentSelectedPreview;
-            } 
-            // Otherwise select the first one
-            else {
+            // Only set selectedPreview if it is not valid anymore
+            if (!selectedPreview.value || !previewFiles.value.some(file => file.name === selectedPreview.value)) {
               selectedPreview.value = previewFiles.value[0].name;
             }
             loadPreview();
@@ -933,7 +914,7 @@ export default {
       workspaceId.value = workspace.id;
       localStorage.setItem('workspaceId', workspace.id);
       currentWorkspace.value = workspace;
-      defaultPfs.value = workspace.defaultPfs || 'NLSR';
+      defaultPfs.value = workspace.defaultPfs || '';
       await loadFileTree();
       await generateAllPreviews();
     };
@@ -1069,18 +1050,6 @@ body {
   margin-right: 0.5rem;
 }
 
-.logout-btn {
-  background-color: #f8f8f8;
-  color: #333;
-  border: 1px solid #ddd;
-  padding: 0.2rem 0.5rem;
-  font-size: 0.8rem;
-}
-
-.logout-btn:hover {
-  background-color: #e9e9e9;
-}
-
 /* Workspace creation screen */
 .workspace-controls {
   display: flex;
@@ -1142,24 +1111,6 @@ body {
 .workspace-create-new {
   margin-top: 2rem;
   text-align: center;
-}
-
-.create-workspace-btn {
-  padding: 0.5rem 1rem;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.create-workspace-btn:hover {
-  background-color: #0069d9;
-}
-
-.create-workspace-btn:disabled {
-  background-color: #cccccc;
-  cursor: not-allowed;
 }
 
 /* Loading initial workspace */
@@ -1482,6 +1433,13 @@ select {
   border: 1px solid #ddd;
 }
 
+select.form-control {
+  display: inline-block;
+  width: auto;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.9rem;
+}
+
 .no-file-selected {
   margin: 2rem 0;
   color: #777;
@@ -1577,22 +1535,6 @@ select {
   gap: 0.5rem;
 }
 
-.secondary-button {
-  background-color: #6c757d;
-}
-
-.secondary-button:hover {
-  background-color: #5a6268;
-}
-
-.primary-button {
-  background-color: #007bff;
-}
-
-.primary-button:hover {
-  background-color: #0069d9;
-}
-
 /* Proposal result styles */
 .proposal-result {
   text-align: center;
@@ -1623,17 +1565,6 @@ select {
 
 .pr-url:hover {
   text-decoration: underline;
-}
-
-.icon-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1rem;
-}
-
-.icon-button:hover {
-  color: #0056b3;
 }
 
 .error-message {

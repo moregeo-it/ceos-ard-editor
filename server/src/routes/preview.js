@@ -2,10 +2,7 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs-extra');
-const { spawn } = require('child_process');
-
-// Track build processes
-const buildProcesses = new Map();
+const { startBuild, getBuildStatus } = require('../utils/build');
 
 const WORKSPACES_DIR = path.join(__dirname, '../../workspaces');
 
@@ -35,6 +32,7 @@ const validateWorkspace = async (req, res, next) => {
     }
 
     req.workspacePath = workspacePath;
+    req.workspaceId = workspaceId;
     next();
   } catch (error) {
     return res.status(500).json({
@@ -51,36 +49,10 @@ router.use(validateWorkspace);
 // Unified build endpoint that handles both all files and specific PFS builds
 router.post('/build', async (req, res) => {
   try {
-    const workspaceId = req.headers['workspace-id'];
     const pfs = req.query.pfs; // Optional PFS parameter
     
-    // Check if a build is already in progress for this workspace
-    if (buildProcesses.has(workspaceId)) {
-      const existingBuild = buildProcesses.get(workspaceId);
-      
-      // If there's a running process, kill it
-      if (existingBuild.process && existingBuild.process.kill) {
-        console.log(`Aborting existing build for workspace ${workspaceId}`);
-        existingBuild.process.kill('SIGTERM');
-        existingBuild.status = 'aborted';
-        existingBuild.endTime = Date.now();
-        existingBuild.error = 'Build aborted because a new build was requested';
-      }
-    }
-    
-    // Create tracking object
-    const buildInfo = {
-      status: 'starting',
-      logs: [],
-      startTime: Date.now(),
-      endTime: null,
-      error: null,
-      process: null, // Track the process object itself
-      type: pfs ? 'specific' : 'all', // Indicate if this is a specific file build
-      pfs: pfs // Store the PFS name if provided
-    };
-    
-    buildProcesses.set(workspaceId, buildInfo);
+    // Start build using the shared utility
+    startBuild(req.workspacePath, req.workspaceId, pfs);
     
     // Respond immediately that the build has started
     res.status(202).json({
@@ -88,66 +60,6 @@ router.post('/build', async (req, res) => {
       message: pfs ? `Build process started for ${pfs}` : 'Build process started for all previews',
       status: 'started'
     });
-    
-    // Run the build process asynchronously
-    try {
-      buildInfo.status = 'in_progress';
-      
-      // Prepare command arguments based on whether a specific PFS was provided
-      const cmdArgs = ['generate-all', '-o', 'build', '--pdf', '--docx'];
-      if (pfs) {
-        cmdArgs.push('--pfs', pfs);
-      }
-        
-      // Run the ceos-ard build command
-      const buildCmd = spawn('ceos-ard', cmdArgs, { 
-        cwd: req.workspacePath,
-        shell: true
-      });
-      
-      // Store the process reference
-      buildInfo.process = buildCmd;
-      
-      // Collect output
-      buildCmd.stdout.on('data', (data) => {
-        const logLine = data.toString();
-        buildInfo.logs.push({ type: 'stdout', text: logLine });
-      });
-      
-      buildCmd.stderr.on('data', (data) => {
-        const logLine = data.toString();
-        buildInfo.logs.push({ type: 'stderr', text: logLine });
-      });
-      
-      // Handle process completion
-      buildCmd.on('close', (code) => {
-        buildInfo.endTime = Date.now();
-        if (buildInfo.status !== 'aborted') {
-          if (code === 0) {
-            buildInfo.status = 'completed';
-          } else {
-            buildInfo.status = 'failed';
-            buildInfo.error = `Process exited with code ${code}`;
-          }
-        }
-        
-        // Automatically remove from tracking after 10 minutes
-        setTimeout(() => {
-          buildProcesses.delete(workspaceId);
-        }, 10 * 60 * 1000);
-      });
-      
-      buildCmd.on('error', (err) => {
-        buildInfo.status = 'failed';
-        buildInfo.error = err.message;
-        buildInfo.endTime = Date.now();
-      });
-      
-    } catch (buildError) {
-      buildInfo.status = 'failed';
-      buildInfo.error = buildError.message;
-      buildInfo.endTime = Date.now();
-    }
     
   } catch (error) {
     console.error('Error starting build process:', error);
@@ -161,17 +73,15 @@ router.post('/build', async (req, res) => {
 // Get build status
 router.get('/build-status', async (req, res) => {
   try {
-    const workspaceId = req.headers['workspace-id'];
+    const buildInfo = getBuildStatus(req.workspaceId);
     
-    if (!buildProcesses.has(workspaceId)) {
+    if (!buildInfo) {
       return res.status(404).json({
         success: false,
         message: 'No build process found for this workspace',
         status: 'not_found'
       });
     }
-    
-    const buildInfo = buildProcesses.get(workspaceId);
     
     return res.status(200).json({
       success: true,

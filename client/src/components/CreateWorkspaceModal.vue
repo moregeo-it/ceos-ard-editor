@@ -8,25 +8,28 @@
           v-model="workspaceTitle" 
           type="text" 
           placeholder="Enter workspace title"
+          class="form-control"
           @keyup.enter="submit"
         >
       </div>
       <div v-if="availablePfs.length > 0" class="form-group">
-        <label for="defaultPfs">Default PFS</label>
-        <select id="defaultPfs" v-model="defaultPfs">
+        <label for="defaultPfs" class="form-label">Default PFS</label>
+        <select id="defaultPfs" v-model="defaultPfs" class="form-control">
           <option v-for="pfs in availablePfs" :key="pfs" :value="pfs">{{ pfs }}</option>
         </select>
         <div class="helper-text">This PFS will be selected by default in the preview pane.</div>
       </div>
-      <div class="form-description">
+      <div class="form-description text-muted mt-3">
         <p>A new workspace will be created with a fork of the CEOS-ARD repository.</p>
       </div>
     </div>
     <template #footer>
-      <button @click="close" class="secondary-button">Cancel</button>
-      <button @click="submit" class="primary-button" :disabled="isSubmitting">
-        {{ isSubmitting ? 'Creating...' : 'Create Workspace' }}
-      </button>
+      <div class="d-flex justify-content-end gap-2">
+        <base-button variant="secondary" @click="close">Cancel</base-button>
+        <base-button variant="primary" @click="submit" :disabled="isSubmitting">
+          {{ isSubmitting ? 'Creating...' : 'Create Workspace' }}
+        </base-button>
+      </div>
     </template>
   </Modal>
 </template>
@@ -34,12 +37,14 @@
 <script>
 import { ref, onMounted } from 'vue';
 import Modal from './Modal.vue';
+import BaseButton from './BaseButton.vue';
 import api from '../services/auth';
 
 export default {
   name: 'CreateWorkspaceModal',
   components: {
-    Modal
+    Modal,
+    BaseButton
   },
   emits: ['workspace-created'],
   setup(props, { emit }) {
@@ -135,79 +140,15 @@ export default {
 </script>
 
 <style scoped>
-.form-container {
-  margin-bottom: 1rem;
-}
-
-.form-group {
-  margin-bottom: 1rem;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: bold;
-}
-
-.form-group input {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
+/* Form description text */
 .form-description {
   font-size: 0.9rem;
-  color: #666;
 }
 
-.secondary-button {
-  background-color: #6c757d;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-}
-
-.secondary-button:hover {
-  background-color: #5a6268;
-}
-
-.primary-button {
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-}
-
-.primary-button:hover {
-  background-color: #0069d9;
-}
-
-.primary-button:disabled {
-  background-color: #cccccc;
-  cursor: not-allowed;
-}
-
-select {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
+/* Helper text below form controls */
 .helper-text {
   font-size: 0.8rem;
   color: #666;
-  margin-top: 0.25rem;
-}
-
-.error-text {
-  font-size: 0.8rem;
-  color: red;
   margin-top: 0.25rem;
 }
 </style>

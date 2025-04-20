@@ -2,17 +2,20 @@
   <Modal v-model="isOpen" :title="title">
     <div class="alert-message">{{ message }}</div>
     <template #footer>
-      <button class="modal-button" @click="close">OK</button>
+      <div class="d-flex justify-content-end">
+        <base-button variant="primary" @click="close">OK</base-button>
+      </div>
     </template>
   </Modal>
 </template>
 
 <script>
 import Modal from './Modal.vue';
+import BaseButton from './BaseButton.vue';
 
 export default {
   name: 'AlertModal',
-  components: { Modal },
+  components: { Modal, BaseButton },
   props: {
     title: {
       type: String,
@@ -49,19 +52,5 @@ export default {
 .alert-message {
   margin-bottom: 10px;
   white-space: pre-line;
-}
-
-.modal-button {
-  padding: 8px 16px;
-  background-color: #4d85bd;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.modal-button:hover {
-  background-color: #3a6d9e;
 }
 </style>
