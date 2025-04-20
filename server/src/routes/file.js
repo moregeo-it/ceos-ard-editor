@@ -988,4 +988,46 @@ router.get('/diff', async (req, res) => {
   }
 });
 
+// Create a new folder
+router.post('/create-folder', async (req, res) => {
+  try {
+    const { folderPath } = req.body;
+    if (!folderPath) {
+      return res.status(400).json({
+        success: false,
+        message: 'Folder path is required'
+      });
+    }
+    const fullPath = path.join(req.workspacePath, folderPath);
+    // Check if path is within the workspace
+    if (!fullPath.startsWith(req.workspacePath)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid folder path'
+      });
+    }
+    // Ensure directory does not already exist
+    if (await fs.pathExists(fullPath)) {
+      return res.status(409).json({
+        success: false,
+        message: 'Folder already exists'
+      });
+    }
+    // Create the directory
+    await fs.ensureDir(fullPath);
+    return res.status(200).json({
+      success: true,
+      message: 'Folder created successfully',
+      folderPath
+    });
+  } catch (error) {
+    console.error('Error creating folder:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to create folder',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

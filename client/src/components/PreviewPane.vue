@@ -23,7 +23,7 @@
     ></iframe>
     
     <div v-if="!content" class="no-preview">
-      <p>No preview available. Generate a preview to see the document.</p>
+      <p>No preview available yet.</p>
     </div>
   </div>
 </template>

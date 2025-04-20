@@ -32,9 +32,10 @@
             <div v-for="workspace in userWorkspaces" :key="workspace.id" class="workspace-item">
               <div class="workspace-info">
                 <h3>{{ workspace.title || 'Untitled Workspace' }}</h3>
+                <p v-if="workspace.defaultPfs" class="workspace-pfs">Selected PFS: <strong>{{ workspace.defaultPfs }}</strong></p>
                 <p class="workspace-date">Created: {{ formatDate(workspace.createdAt) }}</p>
                 <p class="workspace-branch">Branch: {{ workspace.branchName }}</p>
-                <p v-if="workspace.defaultPfs" class="workspace-pfs">Selected PFS: <strong>{{ workspace.defaultPfs }}</strong></p>
+                <p class="workspace-id">ID: {{ workspace.id }}</p>
               </div>
               <div class="workspace-actions">
                 <base-button @click="openWorkspace(workspace.id)" variant="primary">Open</base-button>
@@ -1098,7 +1099,7 @@ body {
 }
 
 .workspace-info p {
-  margin: 0.25rem 0;
+  margin: 0.1rem 0;
   font-size: 0.9rem;
   color: #555;
 }

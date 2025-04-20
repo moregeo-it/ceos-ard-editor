@@ -19,7 +19,7 @@ router.get('/github/callback',
     
     // Redirect to client application after successful authentication
     // The client will handle checking for existing workspaces
-    res.redirect(process.env.AUTH_SUCCESS_REDIRECT || 'http://localhost:5174');
+    res.redirect(process.env.AUTH_SUCCESS_REDIRECT || 'http://localhost:5173');
   }
 );
 
@@ -43,13 +43,13 @@ router.get('/user', (req, res) => {
 router.get('/logout', (req, res, next) => {
   req.logout((err) => {
     if (err) { return next(err); }
-    res.redirect(process.env.LOGOUT_REDIRECT || 'http://localhost:5174');
+    res.redirect(process.env.LOGOUT_REDIRECT || 'http://localhost:5173');
   });
 });
 
 // Login failed route
 router.get('/login-failed', (req, res) => {
-  res.redirect(process.env.AUTH_FAILURE_REDIRECT || 'http://localhost:5174/auth-failed');
+  res.redirect(process.env.AUTH_FAILURE_REDIRECT || 'http://localhost:5173/auth-failed');
 });
 
 module.exports = router;

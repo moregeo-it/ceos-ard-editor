@@ -59,6 +59,7 @@
     <!-- Show controls for all directories when not searching -->
     <div v-if="!isSearchActive" class="directory-controls">
       <base-button @click="createNewFile" size="small" variant="outline">New File</base-button>
+      <base-button @click="createNewFolder" size="small" variant="outline">New Folder</base-button>
       <base-button @click="uploadFile" size="small" variant="outline">Upload</base-button>
       <base-button @click="refreshDirectory" size="small" variant="outline" title="Reload">⟳</base-button>
     </div>
@@ -215,6 +216,28 @@
       </div>
     </div>
     
+    <!-- New Folder Dialog -->
+    <div class="modal" v-if="showNewFolderDialog">
+      <div class="modal-content">
+        <h3>Create New Folder</h3>
+        <div class="form-group">
+          <label class="form-label">Folder Path:</label>
+          <input 
+            type="text" 
+            v-model="newFolderPath" 
+            placeholder="e.g., new-folder" 
+            class="form-control"
+            ref="newFolderInput"
+            @keyup.enter="confirmNewFolder"
+          />
+        </div>
+        <div class="d-flex justify-content-end gap-2">
+          <base-button @click="cancelNewFolder" variant="secondary">Cancel</base-button>
+          <base-button @click="confirmNewFolder" variant="primary">Create</base-button>
+        </div>
+      </div>
+    </div>
+    
     <!-- File Upload Dialog -->
     <div class="modal" v-if="showUploadDialog">
       <div class="modal-content">
@@ -287,6 +310,7 @@ export default {
     const showRenameDialog = ref(false);
     const showMoveDialog = ref(false);
     const showCopyDialog = ref(false);
+    const showNewFolderDialog = ref(false);
     
     // Form values
     const newFilePath = ref('');
@@ -295,6 +319,7 @@ export default {
     const fileInput = ref(null);
     const newFileName = ref('');
     const destinationPath = ref('');
+    const newFolderPath = ref('');
     
     // Search functionality
     const searchQuery = ref('');
@@ -550,6 +575,64 @@ export default {
       } catch (error) {
         console.error('Error creating file:', error);
         showAlert('Failed to create file. Check console for details.', 'Error');
+      } finally {
+        hideLoading();
+      }
+    };
+    
+    // New folder handlers
+    const newFolderInput = ref(null);
+    const createNewFolder = () => {
+      showNewFolderDialog.value = true;
+      newFolderPath.value = props.path ? props.path + '/' : '';
+      nextTick(() => {
+        if (newFolderInput.value) {
+          newFolderInput.value.focus();
+        }
+      });
+    };
+    
+    const cancelNewFolder = () => {
+      showNewFolderDialog.value = false;
+      newFolderPath.value = '';
+    };
+    
+    const confirmNewFolder = async () => {
+      if (!newFolderPath.value.trim()) {
+        showAlert('Please enter a folder path', 'Error');
+        return;
+      }
+      
+      try {
+        showLoading('Creating folder...');
+        const workspaceId = localStorage.getItem('workspaceId');
+        
+        // Prepend current directory path to new folder path if not an absolute path
+        let fullPath = newFolderPath.value;
+        if (!newFolderPath.value.startsWith('/') && props.path && !fullPath.includes('/')) {
+          fullPath = `${props.path}/${newFolderPath.value}`;
+        }
+        
+        const response = await api.post('/file/create-folder', {
+          folderPath: fullPath
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'workspace-id': workspaceId
+          }
+        });
+        
+        const data = response.data;
+        
+        if (data.success) {
+          showNewFolderDialog.value = false;
+          refreshDirectory();
+        } else {
+          showAlert(`Failed to create folder: ${data.message}`, 'Error');
+        }
+      } catch (error) {
+        console.error('Error creating folder:', error);
+        showAlert('Failed to create folder. Check console for details.', 'Error');
       } finally {
         hideLoading();
       }
@@ -1095,6 +1178,14 @@ export default {
       createNewFile,
       cancelNewFile,
       confirmNewFile,
+      
+      // New folder
+      showNewFolderDialog,
+      newFolderPath,
+      newFolderInput,
+      createNewFolder,
+      cancelNewFolder,
+      confirmNewFolder,
       
       // Upload file
       showUploadDialog,
