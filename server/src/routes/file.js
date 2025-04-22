@@ -6,6 +6,7 @@ const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
 const axios = require('axios');
+const yaml = require('js-yaml');
 const { sanitizePath, sanitizeString, sanitizeQuery, sanitizeWorkspaceId } = require('../utils/sanitize');
 
 const WORKSPACES_DIR = path.join(__dirname, '../../workspaces');
@@ -979,12 +980,30 @@ router.get('/pfs-references', async (req, res) => {
         try {
           const content = await fs.readFile(requirementsFilePath, 'utf-8');
           
-          // Check if the requirement name is in the content
-          if (content.includes(requirementName)) {
-            pfsDocuments.push(pfsFolder);
+          // Parse the YAML content
+          const yamlContent = yaml.load(content);
+          
+          // Check if this is a properly structured YAML array with categories
+          if (Array.isArray(yamlContent)) {
+            // Iterate through each category
+            let requirementFound = false;
+            
+            for (const category of yamlContent) {
+              if (category && category.requirements && Array.isArray(category.requirements)) {
+                // Check if the requirement exists in this category's requirements array
+                if (category.requirements.includes(requirementName)) {
+                  requirementFound = true;
+                  break;
+                }
+              }
+            }
+            
+            if (requirementFound) {
+              pfsDocuments.push(pfsFolder);
+            }
           }
         } catch (error) {
-          console.warn(`Could not read requirements file for ${pfsFolder}:`, error.message);
+          console.warn(`Could not read or parse requirements file for ${pfsFolder}:`, error.message);
         }
       }
     }
