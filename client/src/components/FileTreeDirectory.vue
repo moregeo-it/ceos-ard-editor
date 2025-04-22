@@ -442,10 +442,44 @@ export default {
       // Position the menu near the clicked element
       nextTick(() => {
         const rect = event.target.getBoundingClientRect();
-        fileMenuPosition.value = {
-          top: `${rect.bottom + window.scrollY}px`,
-          left: `${rect.left + window.scrollX}px`
-        };
+        const menuElement = document.querySelector('.file-menu');
+        
+        if (menuElement) {
+          // Calculate menu dimensions
+          const menuWidth = menuElement.offsetWidth;
+          const menuHeight = menuElement.offsetHeight;
+          
+          // Calculate available space
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+          
+          // Default position (same as before)
+          let top = rect.bottom + window.scrollY;
+          let left = rect.left + window.scrollX;
+          
+          // Check if menu would go off the right edge and adjust if needed
+          if (left + menuWidth > viewportWidth) {
+            left = Math.max(5, viewportWidth - menuWidth - 5);
+          }
+          
+          // Check if menu would go off the bottom edge and adjust if needed
+          if (top + menuHeight > viewportHeight) {
+            // Position menu above the button instead of below it
+            top = Math.max(5, rect.top + window.scrollY - menuHeight);
+          }
+          
+          // Apply the calculated position
+          fileMenuPosition.value = {
+            top: `${top}px`,
+            left: `${left}px`
+          };
+        } else {
+          // Fallback to original positioning if menu element isn't ready yet
+          fileMenuPosition.value = {
+            top: `${rect.bottom + window.scrollY}px`,
+            left: `${rect.left + window.scrollX}px`
+          };
+        }
       });
     };
     
