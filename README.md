@@ -25,6 +25,7 @@ A collaborative web-based editor for the CEOS-ARD (Committee on Earth Observatio
 - npm or yarn
 - Git
 - [ceos-ard CLI tool](https://github.com/ceos-org/ceos-ard-cli) installed globally
+- **GitHub account** (required for authentication and to obtain OAuth credentials)
 
 ### Server Setup
 
@@ -38,7 +39,28 @@ A collaborative web-based editor for the CEOS-ARD (Committee on Earth Observatio
    npm install
    ```
 
-3. Start the server:
+3. **Set up environment variables:**  
+   Create a `.env` file in the `server` directory with the following keys:
+   ```
+   GITHUB_CLIENT_ID=your_github_client_id
+   GITHUB_CLIENT_SECRET=your_github_client_secret
+   BASE_URL=http://localhost:3000
+   SESSION_SECRET=your_session_secret
+   ```
+   - `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are required for GitHub authentication.
+   - `BASE_URL` should match your server's base URL.
+   - `SESSION_SECRET` is any random string for securing sessions.
+
+4. **Obtain GitHub OAuth App credentials:**  
+   To use GitHub authentication (`passport-github2`), you need to register an OAuth application:
+   - Go to [GitHub Developer Settings > OAuth Apps](https://github.com/settings/developers).
+   - Click **"New OAuth App"**.
+   - Set the **Application name** (e.g., CEOS-ARD Editor).
+   - Set the **Homepage URL** to your server's URL (e.g., `http://localhost:3000` for local development).
+   - Set the **Authorization callback URL** to `http://localhost:3000/api/auth/github/callback`.
+   - After creating the app, copy the **Client ID** and **Client Secret** into your `.env` file as shown above.
+
+5. Start the server:
    ```
    npm run dev
    ```
