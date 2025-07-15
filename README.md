@@ -39,7 +39,7 @@ A collaborative web-based editor for the CEOS-ARD (Committee on Earth Observatio
    npm install
    ```
 
-3. **Set up environment variables:**  
+3. Set up environment variables:
    Create a `.env` file in the `server` directory with the following keys:
    ```
    GITHUB_CLIENT_ID=your_github_client_id
@@ -51,7 +51,7 @@ A collaborative web-based editor for the CEOS-ARD (Committee on Earth Observatio
    - `BASE_URL` should match your server's base URL.
    - `SESSION_SECRET` is any random string for securing sessions.
 
-4. **Obtain GitHub OAuth App credentials:**  
+4. Obtain GitHub OAuth App credentials:
    To use GitHub authentication (`passport-github2`), you need to register an OAuth application:
    - Go to [GitHub Developer Settings > OAuth Apps](https://github.com/settings/developers).
    - Click **"New OAuth App"**.
