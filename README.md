@@ -25,7 +25,7 @@ A collaborative web-based editor for the CEOS-ARD (Committee on Earth Observatio
 - npm or yarn
 - Git
 - [ceos-ard CLI tool](https://github.com/ceos-org/ceos-ard-cli) installed globally
-- **GitHub account** (required for authentication and to obtain OAuth credentials)
+- GitHub account (required for authentication and to obtain OAuth credentials)
 
 ### Server Setup
 
