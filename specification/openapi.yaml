@@ -384,11 +384,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-    # todo
     post:
-      summary: Create new file or folder
-      description: Creates a new file or folder in the workspace
-      operationId: createFile
+      summary: Create new empty file or folder
+      description: Creates a new empty file or folder in the workspace
+      operationId: createFileOrFolder
       tags:
         - Files
       parameters:
@@ -413,12 +412,6 @@ paths:
                     - file
                     - directory
                   description: Type of item to create
-                content:
-                  type: string
-                  description: Initial content for files (ignored for directories)
-                mimeType:
-                  type: string
-                  description: MIME type for the file
               required:
                 - name
                 - path
@@ -481,9 +474,9 @@ paths:
                 $ref: '#/components/schemas/Error'
 
     put:
-      summary: Update file content
-      description: Updates the content of a specific file
-      operationId: updateFileContent
+      summary: Upload file content
+      description: Uploads the content of a specific file
+      operationId: uploadFileContent
       tags:
         - Files
       parameters:
@@ -495,6 +488,7 @@ paths:
           '*/*':
             schema:
               type: string
+              format: binary
       responses:
         '200':
           description: File updated successfully
