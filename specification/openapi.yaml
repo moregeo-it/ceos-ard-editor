@@ -210,6 +210,8 @@ paths:
                 description:
                   type: string
                   description: Workspace description
+                pfs:
+                  $ref: '#/components/schemas/pfs'
       responses:
         '201':
           description: Workspace created successfully
@@ -281,11 +283,7 @@ paths:
                   type: string
                   description: Workspace description
                 pfs:
-                  type: 
-                    - string
-                    - "null"
-                  description: Primary PFS type assigned to workspace
-                  default: null
+                  $ref: '#/components/schemas/pfs'
       responses:
         '200':
           description: Workspace updated successfully
@@ -1209,11 +1207,7 @@ components:
           type: string
           description: Name of the branch in the repository
         pfs:
-          type: 
-            - string
-            - "null"
-          description: Primary PFS type assigned to workspace
-          default: null
+          $ref: '#/components/schemas/pfs'
         created:
           type: string
           format: date-time
@@ -1269,6 +1263,15 @@ components:
             - M=Modified
             - D=Deleted
             - R=Renamed
+
+    pfs:
+      type: array
+      items:
+        type: string
+      description: List of PFS types assigned to the workspace, used for preview generation.
+      example:
+        - SAR-NRB
+        - SAR-POL
 
     PFSType:
       type: object
