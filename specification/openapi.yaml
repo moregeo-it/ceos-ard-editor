@@ -36,7 +36,7 @@ tags:
 
 paths:
   /auth/login:
-    post:
+    get:
       summary: Initiate GitHub login
       description: Redirects to GitHub for authentication
       operationId: initiateLogin
@@ -118,7 +118,7 @@ paths:
                 $ref: '#/components/schemas/Error'
 
   /auth/logout:
-    post:
+    get:
       summary: Logout user
       description: Invalidates current session and tokens
       operationId: logout
@@ -1124,11 +1124,18 @@ components:
         type: string
     
     PfsType:
-      name: pfsType
+      name: pfs
       in: query
-      description: PFS type for preview generation
+      style: form
+      explode: true
+      description: |-
+        PFS type for preview generation.
+
+        If not provided, uses the default PFS type(s) that have been selected during workspace creation.
       schema:
-        type: string
+        type: array
+        items:
+          type: string
 
   schemas:
     Error:
