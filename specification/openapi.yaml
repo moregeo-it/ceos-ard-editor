@@ -35,6 +35,32 @@ tags:
     description: Product Family Specification management
 
 paths:
+  /pfs:
+    get:
+      summary: List available PFS types
+      description: Retrieves all available PFS types for CEOS-ARD (as available on the main branch of the ceos-ard repository)
+      operationId: listPFSTypes
+      tags:
+        - PFS
+      responses:
+        '200':
+          description: Available PFS types
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pfsTypes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PFSType'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /auth/login:
     get:
       summary: Initiate GitHub login
@@ -981,7 +1007,7 @@ paths:
     get:
       summary: List available PFS types
       description: Retrieves all available PFS types for the workspace
-      operationId: listPFSTypes
+      operationId: listWorkspacePFSTypes
       tags:
         - PFS
       parameters:
