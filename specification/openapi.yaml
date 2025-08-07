@@ -310,6 +310,15 @@ paths:
                   description: Workspace description
                 pfs:
                   $ref: '#/components/schemas/pfs'
+                status:
+                  type: string
+                  enum:
+                    - active
+                    - archived
+                  description: |-
+                    Archives/Unarchives a workspace.
+
+                    Can only be unarchived if the PR status is not closed or merged.
       responses:
         '200':
           description: Workspace updated successfully
@@ -1237,12 +1246,28 @@ components:
           enum:
             - active
             - archived
-          description: Workspace status
+          description: |-
+            Workspace status.
+
+            archived if the PR is closed or merged or has been archived by the user manually, active otherwise.
         pr:
           type: 
             - string
             - "null"
           description: ID to the GitHub PR
+          default: null
+        pr_status:
+          type:
+            - string
+            - "null"
+          enum:
+            - unknown
+            - open
+            - approved
+            - closed
+            - merged
+            - null
+          description: Status of the PR
           default: null
         owner:
           type: string
