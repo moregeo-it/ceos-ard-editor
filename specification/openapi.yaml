@@ -939,10 +939,6 @@ paths:
                   type: string
                   description: PR description
                   maxLength: 2000
-                baseBranch:
-                  type: string
-                  description: Base branch name
-                  default: main
       responses:
         '201':
           description: Pull request created successfully
