@@ -51,9 +51,14 @@ paths:
                 type: object
                 properties:
                   pfsTypes:
+                    description: List of available PFS types.
                     type: array
                     items:
-                      $ref: '#/components/schemas/PFSType'
+                      $ref: '#/components/schemas/pfsId'
+              example:
+                pfsTypes:
+                  - SAR-NRB
+                  - SAR-POL
         '401':
           description: Unauthorized
           content:
@@ -1028,7 +1033,7 @@ paths:
                   pfsTypes:
                     type: array
                     items:
-                      $ref: '#/components/schemas/PFSType'
+                      $ref: '#/components/schemas/pfsType'
         '404':
           description: Workspace not found
           content:
@@ -1100,7 +1105,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PFSType'
+                $ref: '#/components/schemas/pfsType'
         '400':
           description: Invalid request data
           content:
@@ -1306,23 +1311,32 @@ components:
             - R=Renamed
 
     pfs:
+      description: List of PFS types assigned to the workspace, used for preview generation.
       type: array
       items:
-        type: string
-      description: List of PFS types assigned to the workspace, used for preview generation.
+        $ref: '#/components/schemas/pfsId'
       example:
         - SAR-NRB
         - SAR-POL
 
-    PFSType:
+    pfsType:
       type: object
       properties:
         id:
-          type: string
-          description: PFS type identifier
+          $ref: '#/components/schemas/pfsId'
         name:
           type: string
           description: Human-readable name
       required:
         - id
         - name
+      example:
+        id: SAR-NRB
+        name: SAR Normalised Radar Backscatter
+
+    pfsId:
+      type: string
+      description: PFS type identifier
+      pattern: ^[A-Z0-9][A-Z0-9-]*[A-Z0-9]$
+      example: SAR-NRB
+
