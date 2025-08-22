@@ -1053,7 +1053,10 @@ paths:
 
     post:
       summary: Create new PFS
-      description: Creates a new PFS based on an existing one
+      description: >-
+        Creates a new PFS based on an existing one.
+
+        The generated documents should be validated against the strictyaml schemas.
       operationId: createPFS
       tags:
         - PFS
