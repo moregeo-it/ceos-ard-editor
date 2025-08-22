@@ -515,7 +515,11 @@ paths:
 
     put:
       summary: Upload file content
-      description: Uploads the content of a specific file
+      description: |-
+        Uploads the content of a specific file.
+
+        Validation may take place, e.g. validating against the strictyaml schemas of the corresponding YAML files.
+        File should be stored as is without parsing, e.g. comments in YAML files should be preserved.
       operationId: uploadFileContent
       tags:
         - Files
