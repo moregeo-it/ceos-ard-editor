@@ -1,6 +1,16 @@
 # ceos-ard-editor
+[![Lint](https://github.com/ceos-org/ceos-ard-editor/actions/workflows/lint.yml/badge.svg)](https://github.com/ceos-org/ceos-ard-editor/actions/workflows/lint.yml)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-This template should help get you started developing with Vue 3 in Vite.
+Web-based YAML editor for CEOS Analysis Ready Data (ARD) metadata.
+
+## Features
+
+- 🔐 GitHub & Google OAuth authentication
+- 📁 Workspace management
+- ✏️ CodeMirror YAML editor
+- 📊 diff2html change preview
+- 🎨 Vuetify Material Design UI
 
 ## Recommended IDE Setup
 
