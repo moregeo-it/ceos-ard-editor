@@ -11,7 +11,6 @@ Web-based YAML editor for CEOS Analysis Ready Data (ARD) metadata.
 - ✏️ CodeMirror YAML editor
 - 📊 diff2html change preview
 - 🎨 Vuetify Material Design UI
-- 📱 Responsive three-column layout
 
 ## Recommended IDE Setup
 
