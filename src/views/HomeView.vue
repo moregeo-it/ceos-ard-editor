@@ -1,5 +1,7 @@
-<script setup>
-// Home page
+<script>
+export default {
+  name: 'HomeView',
+}
 </script>
 
 <template>
