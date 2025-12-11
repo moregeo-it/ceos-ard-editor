@@ -12,6 +12,8 @@
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "lint": "eslint . --fix --cache",
+    "format:check": "prettier --check src/",
+    "lint:check": "eslint . --max-warnings=0",
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
