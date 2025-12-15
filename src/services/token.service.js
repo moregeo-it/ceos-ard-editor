@@ -1,4 +1,3 @@
-// src/services/token.service.js
 const TOKEN_KEYS = {
   ACCESS_TOKEN: 'ceos_ard_editor_access_token',
   TOKEN_TYPE: 'ceos_ard_editor_token_type',
@@ -12,9 +11,7 @@ export default {
   /**
    * Save authentication data to localStorage
    */
-  saveAuth({ accessToken, tokenType, expiresIn, userId, username, provider }) {
-    const expiresAt = Date.now() + expiresIn * 1000
-
+  saveAuth({ accessToken, tokenType, expiresAt, userId, username, provider }) {
     localStorage.setItem(TOKEN_KEYS.ACCESS_TOKEN, accessToken)
     localStorage.setItem(TOKEN_KEYS.TOKEN_TYPE, tokenType)
     localStorage.setItem(TOKEN_KEYS.USER_ID, userId)
