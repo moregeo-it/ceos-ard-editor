@@ -28,12 +28,13 @@ coverage
 
 .eslintcache
 
-# Cypress
-/cypress/videos/
-/cypress/screenshots/
-
-# Vitest
-__screenshots__/
-
+# Playwright E2E
 test-results/
 playwright-report/
+playwright/.cache/
+
+# Environment variables
+.env
+.env.development
+.env.production
+.env.test
