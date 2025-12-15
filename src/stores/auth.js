@@ -81,7 +81,7 @@ export const useAuthStore = defineStore('auth', {
         this.userId = authData.userId
         this.username = authData.username
         this.provider = authData.provider
-        this.expiresAt = authData.expiresAt
+        this.expiresAt = Date.now() + authData.expiresIn * 1000
         this.isAuthenticated = true
 
         return true

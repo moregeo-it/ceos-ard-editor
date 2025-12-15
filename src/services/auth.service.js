@@ -1,3 +1,4 @@
+// src/services/auth.service.js
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
 export default {
@@ -21,7 +22,7 @@ export default {
   parseAuthCallback(searchParams) {
     const accessToken = searchParams.get('access_token')
     const tokenType = searchParams.get('token_type')
-    const expiresAt = searchParams.get('expires_at')
+    const expiresIn = searchParams.get('expires_in')
     const userId = searchParams.get('user_id')
     const username = searchParams.get('username')
     const provider = searchParams.get('provider')
@@ -37,7 +38,7 @@ export default {
     return {
       accessToken,
       tokenType: tokenType || 'Bearer',
-      expiresAt: expiresAt ? parseInt(expiresAt) : Date.now() + 3600 * 1000, // Default 1 hour from now
+      expiresIn: expiresIn ? parseInt(expiresIn) : 3600, // Default 1 hour
       userId,
       username,
       provider: provider || 'unknown',
