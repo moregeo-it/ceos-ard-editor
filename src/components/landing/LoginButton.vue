@@ -1,4 +1,6 @@
 <script>
+import { mdiGithub, mdiGoogle } from '@mdi/js'
+
 export default {
   name: 'LoginButton',
 
@@ -21,13 +23,13 @@ export default {
       const configs = {
         github: {
           label: 'Continue with GitHub',
-          icon: 'mdi-github',
+          icon: mdiGithub,
           color: '#24292e',
           textColor: 'white',
         },
         google: {
           label: 'Continue with Google',
-          icon: 'mdi-google',
+          icon: mdiGoogle,
           color: '#4285f4',
           textColor: 'white',
         },
