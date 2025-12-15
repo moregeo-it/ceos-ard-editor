@@ -60,20 +60,4 @@ export default {
       console.error('Logout error:', error)
     }
   },
-
-  /**
-   * Verify token is still valid (optional health check)
-   */
-  async verifyToken(accessToken) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/verify`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      })
-      return response.ok
-    } catch (error) {
-      return false
-    }
-  }
 }
