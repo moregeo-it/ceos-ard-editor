@@ -5,7 +5,7 @@ const TOKEN_KEYS = {
   USER_ID: 'ceos_ard_editor_user_id',
   USERNAME: 'ceos_ard_editor_username',
   PROVIDER: 'ceos_ard_editor_provider',
-  EXPIRES_AT: 'ceos_ard_editor_expires_at'
+  EXPIRES_AT: 'ceos_ard_editor_expires_at',
 }
 
 export default {
@@ -13,8 +13,8 @@ export default {
    * Save authentication data to localStorage
    */
   saveAuth({ accessToken, tokenType, expiresIn, userId, username, provider }) {
-    const expiresAt = Date.now() + (expiresIn * 1000)
-    
+    const expiresAt = Date.now() + expiresIn * 1000
+
     localStorage.setItem(TOKEN_KEYS.ACCESS_TOKEN, accessToken)
     localStorage.setItem(TOKEN_KEYS.TOKEN_TYPE, tokenType)
     localStorage.setItem(TOKEN_KEYS.USER_ID, userId)
@@ -42,7 +42,7 @@ export default {
       userId,
       username,
       provider,
-      expiresAt: expiresAt ? parseInt(expiresAt) : null
+      expiresAt: expiresAt ? parseInt(expiresAt) : null,
     }
   },
 
@@ -50,7 +50,7 @@ export default {
    * Clear all authentication data
    */
   clearAuth() {
-    Object.values(TOKEN_KEYS).forEach(key => {
+    Object.values(TOKEN_KEYS).forEach((key) => {
       localStorage.removeItem(key)
     })
   },
@@ -77,9 +77,9 @@ export default {
   getAuthorizationHeader() {
     const accessToken = localStorage.getItem(TOKEN_KEYS.ACCESS_TOKEN)
     const tokenType = localStorage.getItem(TOKEN_KEYS.TOKEN_TYPE) || 'Bearer'
-    
+
     if (!accessToken) return null
-    
+
     return `${tokenType} ${accessToken}`
-  }
+  },
 }

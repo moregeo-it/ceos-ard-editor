@@ -12,7 +12,7 @@ export const useAuthStore = defineStore('auth', {
     expiresAt: null,
     isAuthenticated: false,
     isLoading: false,
-    error: null
+    error: null,
   }),
 
   getters: {
@@ -43,8 +43,8 @@ export const useAuthStore = defineStore('auth', {
     userInfo: (state) => ({
       id: state.userId,
       username: state.username,
-      provider: state.provider
-    })
+      provider: state.provider,
+    }),
   },
 
   actions: {
@@ -68,22 +68,22 @@ export const useAuthStore = defineStore('auth', {
     handleAuthCallback(searchParams) {
       try {
         this.error = null
-        
+
         // Parse authentication data from URL
         const authData = authService.parseAuthCallback(searchParams)
-        
+
         // Save to localStorage
         tokenService.saveAuth(authData)
-        
+
         // Update store state
         this.accessToken = authData.accessToken
         this.tokenType = authData.tokenType
         this.userId = authData.userId
         this.username = authData.username
         this.provider = authData.provider
-        this.expiresAt = Date.now() + (authData.expiresIn * 1000)
+        this.expiresAt = Date.now() + authData.expiresIn * 1000
         this.isAuthenticated = true
-        
+
         return true
       } catch (error) {
         this.error = error.message
@@ -97,10 +97,10 @@ export const useAuthStore = defineStore('auth', {
      */
     async restoreSession() {
       this.isLoading = true
-      
+
       try {
         const authData = tokenService.getAuth()
-        
+
         if (!authData || !authData.accessToken) {
           return false
         }
@@ -120,7 +120,7 @@ export const useAuthStore = defineStore('auth', {
         this.provider = authData.provider
         this.expiresAt = authData.expiresAt
         this.isAuthenticated = true
-        
+
         return true
       } catch (error) {
         this.error = error.message
@@ -159,6 +159,6 @@ export const useAuthStore = defineStore('auth', {
       this.isAuthenticated = false
       this.error = null
       tokenService.clearAuth()
-    }
-  }
+    },
+  },
 })

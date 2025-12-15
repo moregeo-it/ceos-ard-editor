@@ -1,21 +1,21 @@
 <script>
 export default {
   name: 'LoginButton',
-  
+
   props: {
     provider: {
       type: String,
       required: true,
-      validator: (value) => ['github', 'google'].includes(value)
+      validator: (value) => ['github', 'google'].includes(value),
     },
     loading: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
-  
+
   emits: ['click'],
-  
+
   computed: {
     buttonConfig() {
       const configs = {
@@ -23,24 +23,24 @@ export default {
           label: 'Continue with GitHub',
           icon: 'mdi-github',
           color: '#24292e',
-          textColor: 'white'
+          textColor: 'white',
         },
         google: {
           label: 'Continue with Google',
           icon: 'mdi-google',
           color: '#4285f4',
-          textColor: 'white'
-        }
+          textColor: 'white',
+        },
       }
       return configs[this.provider]
-    }
+    },
   },
-  
+
   methods: {
     handleClick() {
       this.$emit('click')
-    }
-  }
+    },
+  },
 }
 </script>
 

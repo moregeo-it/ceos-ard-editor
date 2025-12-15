@@ -8,19 +8,19 @@ const router = createRouter({
       path: '/',
       name: 'landing',
       component: () => import('@/views/LandingView.vue'),
-      meta: { requiresAuth: false }
+      meta: { requiresAuth: false },
     },
     {
       path: '/auth/callback',
       name: 'auth-callback',
       component: () => import('@/views/AuthCallbackView.vue'),
-      meta: { requiresAuth: false }
+      meta: { requiresAuth: false },
     },
     {
       path: '/workspaces',
       name: 'workspaces',
       component: () => import('@/views/WorkspacesView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
   ],
 })
@@ -32,7 +32,7 @@ router.beforeEach(async (to, from, next) => {
   if (!authStore.isAuthenticated && !authStore.isLoading) {
     await authStore.restoreSession()
   }
-  
+
   // Check authentication requirement
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next({ name: 'landing' })

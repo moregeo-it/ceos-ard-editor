@@ -41,7 +41,7 @@ export default {
       expiresIn: expiresIn ? parseInt(expiresIn) : 3600, // Default 1 hour
       userId,
       username,
-      provider: provider || 'unknown'
+      provider: provider || 'unknown',
     }
   },
 
@@ -53,8 +53,8 @@ export default {
       await fetch(`${API_BASE_URL}/auth/logout`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
+          Authorization: `Bearer ${accessToken}`,
+        },
       })
     } catch (error) {
       console.error('Logout error:', error)
