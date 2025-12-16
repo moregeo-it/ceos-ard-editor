@@ -97,12 +97,7 @@ export default {
         <v-icon :icon="icons.folderPlus" start></v-icon>
         Create New Workspace
         <v-spacer></v-spacer>
-        <v-btn
-          :icon="icons.close"
-          variant="text"
-          @click="handleClose"
-          :disabled="loading"
-        ></v-btn>
+        <v-btn :icon="icons.close" variant="text" @click="handleClose" :disabled="loading"></v-btn>
       </v-card-title>
 
       <v-divider></v-divider>

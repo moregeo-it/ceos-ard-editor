@@ -3,7 +3,15 @@ import { useAuthStore } from '@/stores/auth'
 import { useWorkspacesStore } from '@/stores/workspaces'
 import WorkspaceCard from '@/components/workspace/WorkspaceCard.vue'
 import CreateWorkspaceDialog from '@/components/workspace/CreateWorkspaceDialog.vue'
-import { mdiFolderMultiple, mdiAccountCircle, mdiLogout, mdiPlus, mdiFolderOff, mdiMenuDown, mdiClose } from '@mdi/js'
+import {
+  mdiFolderMultiple,
+  mdiAccountCircle,
+  mdiLogout,
+  mdiPlus,
+  mdiFolderOff,
+  mdiMenuDown,
+  mdiClose,
+} from '@mdi/js'
 
 export default {
   name: 'WorkspacesView',
@@ -129,11 +137,7 @@ export default {
       <!-- User Menu -->
       <v-menu v-model="showUserMenu" location="bottom end">
         <template v-slot:activator="{ props }">
-          <v-btn
-            v-bind="props"
-            variant="text"
-            :prepend-icon="icons.accountCircle"
-          >
+          <v-btn v-bind="props" variant="text" :prepend-icon="icons.accountCircle">
             {{ authStore.username }}
             <v-icon :icon="icons.menuDown" />
           </v-btn>
@@ -268,7 +272,9 @@ export default {
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn @click="showArchiveDialog = false" :disabled="isArchiving">Cancel</v-btn>
-          <v-btn color="error" :loading="isArchiving" @click="handleArchiveWorkspace">Archive</v-btn>
+          <v-btn color="error" :loading="isArchiving" @click="handleArchiveWorkspace"
+            >Archive</v-btn
+          >
         </v-card-actions>
       </v-card>
     </v-dialog>

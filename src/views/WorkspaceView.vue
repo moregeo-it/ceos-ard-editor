@@ -79,11 +79,7 @@ export default {
     <!-- Top Navigation Bar -->
     <v-app-bar color="primary" elevation="2">
       <!-- Workspace Name -->
-      <v-btn
-        variant="text"
-        class="text-h6 font-weight-medium"
-        @click="goToWorkspaces"
-      >
+      <v-btn variant="text" class="text-h6 font-weight-medium" @click="goToWorkspaces">
         {{ workspace?.title || 'Loading...' }}
       </v-btn>
 
@@ -115,11 +111,7 @@ export default {
       <!-- User Menu -->
       <v-menu v-model="showUserMenu" location="bottom end">
         <template v-slot:activator="{ props }">
-          <v-btn
-            v-bind="props"
-            variant="text"
-            :prepend-icon="icons.accountCircle"
-          >
+          <v-btn v-bind="props" variant="text" :prepend-icon="icons.accountCircle">
             {{ authStore.username }}
             <v-icon :icon="icons.menuDown" />
           </v-btn>
@@ -147,12 +139,8 @@ export default {
         <v-card>
           <v-card-text class="text-center pa-12">
             <v-icon :icon="icons.propose" size="64" color="grey-lighten-1" class="mb-4" />
-            <div class="text-h5 text-grey-darken-1 mb-2">
-              Workspace Editor
-            </div>
-            <div class="text-body-1 text-grey">
-              Editor content will be implemented here
-            </div>
+            <div class="text-h5 text-grey-darken-1 mb-2">Workspace Editor</div>
+            <div class="text-body-1 text-grey">Editor content will be implemented here</div>
           </v-card-text>
         </v-card>
       </v-container>
