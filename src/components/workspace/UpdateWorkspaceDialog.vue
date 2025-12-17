@@ -63,7 +63,11 @@ export default {
         if (workspace) {
           this.formData = {
             title: workspace.title || '',
-            pfs: workspace.pfs ? (Array.isArray(workspace.pfs) ? workspace.pfs : [workspace.pfs]) : [],
+            pfs: workspace.pfs
+              ? Array.isArray(workspace.pfs)
+                ? workspace.pfs
+                : [workspace.pfs]
+              : [],
             description: workspace.description || '',
           }
         }
@@ -100,7 +104,11 @@ export default {
       if (this.workspace) {
         this.formData = {
           title: this.workspace.title || '',
-          pfs: this.workspace.pfs ? (Array.isArray(this.workspace.pfs) ? this.workspace.pfs : [this.workspace.pfs]) : [],
+          pfs: this.workspace.pfs
+            ? Array.isArray(this.workspace.pfs)
+              ? this.workspace.pfs
+              : [this.workspace.pfs]
+            : [],
           description: this.workspace.description || '',
         }
       }
@@ -117,12 +125,7 @@ export default {
         <v-icon :icon="icons.folderEdit" start></v-icon>
         Update Workspace
         <v-spacer></v-spacer>
-        <v-btn
-          :icon="icons.close"
-          variant="text"
-          @click="handleClose"
-          :disabled="loading"
-        ></v-btn>
+        <v-btn :icon="icons.close" variant="text" @click="handleClose" :disabled="loading"></v-btn>
       </v-card-title>
 
       <v-divider></v-divider>

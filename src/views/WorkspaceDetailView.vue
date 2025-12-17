@@ -1,7 +1,17 @@
 <script>
 import { useAuthStore } from '@/stores/auth'
 import { useWorkspacesStore } from '@/stores/workspaces'
-import { mdiAccountCircle, mdiLogout, mdiArchive, mdiCheckCircle, mdiMenuDown, mdiPackageUp, mdiAlertCircle, mdiDelete, mdiClose } from '@mdi/js'
+import {
+  mdiAccountCircle,
+  mdiLogout,
+  mdiArchive,
+  mdiCheckCircle,
+  mdiMenuDown,
+  mdiPackageUp,
+  mdiAlertCircle,
+  mdiDelete,
+  mdiClose,
+} from '@mdi/js'
 
 export default {
   name: 'WorkspaceDetailView',
@@ -208,12 +218,13 @@ export default {
         >
           <v-alert-title>This workspace is archived (Read-Only)</v-alert-title>
           <div class="mt-2">
-            You are viewing this workspace in read-only mode. 
+            You are viewing this workspace in read-only mode.
             <strong>Activate it to make changes or propose updates.</strong>
           </div>
           <template v-if="workspace?.deletion_at">
             <div class="mt-2 text-caption">
-              Scheduled for deletion on: <strong>{{ new Date(workspace.deletion_at).toLocaleDateString() }}</strong>
+              Scheduled for deletion on:
+              <strong>{{ new Date(workspace.deletion_at).toLocaleDateString() }}</strong>
             </div>
           </template>
           <template v-slot:append>
@@ -255,7 +266,8 @@ export default {
         </v-card-title>
         <v-card-text>
           <p class="mb-2">
-            Are you sure you want to permanently delete <strong>{{ workspace?.title }}</strong>?
+            Are you sure you want to permanently delete <strong>{{ workspace?.title }}</strong
+            >?
           </p>
           <v-alert type="error" variant="tonal" density="compact">
             This action cannot be undone. All workspace data will be lost.

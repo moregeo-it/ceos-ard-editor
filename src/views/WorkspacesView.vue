@@ -106,7 +106,7 @@ export default {
     },
 
     handleEditWorkspace(workspaceId) {
-      const workspace = this.workspacesStore.workspaces.find(w => w.id === workspaceId)
+      const workspace = this.workspacesStore.workspaces.find((w) => w.id === workspaceId)
       if (workspace) {
         this.workspaceToUpdate = workspace
         this.showUpdateDialog = true
@@ -131,8 +131,8 @@ export default {
     },
 
     async handleToggleStatus(workspaceId) {
-      const workspace = this.workspacesStore.workspaces.find(w => w.id === workspaceId)
-      
+      const workspace = this.workspacesStore.workspaces.find((w) => w.id === workspaceId)
+
       // If workspace is active, show archive confirmation dialog
       if (workspace?.status === 'active') {
         this.workspaceToArchive = workspaceId
@@ -343,19 +343,30 @@ export default {
           ></v-btn>
         </v-card-title>
         <v-card-text>
-          <p class="mb-2">
-            Are you sure you want to archive this workspace?
-          </p>
+          <p class="mb-2">Are you sure you want to archive this workspace?</p>
           <v-alert type="warning" variant="tonal" density="compact" class="mt-2">
             <template v-if="workspaceToArchive">
-              <div v-if="workspacesStore.workspaces.find(w => w.id === workspaceToArchive)?.deletion_at">
-                This workspace will be <strong>permanently deleted on 
-                {{ new Date(workspacesStore.workspaces.find(w => w.id === workspaceToArchive).deletion_at).toLocaleDateString() }}</strong>
+              <div
+                v-if="
+                  workspacesStore.workspaces.find((w) => w.id === workspaceToArchive)?.deletion_at
+                "
+              >
+                This workspace will be
+                <strong
+                  >permanently deleted on
+                  {{
+                    new Date(
+                      workspacesStore.workspaces.find(
+                        (w) => w.id === workspaceToArchive,
+                      ).deletion_at,
+                    ).toLocaleDateString()
+                  }}</strong
+                >
                 unless reactivated before that date.
               </div>
               <div v-else>
-                Archived workspaces will be scheduled for automatic deletion after a retention period.
-                You can reactivate it anytime before deletion.
+                Archived workspaces will be scheduled for automatic deletion after a retention
+                period. You can reactivate it anytime before deletion.
               </div>
             </template>
           </v-alert>

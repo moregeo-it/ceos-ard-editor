@@ -61,18 +61,18 @@ export const useWorkspacesStore = defineStore('workspaces', {
 
       try {
         const updatedWorkspace = await workspaceService.updateWorkspace(workspaceId, workspaceData)
-        
+
         // Update local state
         const index = this.workspaces.findIndex((w) => w.id === workspaceId)
         if (index !== -1) {
           this.workspaces[index] = updatedWorkspace
         }
-        
+
         // Update currentWorkspace if it matches
         if (this.currentWorkspace?.id === workspaceId) {
           this.currentWorkspace = updatedWorkspace
         }
-        
+
         return updatedWorkspace
       } catch (error) {
         this.error = error.message
@@ -90,7 +90,10 @@ export const useWorkspacesStore = defineStore('workspaces', {
         }
 
         const newStatus = workspace.status === 'active' ? 'archived' : 'active'
-        const updatedWorkspace = await workspaceService.toggleWorkspaceStatus(workspaceId, newStatus)
+        const updatedWorkspace = await workspaceService.toggleWorkspaceStatus(
+          workspaceId,
+          newStatus,
+        )
 
         // Update local state
         const index = this.workspaces.findIndex((w) => w.id === workspaceId)

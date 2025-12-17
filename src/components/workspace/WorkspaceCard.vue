@@ -1,5 +1,15 @@
 <script>
-import { mdiFolder, mdiFileDocument, mdiCalendar, mdiUpdate, mdiEye, mdiArchive, mdiPencil, mdiDelete, mdiPackageUp } from '@mdi/js'
+import {
+  mdiFolder,
+  mdiFileDocument,
+  mdiCalendar,
+  mdiUpdate,
+  mdiEye,
+  mdiArchive,
+  mdiPencil,
+  mdiDelete,
+  mdiPackageUp,
+} from '@mdi/js'
 
 export default {
   name: 'WorkspaceCard',
@@ -124,21 +134,10 @@ export default {
     </v-card-text>
 
     <v-card-actions>
-      <v-btn
-        color="primary"
-        variant="text"
-        :prepend-icon="icons.eye"
-        @click="handleView"
-      >
+      <v-btn color="primary" variant="text" :prepend-icon="icons.eye" @click="handleView">
         View
       </v-btn>
-      <v-btn
-        variant="text"
-        :prepend-icon="icons.pencil"
-        @click="handleEdit"
-      >
-        Update
-      </v-btn>
+      <v-btn variant="text" :prepend-icon="icons.pencil" @click="handleEdit"> Update </v-btn>
       <v-spacer></v-spacer>
       <v-btn
         :color="toggleStatusColor"
@@ -148,12 +147,7 @@ export default {
       >
         {{ toggleStatusLabel }}
       </v-btn>
-      <v-btn
-        color="error"
-        variant="text"
-        :prepend-icon="icons.delete"
-        @click="handleDelete"
-      >
+      <v-btn color="error" variant="text" :prepend-icon="icons.delete" @click="handleDelete">
         Delete
       </v-btn>
     </v-card-actions>

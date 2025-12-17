@@ -2,6 +2,7 @@
 import { useAuthStore } from '@/stores/auth'
 import LoginButton from '@/components/landing/LoginButton.vue'
 import ceosLogo from '@/assets/ceos-ard-logo.png'
+import { mdiGithub, mdiWeb, mdiFileDocument } from '@mdi/js'
 
 export default {
   name: 'LandingView',
@@ -13,6 +14,11 @@ export default {
   data() {
     return {
       ceosLogo,
+      icons: {
+        github: mdiGithub,
+        web: mdiWeb,
+        document: mdiFileDocument,
+      },
     }
   },
 
@@ -25,6 +31,22 @@ export default {
     handleGoogleLogin() {
       const authStore = useAuthStore()
       authStore.loginWithGoogle()
+    },
+
+    openCeosWebsite() {
+      window.open('https://ceos.org/ard/', '_blank')
+    },
+
+    openGitHubRepo() {
+      window.open('https://github.com/ceos-org/ceos-ard', '_blank')
+    },
+
+    openImprint() {
+      window.open('https://moregeo.it/imprint', '_blank')
+    },
+
+    openMoreGeoWebsite() {
+      window.open('https://moregeo.it', '_blank')
     },
   },
 }
@@ -74,10 +96,49 @@ export default {
 
             <!-- Footer -->
             <div class="text-center mt-8">
-              <p class="text-caption text-medium-emphasis">
-                © {{ new Date().getFullYear() }} CEOS-ARD Editor · Licensed under Apache License
-                2.0
-              </p>
+              <div class="d-flex justify-center align-center flex-wrap gap-2 mb-2">
+                <v-btn
+                  variant="text"
+                  size="small"
+                  :prepend-icon="icons.web"
+                  @click="openCeosWebsite"
+                >
+                  CEOS-ARD Website
+                </v-btn>
+
+                <v-divider vertical class="mx-2" style="height: 20px"></v-divider>
+
+                <v-btn
+                  variant="text"
+                  size="small"
+                  :prepend-icon="icons.web"
+                  @click="openMoreGeoWebsite"
+                >
+                  MoreGeo GmbH
+                </v-btn>
+
+                <v-divider vertical class="mx-2" style="height: 20px"></v-divider>
+
+                <v-btn
+                  variant="text"
+                  size="small"
+                  :prepend-icon="icons.github"
+                  @click="openGitHubRepo"
+                >
+                  GitHub Repository
+                </v-btn>
+
+                <v-divider vertical class="mx-2" style="height: 20px"></v-divider>
+
+                <v-btn
+                  variant="text"
+                  size="small"
+                  :prepend-icon="icons.document"
+                  @click="openImprint"
+                >
+                  Imprint
+                </v-btn>
+              </div>
             </div>
           </v-col>
         </v-row>
