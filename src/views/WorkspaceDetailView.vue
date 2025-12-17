@@ -4,7 +4,7 @@ import { useWorkspacesStore } from '@/stores/workspaces'
 import { mdiAccountCircle, mdiLogout, mdiArchive, mdiCheckCircle, mdiMenuDown } from '@mdi/js'
 
 export default {
-  name: 'WorkspaceView',
+  name: 'WorkspaceDetailView',
 
   data() {
     return {

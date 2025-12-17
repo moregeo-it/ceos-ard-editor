@@ -92,7 +92,7 @@ export default {
 
     handleViewWorkspace(workspaceId) {
       this.$router.push({
-        name: 'workspace',
+        name: 'workspace-detail',
         params: { id: workspaceId },
       })
     },
