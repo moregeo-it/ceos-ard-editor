@@ -284,9 +284,3 @@ export default {
     </v-dialog>
   </v-app>
 </template>
-
-<style scoped>
-.v-app-bar {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-}
-</style>
