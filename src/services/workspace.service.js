@@ -23,9 +23,23 @@ export default {
   },
 
   /**
-   * Archive workspace (soft delete)
+   * Update workspace
    */
-  async archiveWorkspace(workspaceId) {
+  async updateWorkspace(workspaceId, workspaceData) {
+    return api.patch(`/workspaces/${workspaceId}`, workspaceData)
+  },
+
+  /**
+   * Toggle workspace status (active <-> archived)
+   */
+  async toggleWorkspaceStatus(workspaceId, newStatus) {
+    return api.patch(`/workspaces/${workspaceId}`, { status: newStatus })
+  },
+
+  /**
+   * Delete workspace (permanent)
+   */
+  async deleteWorkspace(workspaceId) {
     return api.delete(`/workspaces/${workspaceId}`)
   },
 

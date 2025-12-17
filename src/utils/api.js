@@ -70,6 +70,15 @@ export const api = {
     return response.json()
   },
 
+  async patch(endpoint, data, options = {}) {
+    const response = await fetchWithAuth(endpoint, {
+      ...options,
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+    return response.json()
+  },
+
   async delete(endpoint, options = {}) {
     const response = await fetchWithAuth(endpoint, { ...options, method: 'DELETE' })
     // Check if response has content (204 No Content has no body)

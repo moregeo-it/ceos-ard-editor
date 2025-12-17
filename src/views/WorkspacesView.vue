@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useWorkspacesStore } from '@/stores/workspaces'
 import WorkspaceCard from '@/components/workspace/WorkspaceCard.vue'
 import CreateWorkspaceDialog from '@/components/workspace/CreateWorkspaceDialog.vue'
+import UpdateWorkspaceDialog from '@/components/workspace/UpdateWorkspaceDialog.vue'
 import {
   mdiFolderMultiple,
   mdiAccountCircle,
@@ -19,6 +20,7 @@ export default {
   components: {
     WorkspaceCard,
     CreateWorkspaceDialog,
+    UpdateWorkspaceDialog,
   },
 
   data() {
@@ -34,9 +36,15 @@ export default {
       },
       showCreateDialog: false,
       showUserMenu: false,
+      showUpdateDialog: false,
+      workspaceToUpdate: null,
+      isUpdating: false,
       showArchiveDialog: false,
       workspaceToArchive: null,
-      isArchiving: false,
+      showDeleteDialog: false,
+      workspaceToDelete: null,
+      isDeleting: false,
+      isTogglingStatus: false,
       filter: 'all', // 'all', 'active', 'archived'
     }
   },
@@ -97,21 +105,79 @@ export default {
       })
     },
 
-    confirmArchive(workspaceId) {
-      this.workspaceToArchive = workspaceId
-      this.showArchiveDialog = true
+    handleEditWorkspace(workspaceId) {
+      const workspace = this.workspacesStore.workspaces.find(w => w.id === workspaceId)
+      if (workspace) {
+        this.workspaceToUpdate = workspace
+        this.showUpdateDialog = true
+      }
+    },
+
+    async handleUpdateWorkspace(updateData) {
+      this.isUpdating = true
+      try {
+        await this.workspacesStore.updateWorkspace(updateData.id, {
+          title: updateData.title,
+          pfs: updateData.pfs,
+          description: updateData.description,
+        })
+        this.showUpdateDialog = false
+        this.workspaceToUpdate = null
+      } catch (error) {
+        console.error('Failed to update workspace:', error)
+      } finally {
+        this.isUpdating = false
+      }
+    },
+
+    async handleToggleStatus(workspaceId) {
+      const workspace = this.workspacesStore.workspaces.find(w => w.id === workspaceId)
+      
+      // If workspace is active, show archive confirmation dialog
+      if (workspace?.status === 'active') {
+        this.workspaceToArchive = workspaceId
+        this.showArchiveDialog = true
+      } else {
+        // If workspace is archived, reactivate immediately without confirmation
+        this.isTogglingStatus = true
+        try {
+          await this.workspacesStore.toggleWorkspaceStatus(workspaceId)
+        } catch (error) {
+          console.error('Failed to reactivate workspace:', error)
+        } finally {
+          this.isTogglingStatus = false
+        }
+      }
     },
 
     async handleArchiveWorkspace() {
-      this.isArchiving = true
+      this.isTogglingStatus = true
       try {
-        await this.workspacesStore.archiveWorkspace(this.workspaceToArchive)
+        await this.workspacesStore.toggleWorkspaceStatus(this.workspaceToArchive)
         this.showArchiveDialog = false
         this.workspaceToArchive = null
       } catch (error) {
         console.error('Failed to archive workspace:', error)
       } finally {
-        this.isArchiving = false
+        this.isTogglingStatus = false
+      }
+    },
+
+    confirmDelete(workspaceId) {
+      this.workspaceToDelete = workspaceId
+      this.showDeleteDialog = true
+    },
+
+    async handleDeleteWorkspace() {
+      this.isDeleting = true
+      try {
+        await this.workspacesStore.deleteWorkspace(this.workspaceToDelete)
+        this.showDeleteDialog = false
+        this.workspaceToDelete = null
+      } catch (error) {
+        console.error('Failed to delete workspace:', error)
+      } finally {
+        this.isDeleting = false
       }
     },
 
@@ -237,7 +303,9 @@ export default {
             <WorkspaceCard
               :workspace="workspace"
               @view="handleViewWorkspace"
-              @archive="confirmArchive"
+              @edit="handleEditWorkspace"
+              @toggle-status="handleToggleStatus"
+              @delete="confirmDelete"
             />
           </v-col>
         </v-row>
@@ -252,8 +320,17 @@ export default {
       @submit="handleCreateWorkspace"
     />
 
+    <!-- Update Workspace Dialog -->
+    <UpdateWorkspaceDialog
+      v-model="showUpdateDialog"
+      :workspace="workspaceToUpdate"
+      :pfs-options="workspacesStore.pfsOptions"
+      :loading="isUpdating"
+      @submit="handleUpdateWorkspace"
+    />
+
     <!-- Archive Confirmation Dialog -->
-    <v-dialog v-model="showArchiveDialog" max-width="400" persistent>
+    <v-dialog v-model="showArchiveDialog" max-width="500" persistent>
       <v-card>
         <v-card-title class="d-flex align-center">
           Archive Workspace?
@@ -262,19 +339,59 @@ export default {
             :icon="icons.close"
             variant="text"
             @click="showArchiveDialog = false"
-            :disabled="isArchiving"
+            :disabled="isTogglingStatus"
           ></v-btn>
         </v-card-title>
         <v-card-text>
-          Are you sure you want to archive this workspace? You can still view archived workspaces,
-          but they will be marked as inactive.
+          <p class="mb-2">
+            Are you sure you want to archive this workspace?
+          </p>
+          <v-alert type="warning" variant="tonal" density="compact" class="mt-2">
+            <template v-if="workspaceToArchive">
+              <div v-if="workspacesStore.workspaces.find(w => w.id === workspaceToArchive)?.deletion_at">
+                This workspace will be <strong>permanently deleted on 
+                {{ new Date(workspacesStore.workspaces.find(w => w.id === workspaceToArchive).deletion_at).toLocaleDateString() }}</strong>
+                unless reactivated before that date.
+              </div>
+              <div v-else>
+                Archived workspaces will be scheduled for automatic deletion after a retention period.
+                You can reactivate it anytime before deletion.
+              </div>
+            </template>
+          </v-alert>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="showArchiveDialog = false" :disabled="isArchiving">Cancel</v-btn>
-          <v-btn color="error" :loading="isArchiving" @click="handleArchiveWorkspace"
-            >Archive</v-btn
-          >
+          <v-btn @click="showArchiveDialog = false" :disabled="isTogglingStatus">Cancel</v-btn>
+          <v-btn color="warning" :loading="isTogglingStatus" @click="handleArchiveWorkspace">
+            Archive
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Delete Confirmation Dialog -->
+    <v-dialog v-model="showDeleteDialog" max-width="400" persistent>
+      <v-card>
+        <v-card-title class="d-flex align-center">
+          Delete Workspace?
+          <v-spacer></v-spacer>
+          <v-btn
+            :icon="icons.close"
+            variant="text"
+            @click="showDeleteDialog = false"
+            :disabled="isDeleting"
+          ></v-btn>
+        </v-card-title>
+        <v-card-text>
+          Are you sure you want to permanently delete this workspace? This action cannot be undone.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn @click="showDeleteDialog = false" :disabled="isDeleting">Cancel</v-btn>
+          <v-btn color="error" :loading="isDeleting" @click="handleDeleteWorkspace">
+            Delete Permanently
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>

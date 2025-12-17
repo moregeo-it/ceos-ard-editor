@@ -1,5 +1,5 @@
 <script>
-import { mdiFolder, mdiFileDocument, mdiCalendar, mdiUpdate, mdiEye, mdiArchive } from '@mdi/js'
+import { mdiFolder, mdiFileDocument, mdiCalendar, mdiUpdate, mdiEye, mdiArchive, mdiPencil, mdiDelete, mdiPackageUp } from '@mdi/js'
 
 export default {
   name: 'WorkspaceCard',
@@ -11,7 +11,7 @@ export default {
     },
   },
 
-  emits: ['view', 'archive'],
+  emits: ['view', 'edit', 'toggle-status', 'delete'],
 
   data() {
     return {
@@ -22,6 +22,9 @@ export default {
         update: mdiUpdate,
         eye: mdiEye,
         archive: mdiArchive,
+        pencil: mdiPencil,
+        delete: mdiDelete,
+        activate: mdiPackageUp,
       },
     }
   },
@@ -34,6 +37,18 @@ export default {
     isArchived() {
       return this.workspace.status === 'archived'
     },
+
+    toggleStatusLabel() {
+      return this.isArchived ? 'Activate' : 'Archive'
+    },
+
+    toggleStatusIcon() {
+      return this.isArchived ? this.icons.activate : this.icons.archive
+    },
+
+    toggleStatusColor() {
+      return this.isArchived ? 'success' : 'warning'
+    },
   },
 
   methods: {
@@ -41,15 +56,23 @@ export default {
       this.$emit('view', this.workspace.id)
     },
 
-    handleArchive() {
-      this.$emit('archive', this.workspace.id)
+    handleEdit() {
+      this.$emit('edit', this.workspace.id)
+    },
+
+    handleToggleStatus() {
+      this.$emit('toggle-status', this.workspace.id)
+    },
+
+    handleDelete() {
+      this.$emit('delete', this.workspace.id)
     },
   },
 }
 </script>
 
 <template>
-  <v-card :disabled="isArchived" hover>
+  <v-card hover>
     <v-card-title class="d-flex align-center">
       <v-icon :icon="icons.folder" start></v-icon>
       {{ workspace.title }}
@@ -70,7 +93,8 @@ export default {
       </p>
     </v-card-text>
 
-    <v-card-text v-if="workspace.created_at || workspace.updated_at">
+    <!-- Active workspace timestamps -->
+    <v-card-text v-if="!isArchived && (workspace.created_at || workspace.updated_at)">
       <v-divider class="mb-3"></v-divider>
       <div class="d-flex justify-space-between text-caption text-medium-emphasis">
         <span v-if="workspace.created_at">
@@ -84,25 +108,53 @@ export default {
       </div>
     </v-card-text>
 
+    <!-- Archived workspace timestamps -->
+    <v-card-text v-if="isArchived && (workspace.archived_at || workspace.deletion_at)">
+      <v-divider class="mb-3"></v-divider>
+      <div class="d-flex justify-space-between text-caption text-medium-emphasis">
+        <span v-if="workspace.archived_at">
+          <v-icon :icon="icons.archive" size="x-small" start></v-icon>
+          Archived: {{ new Date(workspace.archived_at).toLocaleDateString() }}
+        </span>
+        <span v-if="workspace.deletion_at">
+          <v-icon :icon="icons.delete" size="x-small" start></v-icon>
+          Deletion: {{ new Date(workspace.deletion_at).toLocaleDateString() }}
+        </span>
+      </div>
+    </v-card-text>
+
     <v-card-actions>
       <v-btn
         color="primary"
         variant="text"
         :prepend-icon="icons.eye"
         @click="handleView"
-        :disabled="isArchived"
       >
         View
       </v-btn>
+      <v-btn
+        variant="text"
+        :prepend-icon="icons.pencil"
+        @click="handleEdit"
+      >
+        Update
+      </v-btn>
       <v-spacer></v-spacer>
       <v-btn
-        v-if="!isArchived"
+        :color="toggleStatusColor"
+        variant="text"
+        :prepend-icon="toggleStatusIcon"
+        @click="handleToggleStatus"
+      >
+        {{ toggleStatusLabel }}
+      </v-btn>
+      <v-btn
         color="error"
         variant="text"
-        :prepend-icon="icons.archive"
-        @click="handleArchive"
+        :prepend-icon="icons.delete"
+        @click="handleDelete"
       >
-        Archive
+        Delete
       </v-btn>
     </v-card-actions>
   </v-card>

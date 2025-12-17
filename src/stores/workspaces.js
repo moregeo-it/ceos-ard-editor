@@ -56,14 +56,72 @@ export const useWorkspacesStore = defineStore('workspaces', {
       }
     },
 
-    async archiveWorkspace(workspaceId) {
+    async updateWorkspace(workspaceId, workspaceData) {
+      this.error = null
+
       try {
-        await workspaceService.archiveWorkspace(workspaceId)
+        const updatedWorkspace = await workspaceService.updateWorkspace(workspaceId, workspaceData)
+        
+        // Update local state
+        const index = this.workspaces.findIndex((w) => w.id === workspaceId)
+        if (index !== -1) {
+          this.workspaces[index] = updatedWorkspace
+        }
+        
+        // Update currentWorkspace if it matches
+        if (this.currentWorkspace?.id === workspaceId) {
+          this.currentWorkspace = updatedWorkspace
+        }
+        
+        return updatedWorkspace
+      } catch (error) {
+        this.error = error.message
+        throw error
+      }
+    },
+
+    async toggleWorkspaceStatus(workspaceId) {
+      this.error = null
+
+      try {
+        const workspace = this.workspaces.find((w) => w.id === workspaceId)
+        if (!workspace) {
+          throw new Error('Workspace not found')
+        }
+
+        const newStatus = workspace.status === 'active' ? 'archived' : 'active'
+        const updatedWorkspace = await workspaceService.toggleWorkspaceStatus(workspaceId, newStatus)
 
         // Update local state
-        const workspace = this.workspaces.find((w) => w.id === workspaceId)
-        if (workspace) {
-          workspace.status = 'archived'
+        const index = this.workspaces.findIndex((w) => w.id === workspaceId)
+        if (index !== -1) {
+          this.workspaces[index] = updatedWorkspace
+        }
+
+        // Update currentWorkspace if it matches
+        if (this.currentWorkspace?.id === workspaceId) {
+          this.currentWorkspace = updatedWorkspace
+        }
+
+        return updatedWorkspace
+      } catch (error) {
+        this.error = error.message
+        throw error
+      }
+    },
+
+    async deleteWorkspace(workspaceId) {
+      this.error = null
+
+      try {
+        await workspaceService.deleteWorkspace(workspaceId)
+
+        // Remove from local state
+        this.workspaces = this.workspaces.filter((w) => w.id !== workspaceId)
+
+        // Clear currentWorkspace if it matches
+        if (this.currentWorkspace?.id === workspaceId) {
+          this.currentWorkspace = null
         }
       } catch (error) {
         this.error = error.message
