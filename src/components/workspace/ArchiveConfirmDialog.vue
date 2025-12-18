@@ -69,8 +69,8 @@ export default {
             unless reactivated before that date.
           </div>
           <div v-else>
-            Archived workspaces will be scheduled for automatic deletion after a retention period
-            of one month. You can reactivate it anytime before deletion.
+            Archived workspaces will be scheduled for automatic deletion after a retention period of
+            one month. You can reactivate it anytime before deletion.
           </div>
         </v-alert>
       </v-card-text>

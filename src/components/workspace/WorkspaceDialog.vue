@@ -1,5 +1,12 @@
 <script>
-import { mdiFolderPlus, mdiFolderEdit, mdiFolder, mdiFileDocument, mdiText, mdiClose } from '@mdi/js'
+import {
+  mdiFolderPlus,
+  mdiFolderEdit,
+  mdiFolder,
+  mdiFileDocument,
+  mdiText,
+  mdiClose,
+} from '@mdi/js'
 
 export default {
   name: 'WorkspaceDialog',

@@ -28,11 +28,6 @@ export default {
       authStore.loginWithGitHub()
     },
 
-    handleGoogleLogin() {
-      const authStore = useAuthStore()
-      authStore.loginWithGoogle()
-    },
-
     openCeosWebsite() {
       window.open('https://ceos.org/ard/', '_blank')
     },
@@ -86,9 +81,7 @@ export default {
                   <div style="max-width: 360px; width: 100%">
                     <p class="text-h6 mb-6 text-center">Sign in to get started</p>
 
-                    <LoginButton provider="github" class="mb-4" @click="handleGitHubLogin" />
-
-                    <LoginButton provider="google" @click="handleGoogleLogin" />
+                    <LoginButton provider="github" @click="handleGitHubLogin" />
                   </div>
                 </v-col>
               </v-row>
