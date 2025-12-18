@@ -2,8 +2,9 @@
 import { useAuthStore } from '@/stores/auth'
 import { useWorkspacesStore } from '@/stores/workspaces'
 import WorkspaceCard from '@/components/workspace/WorkspaceCard.vue'
-import CreateWorkspaceDialog from '@/components/workspace/CreateWorkspaceDialog.vue'
-import UpdateWorkspaceDialog from '@/components/workspace/UpdateWorkspaceDialog.vue'
+import WorkspaceDialog from '@/components/workspace/WorkspaceDialog.vue'
+import ArchiveConfirmDialog from '@/components/workspace/ArchiveConfirmDialog.vue'
+import DeleteConfirmDialog from '@/components/workspace/DeleteConfirmDialog.vue'
 import {
   mdiFolderMultiple,
   mdiAccountCircle,
@@ -19,8 +20,9 @@ export default {
 
   components: {
     WorkspaceCard,
-    CreateWorkspaceDialog,
-    UpdateWorkspaceDialog,
+    WorkspaceDialog,
+    ArchiveConfirmDialog,
+    DeleteConfirmDialog,
   },
 
   data() {
@@ -34,11 +36,11 @@ export default {
         menuDown: mdiMenuDown,
         close: mdiClose,
       },
-      showCreateDialog: false,
+      showWorkspaceDialog: false,
+      workspaceDialogMode: 'create',
+      workspaceToEdit: null,
       showUserMenu: false,
-      showUpdateDialog: false,
-      workspaceToUpdate: null,
-      isUpdating: false,
+      isSubmitting: false,
       showArchiveDialog: false,
       workspaceToArchive: null,
       showDeleteDialog: false,
@@ -89,12 +91,30 @@ export default {
       }
     },
 
-    async handleCreateWorkspace(workspaceData) {
+    openCreateDialog() {
+      this.workspaceDialogMode = 'create'
+      this.workspaceToEdit = null
+      this.showWorkspaceDialog = true
+    },
+
+    async handleWorkspaceSubmit(workspaceData) {
+      this.isSubmitting = true
       try {
-        await this.workspacesStore.createWorkspace(workspaceData)
-        this.showCreateDialog = false
+        if (this.workspaceDialogMode === 'create') {
+          await this.workspacesStore.createWorkspace(workspaceData)
+        } else {
+          await this.workspacesStore.updateWorkspace(workspaceData.id, {
+            title: workspaceData.title,
+            pfs: workspaceData.pfs,
+            description: workspaceData.description,
+          })
+        }
+        this.showWorkspaceDialog = false
+        this.workspaceToEdit = null
       } catch (error) {
-        console.error('Failed to create workspace:', error)
+        console.error('Failed to save workspace:', error)
+      } finally {
+        this.isSubmitting = false
       }
     },
 
@@ -108,25 +128,9 @@ export default {
     handleEditWorkspace(workspaceId) {
       const workspace = this.workspacesStore.workspaces.find((w) => w.id === workspaceId)
       if (workspace) {
-        this.workspaceToUpdate = workspace
-        this.showUpdateDialog = true
-      }
-    },
-
-    async handleUpdateWorkspace(updateData) {
-      this.isUpdating = true
-      try {
-        await this.workspacesStore.updateWorkspace(updateData.id, {
-          title: updateData.title,
-          pfs: updateData.pfs,
-          description: updateData.description,
-        })
-        this.showUpdateDialog = false
-        this.workspaceToUpdate = null
-      } catch (error) {
-        console.error('Failed to update workspace:', error)
-      } finally {
-        this.isUpdating = false
+        this.workspaceDialogMode = 'update'
+        this.workspaceToEdit = workspace
+        this.showWorkspaceDialog = true
       }
     },
 
@@ -229,7 +233,7 @@ export default {
               color="primary"
               size="large"
               :prepend-icon="icons.plus"
-              @click="showCreateDialog = true"
+              @click="openCreateDialog"
             >
               Create Workspace
             </v-btn>
@@ -283,7 +287,7 @@ export default {
                 v-if="filter === 'all'"
                 color="primary"
                 :prepend-icon="icons.plus"
-                @click="showCreateDialog = true"
+                @click="openCreateDialog"
               >
                 Create Workspace
               </v-btn>
@@ -312,99 +316,29 @@ export default {
       </v-container>
     </v-main>
 
-    <!-- Create Workspace Dialog -->
-    <CreateWorkspaceDialog
-      v-model="showCreateDialog"
+    <!-- Workspace Dialog (Create/Update) -->
+    <WorkspaceDialog
+      v-model="showWorkspaceDialog"
+      :mode="workspaceDialogMode"
+      :workspace="workspaceToEdit"
       :pfs-options="workspacesStore.pfsOptions"
-      :loading="workspacesStore.isCreating"
-      @submit="handleCreateWorkspace"
-    />
-
-    <!-- Update Workspace Dialog -->
-    <UpdateWorkspaceDialog
-      v-model="showUpdateDialog"
-      :workspace="workspaceToUpdate"
-      :pfs-options="workspacesStore.pfsOptions"
-      :loading="isUpdating"
-      @submit="handleUpdateWorkspace"
+      :loading="isSubmitting"
+      @submit="handleWorkspaceSubmit"
     />
 
     <!-- Archive Confirmation Dialog -->
-    <v-dialog v-model="showArchiveDialog" max-width="500" persistent>
-      <v-card>
-        <v-card-title class="d-flex align-center">
-          Archive Workspace?
-          <v-spacer></v-spacer>
-          <v-btn
-            :icon="icons.close"
-            variant="text"
-            @click="showArchiveDialog = false"
-            :disabled="isTogglingStatus"
-          ></v-btn>
-        </v-card-title>
-        <v-card-text>
-          <p class="mb-2">Are you sure you want to archive this workspace?</p>
-          <v-alert type="warning" variant="tonal" density="compact" class="mt-2">
-            <template v-if="workspaceToArchive">
-              <div
-                v-if="
-                  workspacesStore.workspaces.find((w) => w.id === workspaceToArchive)?.deletion_at
-                "
-              >
-                This workspace will be
-                <strong
-                  >permanently deleted on
-                  {{
-                    new Date(
-                      workspacesStore.workspaces.find(
-                        (w) => w.id === workspaceToArchive,
-                      ).deletion_at,
-                    ).toLocaleDateString()
-                  }}</strong
-                >
-                unless reactivated before that date.
-              </div>
-              <div v-else>
-                Archived workspaces will be scheduled for automatic deletion after a retention
-                period of one month. You can reactivate it anytime before deletion.
-              </div>
-            </template>
-          </v-alert>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn @click="showArchiveDialog = false" :disabled="isTogglingStatus">Cancel</v-btn>
-          <v-btn color="warning" :loading="isTogglingStatus" @click="handleArchiveWorkspace">
-            Archive
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <ArchiveConfirmDialog
+      v-model="showArchiveDialog"
+      :workspace="workspacesStore.workspaces.find((w) => w.id === workspaceToArchive)"
+      :loading="isTogglingStatus"
+      @confirm="handleArchiveWorkspace"
+    />
 
     <!-- Delete Confirmation Dialog -->
-    <v-dialog v-model="showDeleteDialog" max-width="400" persistent>
-      <v-card>
-        <v-card-title class="d-flex align-center">
-          Delete Workspace?
-          <v-spacer></v-spacer>
-          <v-btn
-            :icon="icons.close"
-            variant="text"
-            @click="showDeleteDialog = false"
-            :disabled="isDeleting"
-          ></v-btn>
-        </v-card-title>
-        <v-card-text>
-          Are you sure you want to permanently delete this workspace? This action cannot be undone.
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn @click="showDeleteDialog = false" :disabled="isDeleting">Cancel</v-btn>
-          <v-btn color="error" :loading="isDeleting" @click="handleDeleteWorkspace">
-            Delete Permanently
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <DeleteConfirmDialog
+      v-model="showDeleteDialog"
+      :loading="isDeleting"
+      @confirm="handleDeleteWorkspace"
+    />
   </v-app>
 </template>

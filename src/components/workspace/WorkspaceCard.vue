@@ -1,7 +1,7 @@
 <script>
+import PfsBadges from './PfsBadges.vue'
 import {
   mdiFolder,
-  mdiFileDocument,
   mdiCalendar,
   mdiUpdate,
   mdiEye,
@@ -13,6 +13,10 @@ import {
 
 export default {
   name: 'WorkspaceCard',
+
+  components: {
+    PfsBadges,
+  },
 
   props: {
     workspace: {
@@ -27,7 +31,6 @@ export default {
     return {
       icons: {
         folder: mdiFolder,
-        fileDocument: mdiFileDocument,
         calendar: mdiCalendar,
         update: mdiUpdate,
         eye: mdiEye,
@@ -82,7 +85,7 @@ export default {
 </script>
 
 <template>
-  <v-card hover>
+  <v-card hover class="d-flex flex-column" style="height: 100%">
     <v-card-title class="d-flex align-center">
       <v-icon :icon="icons.folder" start></v-icon>
       {{ workspace.title }}
@@ -92,14 +95,13 @@ export default {
       </v-chip>
     </v-card-title>
 
-    <v-card-subtitle v-if="workspace.pfs" class="mt-2">
-      <v-icon :icon="icons.fileDocument" size="small" start></v-icon>
-      {{ workspace.pfs }}
+    <v-card-subtitle class="mt-2">
+      <PfsBadges :pfs="workspace.pfs" />
     </v-card-subtitle>
 
-    <v-card-text v-if="workspace.description">
+    <v-card-text class="flex-grow-1">
       <p class="text-body-2 text-medium-emphasis">
-        {{ workspace.description }}
+        {{ workspace.description || 'No description provided.' }}
       </p>
     </v-card-text>
 
@@ -133,7 +135,7 @@ export default {
       </div>
     </v-card-text>
 
-    <v-card-actions>
+    <v-card-actions class="mt-auto">
       <v-btn color="primary" variant="text" :prepend-icon="icons.eye" @click="handleView">
         View
       </v-btn>

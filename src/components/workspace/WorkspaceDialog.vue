@@ -1,11 +1,20 @@
 <script>
-import { mdiFolderPlus, mdiFolder, mdiFileDocument, mdiText, mdiClose } from '@mdi/js'
+import { mdiFolderPlus, mdiFolderEdit, mdiFolder, mdiFileDocument, mdiText, mdiClose } from '@mdi/js'
 
 export default {
-  name: 'CreateWorkspaceDialog',
+  name: 'WorkspaceDialog',
 
   props: {
     modelValue: Boolean,
+    mode: {
+      type: String,
+      default: 'create',
+      validator: (value) => ['create', 'update'].includes(value),
+    },
+    workspace: {
+      type: Object,
+      default: null,
+    },
     pfsOptions: {
       type: Array,
       default: () => [],
@@ -22,6 +31,7 @@ export default {
     return {
       icons: {
         folderPlus: mdiFolderPlus,
+        folderEdit: mdiFolderEdit,
         folder: mdiFolder,
         fileDocument: mdiFileDocument,
         text: mdiText,
@@ -50,6 +60,47 @@ export default {
         this.$emit('update:modelValue', value)
       },
     },
+
+    isUpdateMode() {
+      return this.mode === 'update'
+    },
+
+    dialogTitle() {
+      return this.isUpdateMode ? 'Update Workspace' : 'Create New Workspace'
+    },
+
+    dialogIcon() {
+      return this.isUpdateMode ? this.icons.folderEdit : this.icons.folderPlus
+    },
+
+    submitButtonText() {
+      return this.isUpdateMode ? 'Update Workspace' : 'Create Workspace'
+    },
+  },
+
+  watch: {
+    workspace: {
+      immediate: true,
+      handler(workspace) {
+        if (workspace && this.isUpdateMode) {
+          this.formData = {
+            title: workspace.title || '',
+            pfs: workspace.pfs
+              ? Array.isArray(workspace.pfs)
+                ? workspace.pfs
+                : [workspace.pfs]
+              : [],
+            description: workspace.description || '',
+          }
+        }
+      },
+    },
+
+    showDialog(val) {
+      if (!val) {
+        this.resetForm()
+      }
+    },
   },
 
   methods: {
@@ -58,11 +109,22 @@ export default {
 
       if (!valid) return
 
-      this.$emit('submit', {
+      const payload = {
         title: this.formData.title,
-        pfs: this.formData.pfs,
         description: this.formData.description || undefined,
-      })
+      }
+
+      // Only include pfs if values are selected
+      if (this.formData.pfs && this.formData.pfs.length > 0) {
+        payload.pfs = this.formData.pfs
+      }
+
+      // Include workspace ID for update mode
+      if (this.isUpdateMode && this.workspace) {
+        payload.id = this.workspace.id
+      }
+
+      this.$emit('submit', payload)
     },
 
     handleClose() {
@@ -71,19 +133,26 @@ export default {
     },
 
     resetForm() {
-      this.formData = {
-        title: '',
-        pfs: [],
-        description: '',
-      }
-      this.$refs.form?.reset()
-    },
-  },
-
-  watch: {
-    showDialog(val) {
-      if (!val) {
-        this.resetForm()
+      if (this.isUpdateMode && this.workspace) {
+        // Restore workspace data in update mode
+        this.formData = {
+          title: this.workspace.title || '',
+          pfs: this.workspace.pfs
+            ? Array.isArray(this.workspace.pfs)
+              ? this.workspace.pfs
+              : [this.workspace.pfs]
+            : [],
+          description: this.workspace.description || '',
+        }
+        this.$refs.form?.resetValidation()
+      } else {
+        // Clear form in create mode
+        this.formData = {
+          title: '',
+          pfs: [],
+          description: '',
+        }
+        this.$refs.form?.reset()
       }
     },
   },
@@ -94,8 +163,8 @@ export default {
   <v-dialog v-model="showDialog" max-width="600" persistent>
     <v-card>
       <v-card-title class="d-flex align-center">
-        <v-icon :icon="icons.folderPlus" start></v-icon>
-        Create New Workspace
+        <v-icon :icon="dialogIcon" start></v-icon>
+        {{ dialogTitle }}
         <v-spacer></v-spacer>
         <v-btn :icon="icons.close" variant="text" @click="handleClose" :disabled="loading"></v-btn>
       </v-card-title>
@@ -148,7 +217,7 @@ export default {
         <v-spacer></v-spacer>
         <v-btn variant="text" @click="handleClose" :disabled="loading"> Cancel </v-btn>
         <v-btn color="primary" variant="elevated" :loading="loading" @click="handleSubmit">
-          Create Workspace
+          {{ submitButtonText }}
         </v-btn>
       </v-card-actions>
     </v-card>
