@@ -146,9 +146,3 @@ export default {
     </v-main>
   </v-app>
 </template>
-
-<style scoped>
-.fill-height {
-  min-height: 100vh;
-}
-</style>
