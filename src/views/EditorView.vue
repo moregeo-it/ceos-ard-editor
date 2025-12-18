@@ -14,7 +14,7 @@ import {
 } from '@mdi/js'
 
 export default {
-  name: 'WorkspaceDetailView',
+  name: 'EditorView',
 
   data() {
     return {

@@ -100,7 +100,7 @@ export default {
 
     handleViewWorkspace(workspaceId) {
       this.$router.push({
-        name: 'workspace-detail',
+        name: 'editor',
         params: { id: workspaceId },
       })
     },
