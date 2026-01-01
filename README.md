@@ -1,4 +1,5 @@
-# ceos-ard-editor
+# CEOS-ARD Editor
+
 [![Lint](https://github.com/ceos-org/ceos-ard-editor/actions/workflows/lint.yml/badge.svg)](https://github.com/ceos-org/ceos-ard-editor/actions/workflows/lint.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
