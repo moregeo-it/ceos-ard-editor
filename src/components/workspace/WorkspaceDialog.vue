@@ -118,7 +118,11 @@ export default {
 
       const payload = {
         title: this.formData.title,
-        description: this.formData.description || undefined,
+      }
+
+      // Only include description if it has a value
+      if (this.formData.description) {
+        payload.description = this.formData.description
       }
 
       // Only include pfs if values are selected
