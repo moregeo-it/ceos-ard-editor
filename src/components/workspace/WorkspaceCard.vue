@@ -85,7 +85,7 @@ export default {
 </script>
 
 <template>
-  <v-card hover class="d-flex flex-column" style="height: 100%">
+  <v-card hover class="d-flex flex-column workspace-card" style="height: 100%; cursor: pointer" @click="handleView">
     <v-card-title class="d-flex align-center">
       <v-icon :icon="icons.folder" start></v-icon>
       {{ workspace.title }}
@@ -136,20 +136,20 @@ export default {
     </v-card-text>
 
     <v-card-actions class="mt-auto flex-wrap">
-      <v-btn color="primary" variant="text" :prepend-icon="icons.eye" @click="handleView">
+      <v-btn color="primary" variant="text" :prepend-icon="icons.eye" @click.stop="handleView">
         View
       </v-btn>
-      <v-btn variant="text" :prepend-icon="icons.pencil" @click="handleEdit"> Update </v-btn>
+      <v-btn variant="text" :prepend-icon="icons.pencil" @click.stop="handleEdit"> Update </v-btn>
       <v-spacer></v-spacer>
       <v-btn
         :color="toggleStatusColor"
         variant="text"
         :prepend-icon="toggleStatusIcon"
-        @click="handleToggleStatus"
+        @click.stop="handleToggleStatus"
       >
         {{ toggleStatusLabel }}
       </v-btn>
-      <v-btn color="error" variant="text" :prepend-icon="icons.delete" @click="handleDelete">
+      <v-btn color="error" variant="text" :prepend-icon="icons.delete" @click.stop="handleDelete">
         Delete
       </v-btn>
     </v-card-actions>
