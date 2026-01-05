@@ -133,51 +133,14 @@ export default {
 
       <!-- Action Buttons -->
       <v-btn
-        v-if="isArchived"
         variant="outlined"
         color="success"
-        class="mr-2"
-        :prepend-icon="icons.activate"
-        @click="handleToggleStatus"
-        :disabled="loading || isToggling"
-        :loading="isToggling"
-      >
-        Activate
-      </v-btn>
-
-      <v-btn
-        v-if="!isArchived"
-        variant="outlined"
-        color="warning"
-        class="mr-2"
-        :prepend-icon="icons.archive"
-        @click="handleToggleStatus"
-        :disabled="loading || isToggling"
-        :loading="isToggling"
-      >
-        Archive
-      </v-btn>
-
-      <v-btn
-        variant="outlined"
-        color="success"
-        class="mr-2"
+        class="mr-4"
         :prepend-icon="icons.propose"
         @click="handlePropose"
         :disabled="loading || isArchived"
       >
         Propose
-      </v-btn>
-
-      <v-btn
-        variant="outlined"
-        color="error"
-        class="mr-4"
-        :prepend-icon="icons.delete"
-        @click="confirmDelete"
-        :disabled="loading"
-      >
-        Delete
       </v-btn>
 
       <!-- User Menu -->
