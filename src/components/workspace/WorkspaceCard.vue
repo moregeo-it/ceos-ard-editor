@@ -85,7 +85,12 @@ export default {
 </script>
 
 <template>
-  <v-card hover class="d-flex flex-column workspace-card" style="height: 100%; cursor: pointer" @click="handleView">
+  <v-card
+    hover
+    class="d-flex flex-column workspace-card"
+    style="height: 100%; cursor: pointer"
+    @click="handleView"
+  >
     <v-card-title class="d-flex align-center">
       <v-icon :icon="icons.folder" start></v-icon>
       {{ workspace.title }}
