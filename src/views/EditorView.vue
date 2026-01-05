@@ -8,6 +8,7 @@ import {
   mdiMenuDown,
   mdiAlertCircle,
   mdiPackageUp,
+  mdiArrowLeft,
 } from '@mdi/js'
 
 export default {
@@ -22,6 +23,7 @@ export default {
         menuDown: mdiMenuDown,
         activate: mdiPackageUp,
         alert: mdiAlertCircle,
+        back: mdiArrowLeft,
       },
       showUserMenu: false,
       workspace: null,
@@ -99,21 +101,31 @@ export default {
   <v-app>
     <!-- Top Navigation Bar -->
     <v-app-bar color="primary" elevation="2">
-      <!-- Workspace Name -->
-      <v-btn variant="text" class="text-h6 font-weight-medium" @click="goToWorkspaces">
-        {{ workspace?.title || 'Loading...' }}
+      <!-- Back Button -->
+      <v-btn
+        icon
+        variant="text"
+        @click="goToWorkspaces"
+      >
+        <v-icon :icon="icons.back" />
       </v-btn>
+
+      <!-- Workspace Name -->
+      <v-app-bar-title>
+        {{ workspace?.title || 'Loading...' }}
+      </v-app-bar-title>
 
       <v-spacer />
 
       <!-- Action Buttons -->
       <v-btn
+        v-if="!isArchived"
         variant="outlined"
         color="success"
         class="mr-4"
         :prepend-icon="icons.propose"
         @click="handlePropose"
-        :disabled="loading || isArchived"
+        :disabled="loading"
       >
         Propose
       </v-btn>
