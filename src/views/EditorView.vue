@@ -4,13 +4,10 @@ import { useWorkspacesStore } from '@/stores/workspaces'
 import {
   mdiAccountCircle,
   mdiLogout,
-  mdiArchive,
   mdiCheckCircle,
   mdiMenuDown,
-  mdiPackageUp,
   mdiAlertCircle,
-  mdiDelete,
-  mdiClose,
+  mdiPackageUp,
 } from '@mdi/js'
 
 export default {
@@ -21,17 +18,12 @@ export default {
       icons: {
         accountCircle: mdiAccountCircle,
         logout: mdiLogout,
-        archive: mdiArchive,
         propose: mdiCheckCircle,
         menuDown: mdiMenuDown,
         activate: mdiPackageUp,
         alert: mdiAlertCircle,
-        delete: mdiDelete,
-        close: mdiClose,
       },
       showUserMenu: false,
-      showDeleteDialog: false,
-      isDeleting: false,
       workspace: null,
       loading: true,
       isToggling: false,
@@ -89,23 +81,6 @@ export default {
     handlePropose() {
       // TODO: Implement propose functionality
       console.log('Propose workspace:', this.workspaceId)
-    },
-
-    confirmDelete() {
-      this.showDeleteDialog = true
-    },
-
-    async handleDeleteWorkspace() {
-      this.isDeleting = true
-      try {
-        await this.workspacesStore.deleteWorkspace(this.workspaceId)
-        // Navigate back to workspaces after successful deletion
-        this.$router.push({ name: 'workspaces' })
-      } catch (error) {
-        console.error('Failed to delete workspace:', error)
-      } finally {
-        this.isDeleting = false
-      }
     },
 
     async handleLogout() {
@@ -213,37 +188,5 @@ export default {
         </v-card>
       </v-container>
     </v-main>
-
-    <!-- Delete Confirmation Dialog -->
-    <v-dialog v-model="showDeleteDialog" max-width="450" persistent>
-      <v-card>
-        <v-card-title class="d-flex align-center">
-          Delete Workspace?
-          <v-spacer></v-spacer>
-          <v-btn
-            :icon="icons.close"
-            variant="text"
-            @click="showDeleteDialog = false"
-            :disabled="isDeleting"
-          ></v-btn>
-        </v-card-title>
-        <v-card-text>
-          <p class="mb-2">
-            Are you sure you want to permanently delete <strong>{{ workspace?.title }}</strong
-            >?
-          </p>
-          <v-alert type="error" variant="tonal" density="compact">
-            This action cannot be undone. All workspace data will be lost.
-          </v-alert>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn @click="showDeleteDialog = false" :disabled="isDeleting">Cancel</v-btn>
-          <v-btn color="error" :loading="isDeleting" @click="handleDeleteWorkspace">
-            Delete Permanently
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
   </v-app>
 </template>
