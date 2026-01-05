@@ -135,7 +135,7 @@ export default {
       </div>
     </v-card-text>
 
-    <v-card-actions class="mt-auto">
+    <v-card-actions class="mt-auto flex-wrap">
       <v-btn color="primary" variant="text" :prepend-icon="icons.eye" @click="handleView">
         View
       </v-btn>
