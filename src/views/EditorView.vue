@@ -1,3 +1,110 @@
+<template>
+  <v-app>
+    <!-- Top Navigation Bar -->
+    <v-app-bar color="primary" elevation="2">
+      <!-- Workspace Name -->
+      <v-app-bar-title>
+        {{ workspace?.title || 'Loading...' }}
+      </v-app-bar-title>
+
+      <!-- Action Buttons -->
+      <v-btn
+        v-if="!isArchived"
+        color="success"
+        class="mr-2"
+        :prepend-icon="icons.propose"
+        @click="handlePropose"
+        :disabled="loading"
+      >
+        Propose
+      </v-btn>
+
+      <v-btn
+        color="error"
+        class="mr-4"
+        :prepend-icon="icons.close"
+        @click="goToWorkspaces"
+      >
+        Close
+      </v-btn>
+
+      <v-spacer />
+
+      <!-- User Menu -->
+      <v-menu v-model="showUserMenu" location="bottom end">
+        <template v-slot:activator="{ props }">
+          <v-btn v-bind="props" variant="text" :prepend-icon="icons.accountCircle">
+            {{ authStore.username }}
+            <v-icon :icon="icons.menuDown" />
+          </v-btn>
+        </template>
+
+        <v-list>
+          <v-list-item @click="handleLogout">
+            <template v-slot:prepend>
+              <v-icon :icon="icons.logout" />
+            </template>
+            <v-list-item-title>Logout</v-list-item-title>
+          </v-list-item>
+        </v-list>
+      </v-menu>
+    </v-app-bar>
+
+    <!-- Main Content Area -->
+    <v-main>
+      <v-container v-if="loading" class="fill-height d-flex align-center justify-center">
+        <v-progress-circular indeterminate color="primary" size="64" />
+      </v-container>
+      <splitpanes @resized="storePaneSizes" :dbl-click-splitter="false">
+        <pane class="files" min-size="10" :size="panelSizes.files">
+          <FilesPane />
+        </pane>
+        <pane class="editor" min-size="30" :size="panelSizes.editor">
+          <EditorPane>
+            <template #message>
+              <!-- Archived Workspace Banner -->
+              <v-alert
+                v-if="isArchived"
+                type="warning"
+                variant="tonal"
+                prominent
+                class="mb-4"
+                :icon="icons.alert"
+              >
+                <v-alert-title>This workspace is archived (Read-Only)</v-alert-title>
+                <div class="mt-2">
+                  You are viewing this workspace in read-only mode.
+                  <strong>Activate it to make changes or propose updates.</strong>
+                </div>
+                <template v-if="workspace?.deletion_at">
+                  <div class="mt-2 text-caption">
+                    Scheduled for deletion on:
+                    <strong>{{ new Date(workspace.deletion_at).toLocaleDateString() }}</strong>
+                  </div>
+                </template>
+                <template v-slot:append>
+                  <v-btn
+                    color="success"
+                    variant="elevated"
+                    :prepend-icon="icons.activate"
+                    @click="handleToggleStatus"
+                    :loading="isToggling"
+                  >
+                    Activate Now
+                  </v-btn>
+                </template>
+              </v-alert>
+            </template>
+          </EditorPane>
+        </pane>
+        <pane class="preview" min-size="0" :size="panelSizes.preview">
+          <PreviewPane />
+        </pane>
+      </splitpanes>
+    </v-main>
+  </v-app>
+</template>
+
 <script>
 import { useAuthStore } from '@/stores/auth'
 import { useWorkspacesStore } from '@/stores/workspaces'
@@ -6,15 +113,31 @@ import {
   mdiLogout,
   mdiCheckCircle,
   mdiMenuDown,
-  mdiAlertCircle,
+  mdiAlert,
   mdiPackageUp,
   mdiClose,
 } from '@mdi/js'
+import EditorPane from '@/components/ide/EditorPane.vue'
+import FilesPane from '@/components/ide/FilesPane.vue'
+import PreviewPane from '@/components/ide/PreviewPane.vue'
+import { Splitpanes, Pane } from 'splitpanes'
 
 export default {
   name: 'EditorView',
+  components: {
+    EditorPane,
+    FilesPane,
+    Pane,
+    PreviewPane,
+    Splitpanes,
+  },
 
   data() {
+    const panelSizeDefaults = {
+      files: 20,
+      editor: 45,
+      preview: 35,
+    }
     return {
       icons: {
         accountCircle: mdiAccountCircle,
@@ -29,6 +152,12 @@ export default {
       workspace: null,
       loading: true,
       isToggling: false,
+      panelSizeDefaults: panelSizeDefaults,
+      panelSizes: {
+        files: localStorage.filesPanelSize ?? panelSizeDefaults.files,
+        editor: localStorage.editorPanelSize ?? panelSizeDefaults.editor,
+        preview: localStorage.previewPanelSize ?? panelSizeDefaults.preview,
+      },
     }
   },
 
@@ -55,6 +184,14 @@ export default {
   },
 
   methods: {
+    storePaneSizes: ({ panes }) => {
+      if (panes.length === 3) {
+        localStorage.filesPanelSize = panes[0].size
+        localStorage.editorPanelSize = panes[1].size
+        localStorage.previewPanelSize = panes[2].size
+      }
+    },
+
     async loadWorkspace() {
       try {
         this.loading = true
@@ -97,109 +234,30 @@ export default {
 }
 </script>
 
-<template>
-  <v-app>
-    <!-- Top Navigation Bar -->
-    <v-app-bar color="primary" elevation="2">
-      <!-- Action Buttons -->
-      <v-btn
-        v-if="!isArchived"
-        variant="outlined"
-        color="success"
-        class="mr-2"
-        :prepend-icon="icons.propose"
-        @click="handlePropose"
-        :disabled="loading"
-      >
-        Propose
-      </v-btn>
+<style>
+@import '../../node_modules/splitpanes/dist/splitpanes.css';
 
-      <v-btn
-        variant="outlined"
-        color="error"
-        class="mr-4"
-        :prepend-icon="icons.close"
-        @click="goToWorkspaces"
-      >
-        Close
-      </v-btn>
+.splitpanes .splitpanes__splitter {
+  background-color: #cccccc;
+  min-width: 4px;
+}
 
-      <!-- Workspace Name -->
-      <v-app-bar-title>
-        {{ workspace?.title || 'Loading...' }}
-      </v-app-bar-title>
+.splitpanes .splitpanes__splitter:hover,
+.splitpanes .splitpanes__splitter:active,
+.splitpanes .splitpanes__splitter:focus {
+  background-color: #aaaaaa;
+}
+</style>
 
-      <v-spacer />
-
-      <!-- User Menu -->
-      <v-menu v-model="showUserMenu" location="bottom end">
-        <template v-slot:activator="{ props }">
-          <v-btn v-bind="props" variant="text" :prepend-icon="icons.accountCircle">
-            {{ authStore.username }}
-            <v-icon :icon="icons.menuDown" />
-          </v-btn>
-        </template>
-
-        <v-list>
-          <v-list-item @click="handleLogout">
-            <template v-slot:prepend>
-              <v-icon :icon="icons.logout" />
-            </template>
-            <v-list-item-title>Logout</v-list-item-title>
-          </v-list-item>
-        </v-list>
-      </v-menu>
-    </v-app-bar>
-
-    <!-- Main Content Area -->
-    <v-main>
-      <v-container v-if="loading" class="fill-height d-flex align-center justify-center">
-        <v-progress-circular indeterminate color="primary" size="64" />
-      </v-container>
-
-      <v-container v-else fluid class="pa-6">
-        <!-- Archived Workspace Banner -->
-        <v-alert
-          v-if="isArchived"
-          type="warning"
-          variant="tonal"
-          prominent
-          class="mb-4"
-          :icon="icons.alert"
-        >
-          <v-alert-title>This workspace is archived (Read-Only)</v-alert-title>
-          <div class="mt-2">
-            You are viewing this workspace in read-only mode.
-            <strong>Activate it to make changes or propose updates.</strong>
-          </div>
-          <template v-if="workspace?.deletion_at">
-            <div class="mt-2 text-caption">
-              Scheduled for deletion on:
-              <strong>{{ new Date(workspace.deletion_at).toLocaleDateString() }}</strong>
-            </div>
-          </template>
-          <template v-slot:append>
-            <v-btn
-              color="success"
-              variant="elevated"
-              :prepend-icon="icons.activate"
-              @click="handleToggleStatus"
-              :loading="isToggling"
-            >
-              Activate Now
-            </v-btn>
-          </template>
-        </v-alert>
-
-        <!-- Placeholder content - will be replaced with editor -->
-        <v-card>
-          <v-card-text class="text-center pa-12">
-            <v-icon :icon="icons.propose" size="64" color="grey-lighten-1" class="mb-4" />
-            <div class="text-h5 text-grey-darken-1 mb-2">Workspace Editor</div>
-            <div class="text-body-1 text-grey">Editor content will be implemented here</div>
-          </v-card-text>
-        </v-card>
-      </v-container>
-    </v-main>
-  </v-app>
-</template>
+<style scoped>
+.files {
+  background-color: #f5f5f5;
+  overflow: auto;
+}
+.editor {
+  overflow: auto;
+}
+.preview {
+  overflow: auto;
+}
+</style>
