@@ -4,7 +4,6 @@ import {
   mdiFolder,
   mdiCalendar,
   mdiUpdate,
-  mdiEye,
   mdiArchive,
   mdiPencil,
   mdiDelete,
@@ -33,7 +32,6 @@ export default {
         folder: mdiFolder,
         calendar: mdiCalendar,
         update: mdiUpdate,
-        eye: mdiEye,
         archive: mdiArchive,
         pencil: mdiPencil,
         delete: mdiDelete,
@@ -87,8 +85,8 @@ export default {
 <template>
   <v-card
     hover
-    class="d-flex flex-column workspace-card"
-    style="height: 100%; cursor: pointer"
+    :link="false"
+    class="workspace-card"
     @click="handleView"
   >
     <v-card-title class="d-flex align-center">
@@ -112,7 +110,6 @@ export default {
 
     <!-- Active workspace timestamps -->
     <v-card-text v-if="!isArchived && (workspace.created_at || workspace.updated_at)">
-      <v-divider class="mb-3"></v-divider>
       <div class="d-flex justify-space-between text-caption text-medium-emphasis">
         <span v-if="workspace.created_at">
           <v-icon :icon="icons.calendar" size="x-small" start></v-icon>
@@ -127,7 +124,6 @@ export default {
 
     <!-- Archived workspace timestamps -->
     <v-card-text v-if="isArchived && (workspace.archived_at || workspace.deletion_at)">
-      <v-divider class="mb-3"></v-divider>
       <div class="d-flex justify-space-between text-caption text-medium-emphasis">
         <span v-if="workspace.archived_at">
           <v-icon :icon="icons.archive" size="x-small" start></v-icon>
@@ -140,11 +136,8 @@ export default {
       </div>
     </v-card-text>
 
-    <v-card-actions class="mt-auto flex-wrap">
-      <v-btn color="primary" variant="text" :prepend-icon="icons.eye" @click.stop="handleView">
-        View
-      </v-btn>
-      <v-btn variant="text" :prepend-icon="icons.pencil" @click.stop="handleEdit"> Update </v-btn>
+    <v-card-actions class="mt-auto flex-wrap cursor-default border-t-sm" @click.stop>
+      <v-btn variant="text" :prepend-icon="icons.pencil" @click.stop="handleEdit">Settings</v-btn>
       <v-spacer></v-spacer>
       <v-btn
         :color="toggleStatusColor"
