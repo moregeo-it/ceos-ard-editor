@@ -88,7 +88,7 @@ export default {
 </script>
 
 <template>
-  <v-card hover :link="false" class="workspace-card" @click="handleView">
+  <v-card hover :link="false" class="workspace-card h-100 d-flex flex-column" @click="handleView">
     <v-card-title class="d-flex align-center">
       <v-icon :icon="icons.folder" start></v-icon>
       {{ workspace.title }}
@@ -103,7 +103,7 @@ export default {
       <p v-else>No PFS assigned</p>
     </v-card-subtitle>
 
-    <v-card-text class="flex-grow-1 d-flex flex-column">
+    <v-card-text class="d-flex flex-column flex-grow-1">
       <p class="description text-body-2 text-medium-emphasis flex-grow-1 overflow-auto">
         {{ workspace.description || 'No description provided.' }}
       </p>
