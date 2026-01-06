@@ -137,7 +137,8 @@ export const useWorkspacesStore = defineStore('workspaces', {
         this.pfsOptions = await workspaceService.fetchPfs()
       } catch (error) {
         console.error('Failed to fetch PFS options:', error)
-        // Non-critical, don't throw
+        this.error = error.message
+        throw error
       }
     },
 

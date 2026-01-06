@@ -36,11 +36,53 @@ export async function fetchWithAuth(endpoint, options = {}) {
   }
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }))
-    throw new Error(error.message || `HTTP ${response.status}`)
+    const error = await response.json().catch(() => ({}))
+    const errorMessage = parseErrorMessage(error, response.status)
+    const err = new Error(errorMessage)
+    err.status = response.status
+    err.details = error
+    throw err
   }
 
   return response
+}
+
+/**
+ * Parse error message from API response
+ */
+function parseErrorMessage(errorData, status) {
+  // Check for message in various formats
+  if (errorData.message) return errorData.message
+  if (errorData.error) return errorData.error
+  if (errorData.detail) return errorData.detail
+
+  // Handle validation errors (422)
+  if (status === 422 && errorData.errors) {
+    const fieldErrors = Object.entries(errorData.errors)
+      .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
+      .join('; ')
+    return `Validation failed: ${fieldErrors}`
+  }
+
+  // Default messages by status code
+  switch (status) {
+    case 400:
+      return 'Invalid request. Please check your input.'
+    case 403:
+      return 'Permission denied. You do not have access to this resource.'
+    case 404:
+      return 'Resource not found.'
+    case 409:
+      return 'Conflict. This action cannot be completed.'
+    case 422:
+      return 'Validation failed. Please check your input.'
+    case 500:
+      return 'Server error. Please try again later.'
+    case 503:
+      return 'Service unavailable. Please try again later.'
+    default:
+      return `Request failed with status ${status}`
+  }
 }
 
 /**

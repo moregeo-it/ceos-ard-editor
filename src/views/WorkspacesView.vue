@@ -1,6 +1,7 @@
 <script>
 import { useAuthStore } from '@/stores/auth'
 import { useWorkspacesStore } from '@/stores/workspaces'
+import { useNotificationsStore } from '@/stores/notifications'
 import WorkspaceCard from '@/components/workspace/WorkspaceCard.vue'
 import WorkspaceDialog from '@/components/workspace/WorkspaceDialog.vue'
 import ArchiveConfirmDialog from '@/components/workspace/ArchiveConfirmDialog.vue'
@@ -60,6 +61,10 @@ export default {
       return useWorkspacesStore()
     },
 
+    notificationsStore() {
+      return useNotificationsStore()
+    },
+
     username() {
       return this.authStore.getUsername
     },
@@ -88,6 +93,7 @@ export default {
         await Promise.all([this.workspacesStore.fetchWorkspaces(), this.workspacesStore.fetchPfs()])
       } catch (error) {
         console.error('Failed to load data:', error)
+        this.notificationsStore.error(`Failed to load data: ${error.message}`)
       }
     },
 
@@ -102,17 +108,21 @@ export default {
       try {
         if (this.workspaceDialogMode === 'create') {
           await this.workspacesStore.createWorkspace(workspaceData)
+          this.notificationsStore.success('Workspace created successfully')
         } else {
           await this.workspacesStore.updateWorkspace(workspaceData.id, {
             title: workspaceData.title,
             pfs: workspaceData.pfs,
             description: workspaceData.description,
           })
+          this.notificationsStore.success('Workspace updated successfully')
         }
         this.showWorkspaceDialog = false
         this.workspaceToEdit = null
       } catch (error) {
         console.error('Failed to save workspace:', error)
+        const action = this.workspaceDialogMode === 'create' ? 'create' : 'update'
+        this.notificationsStore.error(`Failed to ${action} workspace: ${error.message}`)
       } finally {
         this.isSubmitting = false
       }
@@ -146,8 +156,10 @@ export default {
         this.isTogglingStatus = true
         try {
           await this.workspacesStore.toggleWorkspaceStatus(workspaceId)
+          this.notificationsStore.success('Workspace activated successfully')
         } catch (error) {
           console.error('Failed to reactivate workspace:', error)
+          this.notificationsStore.error(`Failed to activate workspace: ${error.message}`)
         } finally {
           this.isTogglingStatus = false
         }
@@ -158,10 +170,13 @@ export default {
       this.isTogglingStatus = true
       try {
         await this.workspacesStore.toggleWorkspaceStatus(this.workspaceToArchive)
+        this.notificationsStore.success('Workspace archived successfully')
         this.showArchiveDialog = false
         this.workspaceToArchive = null
       } catch (error) {
         console.error('Failed to archive workspace:', error)
+        this.notificationsStore.error(`Failed to archive workspace: ${error.message}`)
+        // Keep dialog open so user can try again
       } finally {
         this.isTogglingStatus = false
       }
@@ -176,18 +191,31 @@ export default {
       this.isDeleting = true
       try {
         await this.workspacesStore.deleteWorkspace(this.workspaceToDelete)
+        this.notificationsStore.success('Workspace deleted successfully')
         this.showDeleteDialog = false
         this.workspaceToDelete = null
       } catch (error) {
         console.error('Failed to delete workspace:', error)
+        this.notificationsStore.error(`Failed to delete workspace: ${error.message}`)
+        // Keep dialog open so user can try again
       } finally {
         this.isDeleting = false
       }
     },
 
     async handleLogout() {
-      await this.authStore.logout()
-      this.$router.push({ name: 'landing' })
+      try {
+        await this.authStore.logout()
+        this.notificationsStore.success('Successfully logged out')
+        this.$router.push({ name: 'landing' })
+      } catch {
+        // Even if logout fails on backend, we still clear local auth
+        // Just notify user there might have been an issue
+        if (this.authStore.error) {
+          this.notificationsStore.warning('Logged out locally. Server logout may have failed.')
+        }
+        this.$router.push({ name: 'landing' })
+      }
     },
   },
 }

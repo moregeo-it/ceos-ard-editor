@@ -141,6 +141,8 @@ export const useAuthStore = defineStore('auth', {
         }
       } catch (error) {
         console.error('Logout error:', error)
+        // Store error but don't throw - still clear local auth
+        this.error = error.message
       } finally {
         this.clearAuth()
       }
