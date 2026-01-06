@@ -10,6 +10,7 @@
       <!-- Action Buttons -->
       <v-btn
         v-if="!isArchived"
+        variant="flat"
         color="success"
         class="mr-2"
         :prepend-icon="icons.propose"
@@ -20,6 +21,7 @@
       </v-btn>
 
       <v-btn
+        variant="flat"
         color="error"
         class="mr-4"
         :prepend-icon="icons.close"
@@ -145,7 +147,7 @@ export default {
         propose: mdiCheckCircle,
         menuDown: mdiMenuDown,
         activate: mdiPackageUp,
-        alert: mdiAlertCircle,
+        alert: mdiAlert,
         close: mdiClose,
       },
       showUserMenu: false,
