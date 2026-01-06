@@ -110,6 +110,7 @@
 <script>
 import { useAuthStore } from '@/stores/auth'
 import { useWorkspacesStore } from '@/stores/workspaces'
+import { useNotificationsStore } from '@/stores/notifications'
 import {
   mdiAccountCircle,
   mdiLogout,
@@ -172,6 +173,10 @@ export default {
       return useWorkspacesStore()
     },
 
+    notificationsStore() {
+      return useNotificationsStore()
+    },
+
     workspaceId() {
       return this.$route.params.id
     },
@@ -200,6 +205,7 @@ export default {
         this.workspace = await this.workspacesStore.getWorkspace(this.workspaceId)
       } catch (error) {
         console.error('Failed to load workspace:', error)
+        this.notificationsStore.error(`Failed to load workspace: ${error.message}`)
         this.$router.push({ name: 'workspaces' })
       } finally {
         this.loading = false
@@ -212,8 +218,10 @@ export default {
         await this.workspacesStore.toggleWorkspaceStatus(this.workspaceId)
         // Reload workspace to get updated status
         this.workspace = await this.workspacesStore.getWorkspace(this.workspaceId)
+        this.notificationsStore.success('Workspace activated successfully')
       } catch (error) {
         console.error('Failed to toggle workspace status:', error)
+        this.notificationsStore.error(`Failed to activate workspace: ${error.message}`)
       } finally {
         this.isToggling = false
       }
@@ -225,8 +233,18 @@ export default {
     },
 
     async handleLogout() {
-      await this.authStore.logout()
-      this.$router.push({ name: 'landing' })
+      try {
+        await this.authStore.logout()
+        this.notificationsStore.success('Successfully logged out')
+        this.$router.push({ name: 'landing' })
+      } catch (error) {
+        // Even if logout fails on backend, we still clear local auth
+        // Just notify user there might have been an issue
+        if (this.authStore.error) {
+          this.notificationsStore.warning('Logged out locally. Server logout may have failed.')
+        }
+        this.$router.push({ name: 'landing' })
+      }
     },
 
     goToWorkspaces() {
