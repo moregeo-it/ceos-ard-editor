@@ -27,22 +27,6 @@ export default {
       const authStore = useAuthStore()
       authStore.loginWithGitHub()
     },
-
-    openCeosWebsite() {
-      window.open('https://ceos.org/ard/', '_blank')
-    },
-
-    openGitHubRepo() {
-      window.open('https://github.com/ceos-org/ceos-ard', '_blank')
-    },
-
-    openImprint() {
-      window.open('https://moregeo.it/imprint', '_blank')
-    },
-
-    openMoreGeoWebsite() {
-      window.open('https://moregeo.it', '_blank')
-    },
   },
 }
 </script>
@@ -51,7 +35,7 @@ export default {
   <v-app>
     <v-main>
       <v-container fluid class="fill-height">
-        <v-row justify="center" align="center">
+        <v-row justify="center">
           <v-col cols="12" md="10" lg="8" xl="7">
             <v-card elevation="0" class="pa-8 pa-md-12">
               <v-row align="center">
@@ -66,12 +50,12 @@ export default {
                     />
                   </div>
 
-                  <h1 class="text-h4 font-weight-bold mb-3" style="color: #3e5265">
+                  <h1 class="text-h4 font-weight-bold mb-3" style="color: var(--ceos-primary)">
                     CEOS-ARD Editor
                   </h1>
 
                   <p class="text-body-1 text-medium-emphasis">
-                    Collaborative Product Specification editor for<br class="d-none d-md-inline" />
+                    Collaborative Product Specification Editor for<br class="d-none d-md-inline" />
                     CEOS Analysis Ready Data
                   </p>
                 </v-col>
@@ -94,40 +78,44 @@ export default {
                   variant="text"
                   size="small"
                   :prepend-icon="icons.web"
-                  @click="openCeosWebsite"
+                  href="https://ceos.org/ard/"
+                  target="_blank"
                 >
                   CEOS-ARD Website
                 </v-btn>
 
-                <v-divider vertical class="mx-2" style="height: 20px"></v-divider>
-
-                <v-btn
-                  variant="text"
-                  size="small"
-                  :prepend-icon="icons.web"
-                  @click="openMoreGeoWebsite"
-                >
-                  MoreGeo GmbH
-                </v-btn>
-
-                <v-divider vertical class="mx-2" style="height: 20px"></v-divider>
+                <v-divider vertical class="mx-2"></v-divider>
 
                 <v-btn
                   variant="text"
                   size="small"
                   :prepend-icon="icons.github"
-                  @click="openGitHubRepo"
+                  href="https://github.com/ceos-org"
+                  target="_blank"
                 >
-                  GitHub Repository
+                  CEOS GitHub Organization
                 </v-btn>
 
-                <v-divider vertical class="mx-2" style="height: 20px"></v-divider>
+                <v-divider vertical class="mx-2"></v-divider>
+
+                <v-btn
+                  variant="text"
+                  size="small"
+                  :prepend-icon="icons.web"
+                  href="https://moregeo.it"
+                  target="_blank"
+                >
+                  MoreGeo GmbH
+                </v-btn>
+
+                <v-divider vertical class="mx-2"></v-divider>
 
                 <v-btn
                   variant="text"
                   size="small"
                   :prepend-icon="icons.document"
-                  @click="openImprint"
+                  href="https://moregeo.it/imprint"
+                  target="_blank"
                 >
                   Imprint
                 </v-btn>
