@@ -208,7 +208,7 @@ export default {
         await this.authStore.logout()
         this.notificationsStore.success('Successfully logged out')
         this.$router.push({ name: 'landing' })
-      } catch (error) {
+      } catch {
         // Even if logout fails on backend, we still clear local auth
         // Just notify user there might have been an issue
         if (this.authStore.error) {

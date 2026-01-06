@@ -29,7 +29,7 @@ export default {
         this.error = errorDescription
           ? decodeURIComponent(errorDescription)
           : 'Authentication failed. Please try again.'
-        
+
         notificationsStore.error(this.error)
 
         setTimeout(() => {
