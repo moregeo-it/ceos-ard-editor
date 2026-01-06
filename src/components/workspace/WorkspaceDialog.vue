@@ -118,12 +118,8 @@ export default {
 
       const payload = {
         title: this.formData.title,
-        description: this.formData.description || undefined,
-      }
-
-      // Only include pfs if values are selected
-      if (this.formData.pfs && this.formData.pfs.length > 0) {
-        payload.pfs = this.formData.pfs
+        description: this.formData.description || null,
+        pfs: this.formData.pfs.length > 0 ? this.formData.pfs : null,
       }
 
       // Include workspace ID for update mode

@@ -3,23 +3,34 @@
     <!-- Top Navigation Bar -->
     <v-app-bar color="primary" elevation="2">
       <!-- Workspace Name -->
-      <v-btn variant="text" class="text-h6 font-weight-medium" @click="goToWorkspaces">
+      <v-app-bar-title>
         {{ workspace?.title || 'Loading...' }}
-      </v-btn>
-
-      <v-spacer />
+      </v-app-bar-title>
 
       <!-- Action Buttons -->
       <v-btn
-        variant="outlined"
+        v-if="!isArchived"
+        variant="flat"
         color="success"
-        class="mr-4"
+        class="mr-2"
         :prepend-icon="icons.propose"
         @click="handlePropose"
-        :disabled="loading || isArchived"
+        :disabled="loading"
       >
         Propose
       </v-btn>
+
+      <v-btn
+        variant="flat"
+        color="error"
+        class="mr-4"
+        :prepend-icon="icons.close"
+        @click="goToWorkspaces"
+      >
+        Close
+      </v-btn>
+
+      <v-spacer />
 
       <!-- User Menu -->
       <v-menu v-model="showUserMenu" location="bottom end">
@@ -106,6 +117,7 @@ import {
   mdiMenuDown,
   mdiAlert,
   mdiPackageUp,
+  mdiClose,
 } from '@mdi/js'
 import EditorPane from '@/components/ide/EditorPane.vue'
 import FilesPane from '@/components/ide/FilesPane.vue'
@@ -136,6 +148,7 @@ export default {
         menuDown: mdiMenuDown,
         activate: mdiPackageUp,
         alert: mdiAlert,
+        close: mdiClose,
       },
       showUserMenu: false,
       workspace: null,

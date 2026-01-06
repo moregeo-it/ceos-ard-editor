@@ -4,7 +4,6 @@ import {
   mdiFolder,
   mdiCalendar,
   mdiUpdate,
-  mdiEye,
   mdiArchive,
   mdiPencil,
   mdiDelete,
@@ -33,7 +32,6 @@ export default {
         folder: mdiFolder,
         calendar: mdiCalendar,
         update: mdiUpdate,
-        eye: mdiEye,
         archive: mdiArchive,
         pencil: mdiPencil,
         delete: mdiDelete,
@@ -80,12 +78,17 @@ export default {
     handleDelete() {
       this.$emit('delete', this.workspace.id)
     },
+    formatDate(dateString) {
+      if (!dateString) return 'n/a'
+      const date = new Date(dateString)
+      return date.toLocaleDateString()
+    },
   },
 }
 </script>
 
 <template>
-  <v-card hover class="d-flex flex-column" style="height: 100%">
+  <v-card hover :link="false" class="workspace-card" @click="handleView">
     <v-card-title class="d-flex align-center">
       <v-icon :icon="icons.folder" start></v-icon>
       {{ workspace.title }}
@@ -96,62 +99,59 @@ export default {
     </v-card-title>
 
     <v-card-subtitle class="mt-2">
-      <PfsBadges :pfs="workspace.pfs" />
+      <PfsBadges v-if="workspace.pfs" :pfs="workspace.pfs" />
+      <p v-else>No PFS assigned</p>
     </v-card-subtitle>
 
-    <v-card-text class="flex-grow-1">
-      <p class="text-body-2 text-medium-emphasis">
+    <v-card-text class="flex-grow-1 d-flex flex-column">
+      <p class="description text-body-2 text-medium-emphasis flex-grow-1 overflow-auto">
         {{ workspace.description || 'No description provided.' }}
+      </p>
+
+      <p class="d-flex justify-space-between text-caption text-medium-emphasis mt-4">
+        <template v-if="isArchived">
+          <span>
+            <v-icon :icon="icons.archive" size="x-small" start></v-icon>
+            Archived: {{ formatDate(workspace.archived_at) }}
+          </span>
+          <span>
+            <v-icon :icon="icons.delete" size="x-small" start></v-icon>
+            Deletion: {{ formatDate(workspace.deletion_at) }}
+          </span>
+        </template>
+        <template v-else>
+          <span>
+            <v-icon :icon="icons.calendar" size="x-small" start></v-icon>
+            Created: {{ formatDate(workspace.created_at) }}
+          </span>
+          <span>
+            <v-icon :icon="icons.update" size="x-small" start></v-icon>
+            Updated: {{ formatDate(workspace.updated_at) }}
+          </span>
+        </template>
       </p>
     </v-card-text>
 
-    <!-- Active workspace timestamps -->
-    <v-card-text v-if="!isArchived && (workspace.created_at || workspace.updated_at)">
-      <v-divider class="mb-3"></v-divider>
-      <div class="d-flex justify-space-between text-caption text-medium-emphasis">
-        <span v-if="workspace.created_at">
-          <v-icon :icon="icons.calendar" size="x-small" start></v-icon>
-          Created: {{ new Date(workspace.created_at).toLocaleDateString() }}
-        </span>
-        <span v-if="workspace.updated_at">
-          <v-icon :icon="icons.update" size="x-small" start></v-icon>
-          Updated: {{ new Date(workspace.updated_at).toLocaleDateString() }}
-        </span>
-      </div>
-    </v-card-text>
-
-    <!-- Archived workspace timestamps -->
-    <v-card-text v-if="isArchived && (workspace.archived_at || workspace.deletion_at)">
-      <v-divider class="mb-3"></v-divider>
-      <div class="d-flex justify-space-between text-caption text-medium-emphasis">
-        <span v-if="workspace.archived_at">
-          <v-icon :icon="icons.archive" size="x-small" start></v-icon>
-          Archived: {{ new Date(workspace.archived_at).toLocaleDateString() }}
-        </span>
-        <span v-if="workspace.deletion_at">
-          <v-icon :icon="icons.delete" size="x-small" start></v-icon>
-          Deletion: {{ new Date(workspace.deletion_at).toLocaleDateString() }}
-        </span>
-      </div>
-    </v-card-text>
-
-    <v-card-actions class="mt-auto flex-wrap">
-      <v-btn color="primary" variant="text" :prepend-icon="icons.eye" @click="handleView">
-        View
-      </v-btn>
-      <v-btn variant="text" :prepend-icon="icons.pencil" @click="handleEdit"> Update </v-btn>
+    <v-card-actions class="mt-auto flex-wrap cursor-default border-t-sm" @click.stop>
+      <v-btn variant="text" :prepend-icon="icons.pencil" @click.stop="handleEdit">Settings</v-btn>
       <v-spacer></v-spacer>
       <v-btn
         :color="toggleStatusColor"
         variant="text"
         :prepend-icon="toggleStatusIcon"
-        @click="handleToggleStatus"
+        @click.stop="handleToggleStatus"
       >
         {{ toggleStatusLabel }}
       </v-btn>
-      <v-btn color="error" variant="text" :prepend-icon="icons.delete" @click="handleDelete">
+      <v-btn color="error" variant="text" :prepend-icon="icons.delete" @click.stop="handleDelete">
         Delete
       </v-btn>
     </v-card-actions>
   </v-card>
 </template>
+
+<style scoped>
+.description {
+  max-height: 5rem;
+}
+</style>
