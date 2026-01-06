@@ -83,12 +83,7 @@ export default {
 </script>
 
 <template>
-  <v-card
-    hover
-    :link="false"
-    class="workspace-card"
-    @click="handleView"
-  >
+  <v-card hover :link="false" class="workspace-card" @click="handleView">
     <v-card-title class="d-flex align-center">
       <v-icon :icon="icons.folder" start></v-icon>
       {{ workspace.title }}
