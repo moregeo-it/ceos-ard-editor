@@ -199,7 +199,7 @@ export default {
     <v-app-bar color="primary" elevation="2">
       <v-app-bar-title>
         <v-icon :icon="icons.folderMultiple" start></v-icon>
-        My Workspaces
+        My PFS Workspaces
       </v-app-bar-title>
 
       <v-spacer></v-spacer>
