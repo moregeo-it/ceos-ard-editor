@@ -1,110 +1,16 @@
-<script>
-import { useAuthStore } from '@/stores/auth'
-import { useWorkspacesStore } from '@/stores/workspaces'
-import {
-  mdiAccountCircle,
-  mdiLogout,
-  mdiCheckCircle,
-  mdiMenuDown,
-  mdiAlertCircle,
-  mdiPackageUp,
-  mdiClose,
-} from '@mdi/js'
-
-export default {
-  name: 'EditorView',
-
-  data() {
-    return {
-      icons: {
-        accountCircle: mdiAccountCircle,
-        logout: mdiLogout,
-        propose: mdiCheckCircle,
-        menuDown: mdiMenuDown,
-        activate: mdiPackageUp,
-        alert: mdiAlertCircle,
-        close: mdiClose,
-      },
-      showUserMenu: false,
-      workspace: null,
-      loading: true,
-      isToggling: false,
-    }
-  },
-
-  computed: {
-    authStore() {
-      return useAuthStore()
-    },
-
-    workspacesStore() {
-      return useWorkspacesStore()
-    },
-
-    workspaceId() {
-      return this.$route.params.id
-    },
-
-    isArchived() {
-      return this.workspace?.status === 'archived'
-    },
-  },
-
-  async mounted() {
-    await this.loadWorkspace()
-  },
-
-  methods: {
-    async loadWorkspace() {
-      try {
-        this.loading = true
-        this.workspace = await this.workspacesStore.getWorkspace(this.workspaceId)
-      } catch (error) {
-        console.error('Failed to load workspace:', error)
-        this.$router.push({ name: 'workspaces' })
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async handleToggleStatus() {
-      this.isToggling = true
-      try {
-        await this.workspacesStore.toggleWorkspaceStatus(this.workspaceId)
-        // Reload workspace to get updated status
-        this.workspace = await this.workspacesStore.getWorkspace(this.workspaceId)
-      } catch (error) {
-        console.error('Failed to toggle workspace status:', error)
-      } finally {
-        this.isToggling = false
-      }
-    },
-
-    handlePropose() {
-      // TODO: Implement propose functionality
-      console.log('Propose workspace:', this.workspaceId)
-    },
-
-    async handleLogout() {
-      await this.authStore.logout()
-      this.$router.push({ name: 'landing' })
-    },
-
-    goToWorkspaces() {
-      this.$router.push({ name: 'workspaces' })
-    },
-  },
-}
-</script>
-
 <template>
   <v-app>
     <!-- Top Navigation Bar -->
     <v-app-bar color="primary" elevation="2">
+      <!-- Workspace Name -->
+      <v-app-bar-title>
+        {{ workspace?.title || 'Loading...' }}
+      </v-app-bar-title>
+
       <!-- Action Buttons -->
       <v-btn
         v-if="!isArchived"
-        variant="outlined"
+        variant="flat"
         color="success"
         class="mr-2"
         :prepend-icon="icons.propose"
@@ -115,7 +21,7 @@ export default {
       </v-btn>
 
       <v-btn
-        variant="outlined"
+        variant="flat"
         color="error"
         class="mr-4"
         :prepend-icon="icons.close"
@@ -123,11 +29,6 @@ export default {
       >
         Close
       </v-btn>
-
-      <!-- Workspace Name -->
-      <v-app-bar-title>
-        {{ workspace?.title || 'Loading...' }}
-      </v-app-bar-title>
 
       <v-spacer />
 
@@ -203,3 +104,102 @@ export default {
     </v-main>
   </v-app>
 </template>
+
+<script>
+import { useAuthStore } from '@/stores/auth'
+import { useWorkspacesStore } from '@/stores/workspaces'
+import {
+  mdiAccountCircle,
+  mdiLogout,
+  mdiCheckCircle,
+  mdiMenuDown,
+  mdiAlert,
+  mdiPackageUp,
+  mdiClose,
+} from '@mdi/js'
+
+export default {
+  name: 'EditorView',
+
+  data() {
+    return {
+      icons: {
+        accountCircle: mdiAccountCircle,
+        logout: mdiLogout,
+        propose: mdiCheckCircle,
+        menuDown: mdiMenuDown,
+        activate: mdiPackageUp,
+        alert: mdiAlert,
+        close: mdiClose,
+      },
+      showUserMenu: false,
+      workspace: null,
+      loading: true,
+      isToggling: false,
+    }
+  },
+
+  computed: {
+    authStore() {
+      return useAuthStore()
+    },
+
+    workspacesStore() {
+      return useWorkspacesStore()
+    },
+
+    workspaceId() {
+      return this.$route.params.id
+    },
+
+    isArchived() {
+      return this.workspace?.status === 'archived'
+    },
+  },
+
+  async mounted() {
+    await this.loadWorkspace()
+  },
+
+  methods: {
+    async loadWorkspace() {
+      try {
+        this.loading = true
+        this.workspace = await this.workspacesStore.getWorkspace(this.workspaceId)
+      } catch (error) {
+        console.error('Failed to load workspace:', error)
+        this.$router.push({ name: 'workspaces' })
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async handleToggleStatus() {
+      this.isToggling = true
+      try {
+        await this.workspacesStore.toggleWorkspaceStatus(this.workspaceId)
+        // Reload workspace to get updated status
+        this.workspace = await this.workspacesStore.getWorkspace(this.workspaceId)
+      } catch (error) {
+        console.error('Failed to toggle workspace status:', error)
+      } finally {
+        this.isToggling = false
+      }
+    },
+
+    handlePropose() {
+      // TODO: Implement propose functionality
+      console.log('Propose workspace:', this.workspaceId)
+    },
+
+    async handleLogout() {
+      await this.authStore.logout()
+      this.$router.push({ name: 'landing' })
+    },
+
+    goToWorkspaces() {
+      this.$router.push({ name: 'workspaces' })
+    },
+  },
+}
+</script>
