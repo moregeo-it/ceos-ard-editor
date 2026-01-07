@@ -1,3 +1,68 @@
+<template>
+  <v-dialog v-model="showDialog" max-width="600" persistent>
+    <v-card>
+      <v-card-title class="d-flex align-center">
+        <v-icon :icon="dialogIcon" start></v-icon>
+        {{ dialogTitle }}
+        <v-spacer></v-spacer>
+        <v-btn :icon="icons.close" variant="text" @click="handleClose" :disabled="loading"></v-btn>
+      </v-card-title>
+
+      <v-divider></v-divider>
+
+      <v-card-text class="pt-6">
+        <v-form ref="form">
+          <v-text-field
+            v-model="formData.title"
+            label="Workspace Title"
+            placeholder="My CEOS-ARD Workspace"
+            :rules="rules.title"
+            variant="outlined"
+            :prepend-inner-icon="icons.folder"
+            required
+          ></v-text-field>
+
+          <v-select
+            v-model="formData.pfs"
+            :items="pfsOptions"
+            label="Product Format Specification (Optional)"
+            placeholder="Select one or more PFS types"
+            variant="outlined"
+            :prepend-inner-icon="icons.fileDocument"
+            clearable
+            multiple
+            chips
+            hint="If not selected, backend will assign a default PFS"
+            persistent-hint
+            class="mb-4"
+          ></v-select>
+
+          <v-textarea
+            v-model="formData.description"
+            label="Description (Optional)"
+            placeholder="Describe the purpose of this workspace..."
+            variant="outlined"
+            :prepend-inner-icon="icons.text"
+            rows="3"
+            counter
+            maxlength="500"
+          ></v-textarea>
+        </v-form>
+      </v-card-text>
+
+      <v-divider></v-divider>
+
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn variant="text" @click="handleClose" :disabled="loading"> Cancel </v-btn>
+        <v-btn color="primary" variant="elevated" :loading="loading" @click="handleSubmit">
+          {{ submitButtonText }}
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+</template>
+
 <script>
 import {
   mdiFolderPlus,
@@ -161,68 +226,3 @@ export default {
   },
 }
 </script>
-
-<template>
-  <v-dialog v-model="showDialog" max-width="600" persistent>
-    <v-card>
-      <v-card-title class="d-flex align-center">
-        <v-icon :icon="dialogIcon" start></v-icon>
-        {{ dialogTitle }}
-        <v-spacer></v-spacer>
-        <v-btn :icon="icons.close" variant="text" @click="handleClose" :disabled="loading"></v-btn>
-      </v-card-title>
-
-      <v-divider></v-divider>
-
-      <v-card-text class="pt-6">
-        <v-form ref="form">
-          <v-text-field
-            v-model="formData.title"
-            label="Workspace Title"
-            placeholder="My CEOS-ARD Workspace"
-            :rules="rules.title"
-            variant="outlined"
-            :prepend-inner-icon="icons.folder"
-            required
-          ></v-text-field>
-
-          <v-select
-            v-model="formData.pfs"
-            :items="pfsOptions"
-            label="Product Format Specification (Optional)"
-            placeholder="Select one or more PFS types"
-            variant="outlined"
-            :prepend-inner-icon="icons.fileDocument"
-            clearable
-            multiple
-            chips
-            hint="If not selected, backend will assign a default PFS"
-            persistent-hint
-            class="mb-4"
-          ></v-select>
-
-          <v-textarea
-            v-model="formData.description"
-            label="Description (Optional)"
-            placeholder="Describe the purpose of this workspace..."
-            variant="outlined"
-            :prepend-inner-icon="icons.text"
-            rows="3"
-            counter
-            maxlength="500"
-          ></v-textarea>
-        </v-form>
-      </v-card-text>
-
-      <v-divider></v-divider>
-
-      <v-card-actions>
-        <v-spacer></v-spacer>
-        <v-btn variant="text" @click="handleClose" :disabled="loading"> Cancel </v-btn>
-        <v-btn color="primary" variant="elevated" :loading="loading" @click="handleSubmit">
-          {{ submitButtonText }}
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
-</template>

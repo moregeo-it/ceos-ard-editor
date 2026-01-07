@@ -1,3 +1,20 @@
+<template>
+  <v-btn
+    block
+    size="x-large"
+    :color="buttonConfig.color"
+    :prepend-icon="buttonConfig.icon"
+    :loading="loading"
+    elevation="2"
+    class="text-none"
+    @click="handleClick"
+  >
+    <span :style="{ color: buttonConfig.textColor }">
+      {{ buttonConfig.label }}
+    </span>
+  </v-btn>
+</template>
+
 <script>
 import { mdiGithub, mdiGoogle } from '@mdi/js'
 
@@ -45,20 +62,3 @@ export default {
   },
 }
 </script>
-
-<template>
-  <v-btn
-    block
-    size="x-large"
-    :color="buttonConfig.color"
-    :prepend-icon="buttonConfig.icon"
-    :loading="loading"
-    elevation="2"
-    class="text-none"
-    @click="handleClick"
-  >
-    <span :style="{ color: buttonConfig.textColor }">
-      {{ buttonConfig.label }}
-    </span>
-  </v-btn>
-</template>
