@@ -1,36 +1,3 @@
-<script>
-import { useAuthStore } from '@/stores/auth'
-import LoginButton from '@/components/landing/LoginButton.vue'
-import ceosLogo from '@/assets/ceos-ard-logo.png'
-import { mdiGithub, mdiWeb, mdiFileDocument } from '@mdi/js'
-
-export default {
-  name: 'LandingView',
-
-  components: {
-    LoginButton,
-  },
-
-  data() {
-    return {
-      ceosLogo,
-      icons: {
-        github: mdiGithub,
-        web: mdiWeb,
-        document: mdiFileDocument,
-      },
-    }
-  },
-
-  methods: {
-    handleGitHubLogin() {
-      const authStore = useAuthStore()
-      authStore.loginWithGitHub()
-    },
-  },
-}
-</script>
-
 <template>
   <v-app>
     <v-main>
@@ -127,3 +94,36 @@ export default {
     </v-main>
   </v-app>
 </template>
+
+<script>
+import { useAuthStore } from '@/stores/auth'
+import LoginButton from '@/components/landing/LoginButton.vue'
+import ceosLogo from '@/assets/ceos-ard-logo.png'
+import { mdiGithub, mdiWeb, mdiFileDocument } from '@mdi/js'
+
+export default {
+  name: 'LandingView',
+
+  components: {
+    LoginButton,
+  },
+
+  data() {
+    return {
+      ceosLogo,
+      icons: {
+        github: mdiGithub,
+        web: mdiWeb,
+        document: mdiFileDocument,
+      },
+    }
+  },
+
+  methods: {
+    handleGitHubLogin() {
+      const authStore = useAuthStore()
+      authStore.loginWithGitHub()
+    },
+  },
+}
+</script>
