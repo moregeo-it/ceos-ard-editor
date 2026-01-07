@@ -237,7 +237,7 @@ export default {
         await this.authStore.logout()
         this.notificationsStore.success('Successfully logged out')
         this.$router.push({ name: 'landing' })
-      } catch (error) {
+      } catch {
         // Even if logout fails on backend, we still clear local auth
         // Just notify user there might have been an issue
         if (this.authStore.error) {
@@ -258,20 +258,19 @@ export default {
 @import '../../node_modules/splitpanes/dist/splitpanes.css';
 
 .splitpanes .splitpanes__splitter {
-  background-color: #cccccc;
+  background-color: rgba(var(--v-border-color), var(--v-border-opacity));
   min-width: 4px;
 }
 
 .splitpanes .splitpanes__splitter:hover,
 .splitpanes .splitpanes__splitter:active,
 .splitpanes .splitpanes__splitter:focus {
-  background-color: #aaaaaa;
+  background-color: rgba(var(--v-border-color), calc(var(--v-border-opacity) * 2));
 }
 </style>
 
 <style scoped>
 .files {
-  background-color: #f5f5f5;
   overflow: auto;
 }
 .editor {

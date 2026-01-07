@@ -32,6 +32,8 @@ export default {
         
         notificationsStore.error(this.error)
 
+        notificationsStore.error(this.error)
+
         setTimeout(() => {
           this.$router.push({ name: 'landing' })
         }, 3000)

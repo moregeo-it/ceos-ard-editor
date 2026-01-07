@@ -41,3 +41,9 @@ export default {
     </v-snackbar>
   </v-app>
 </template>
+
+<style>
+:root {
+  --ceos-primary: #3e5265;
+}
+</style>
