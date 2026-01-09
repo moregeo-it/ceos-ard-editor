@@ -1,5 +1,5 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { createRouter, createWebHistory } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -29,24 +29,24 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
   ],
-})
+});
 
 router.beforeEach(async (to, from, next) => {
-  const authStore = useAuthStore()
+  const authStore = useAuthStore();
 
   // Try to restore session on first load
   if (!authStore.isAuthenticated && !authStore.isLoading) {
-    await authStore.restoreSession()
+    await authStore.restoreSession();
   }
 
   // Check authentication requirement
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    next({ name: 'landing' })
+    next({ name: 'landing' });
   } else if (to.name === 'landing' && authStore.isAuthenticated) {
-    next({ name: 'workspaces' })
+    next({ name: 'workspaces' });
   } else {
-    next()
+    next();
   }
-})
+});
 
-export default router
+export default router;

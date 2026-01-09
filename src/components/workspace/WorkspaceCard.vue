@@ -62,7 +62,7 @@
 </template>
 
 <script>
-import PfsBadges from './PfsBadges.vue'
+import PfsBadges from './PfsBadges.vue';
 import {
   mdiFolder,
   mdiCalendar,
@@ -71,7 +71,7 @@ import {
   mdiPencil,
   mdiDelete,
   mdiPackageUp,
-} from '@mdi/js'
+} from '@mdi/js';
 
 export default {
   name: 'WorkspaceCard',
@@ -100,54 +100,54 @@ export default {
         delete: mdiDelete,
         activate: mdiPackageUp,
       },
-    }
+    };
   },
 
   computed: {
     statusColor() {
-      return this.workspace.status === 'active' ? 'success' : 'grey'
+      return this.workspace.status === 'active' ? 'success' : 'grey';
     },
 
     isArchived() {
-      return this.workspace.status === 'archived'
+      return this.workspace.status === 'archived';
     },
 
     toggleStatusLabel() {
-      return this.isArchived ? 'Activate' : 'Archive'
+      return this.isArchived ? 'Activate' : 'Archive';
     },
 
     toggleStatusIcon() {
-      return this.isArchived ? this.icons.activate : this.icons.archive
+      return this.isArchived ? this.icons.activate : this.icons.archive;
     },
 
     toggleStatusColor() {
-      return this.isArchived ? 'success' : 'warning'
+      return this.isArchived ? 'success' : 'warning';
     },
   },
 
   methods: {
     handleView() {
-      this.$emit('view', this.workspace.id)
+      this.$emit('view', this.workspace.id);
     },
 
     handleEdit() {
-      this.$emit('edit', this.workspace.id)
+      this.$emit('edit', this.workspace.id);
     },
 
     handleToggleStatus() {
-      this.$emit('toggle-status', this.workspace.id)
+      this.$emit('toggle-status', this.workspace.id);
     },
 
     handleDelete() {
-      this.$emit('delete', this.workspace.id)
+      this.$emit('delete', this.workspace.id);
     },
     formatDate(dateString) {
-      if (!dateString) return 'n/a'
-      const date = new Date(dateString)
-      return date.toLocaleDateString()
+      if (!dateString) return 'n/a';
+      const date = new Date(dateString);
+      return date.toLocaleDateString();
     },
   },
-}
+};
 </script>
 
 <style scoped>

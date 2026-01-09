@@ -11,8 +11,8 @@ export default {
   computed: {
     isArchived() {
       // todo
-      return this.workspace?.status === 'archived'
+      return this.workspace?.status === 'archived';
     },
   },
-}
+};
 </script>

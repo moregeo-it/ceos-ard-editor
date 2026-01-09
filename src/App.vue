@@ -19,14 +19,14 @@
 </template>
 
 <script>
-import { useNotificationsStore } from '@/stores/notifications'
+import { useNotificationsStore } from '@/stores/notifications';
 
 export default {
   name: 'App',
 
   computed: {
     notificationsStore() {
-      return useNotificationsStore()
+      return useNotificationsStore();
     },
 
     snackbarColor() {
@@ -35,11 +35,11 @@ export default {
         error: 'error',
         warning: 'warning',
         info: 'info',
-      }
-      return colors[this.notificationsStore.type] || 'info'
+      };
+      return colors[this.notificationsStore.type] || 'info';
     },
   },
-}
+};
 </script>
 
 <style>

@@ -1,6 +1,6 @@
-import { defineStore } from 'pinia'
-import authService from '@/services/auth.service'
-import tokenService from '@/services/token.service'
+import { defineStore } from 'pinia';
+import authService from '@/services/auth.service';
+import tokenService from '@/services/token.service';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -25,16 +25,16 @@ export const useAuthStore = defineStore('auth', {
      * Check if token is expired
      */
     isTokenExpired: (state) => {
-      if (!state.expiresAt) return true
-      return Date.now() >= state.expiresAt
+      if (!state.expiresAt) return true;
+      return Date.now() >= state.expiresAt;
     },
 
     /**
      * Get Authorization header value
      */
     authorizationHeader: (state) => {
-      if (!state.accessToken) return null
-      return `${state.tokenType} ${state.accessToken}`
+      if (!state.accessToken) return null;
+      return `${state.tokenType} ${state.accessToken}`;
     },
 
     /**
@@ -52,14 +52,14 @@ export const useAuthStore = defineStore('auth', {
      * Initiate GitHub login
      */
     loginWithGitHub() {
-      authService.loginWithGitHub()
+      authService.loginWithGitHub();
     },
 
     /**
      * Initiate Google login
      */
     loginWithGoogle() {
-      authService.loginWithGoogle()
+      authService.loginWithGoogle();
     },
 
     /**
@@ -67,28 +67,28 @@ export const useAuthStore = defineStore('auth', {
      */
     handleAuthCallback(searchParams) {
       try {
-        this.error = null
+        this.error = null;
 
         // Parse authentication data from URL
-        const authData = authService.parseAuthCallback(searchParams)
+        const authData = authService.parseAuthCallback(searchParams);
 
         // Save to localStorage
-        tokenService.saveAuth(authData)
+        tokenService.saveAuth(authData);
 
         // Update store state
-        this.accessToken = authData.accessToken
-        this.tokenType = authData.tokenType
-        this.userId = authData.userId
-        this.username = authData.username
-        this.provider = authData.provider
-        this.expiresAt = Date.now() + authData.expiresIn * 1000
-        this.isAuthenticated = true
+        this.accessToken = authData.accessToken;
+        this.tokenType = authData.tokenType;
+        this.userId = authData.userId;
+        this.username = authData.username;
+        this.provider = authData.provider;
+        this.expiresAt = Date.now() + authData.expiresIn * 1000;
+        this.isAuthenticated = true;
 
-        return true
+        return true;
       } catch (error) {
-        this.error = error.message
-        console.error('Auth callback error:', error)
-        return false
+        this.error = error.message;
+        console.error('Auth callback error:', error);
+        return false;
       }
     },
 
@@ -96,38 +96,38 @@ export const useAuthStore = defineStore('auth', {
      * Restore session from localStorage on app load
      */
     async restoreSession() {
-      this.isLoading = true
+      this.isLoading = true;
 
       try {
-        const authData = tokenService.getAuth()
+        const authData = tokenService.getAuth();
 
         if (!authData || !authData.accessToken) {
-          return false
+          return false;
         }
 
         // Check if token is expired
         if (tokenService.isTokenExpired()) {
           // Token expired, clear and return false
-          this.clearAuth()
-          return false
+          this.clearAuth();
+          return false;
         }
 
         // Restore state from localStorage
-        this.accessToken = authData.accessToken
-        this.tokenType = authData.tokenType
-        this.userId = authData.userId
-        this.username = authData.username
-        this.provider = authData.provider
-        this.expiresAt = authData.expiresAt
-        this.isAuthenticated = true
+        this.accessToken = authData.accessToken;
+        this.tokenType = authData.tokenType;
+        this.userId = authData.userId;
+        this.username = authData.username;
+        this.provider = authData.provider;
+        this.expiresAt = authData.expiresAt;
+        this.isAuthenticated = true;
 
-        return true
+        return true;
       } catch (error) {
-        this.error = error.message
-        this.clearAuth()
-        return false
+        this.error = error.message;
+        this.clearAuth();
+        return false;
       } finally {
-        this.isLoading = false
+        this.isLoading = false;
       }
     },
 
@@ -137,14 +137,14 @@ export const useAuthStore = defineStore('auth', {
     async logout() {
       try {
         if (this.accessToken) {
-          await authService.logout(this.accessToken)
+          await authService.logout(this.accessToken);
         }
       } catch (error) {
-        console.error('Logout error:', error)
+        console.error('Logout error:', error);
         // Store error but don't throw - still clear local auth
-        this.error = error.message
+        this.error = error.message;
       } finally {
-        this.clearAuth()
+        this.clearAuth();
       }
     },
 
@@ -152,15 +152,15 @@ export const useAuthStore = defineStore('auth', {
      * Clear authentication state
      */
     clearAuth() {
-      this.accessToken = null
-      this.tokenType = 'Bearer'
-      this.userId = null
-      this.username = null
-      this.provider = null
-      this.expiresAt = null
-      this.isAuthenticated = false
-      this.error = null
-      tokenService.clearAuth()
+      this.accessToken = null;
+      this.tokenType = 'Bearer';
+      this.userId = null;
+      this.username = null;
+      this.provider = null;
+      this.expiresAt = null;
+      this.isAuthenticated = false;
+      this.error = null;
+      tokenService.clearAuth();
     },
   },
-})
+});

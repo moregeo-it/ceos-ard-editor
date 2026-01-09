@@ -37,8 +37,8 @@
 </template>
 
 <script>
-import { useAuthStore } from '@/stores/auth'
-import { useNotificationsStore } from '@/stores/notifications'
+import { useAuthStore } from '@/stores/auth';
+import { useNotificationsStore } from '@/stores/notifications';
 
 export default {
   name: 'AuthCallbackView',
@@ -46,53 +46,53 @@ export default {
   data() {
     return {
       error: null,
-    }
+    };
   },
 
   mounted() {
-    this.handleCallback()
+    this.handleCallback();
   },
 
   methods: {
     async handleCallback() {
-      const authStore = useAuthStore()
-      const notificationsStore = useNotificationsStore()
-      const searchParams = new URLSearchParams(window.location.search)
+      const authStore = useAuthStore();
+      const notificationsStore = useNotificationsStore();
+      const searchParams = new URLSearchParams(window.location.search);
 
       // Check for error from backend
-      const errorParam = searchParams.get('error')
-      const errorDescription = searchParams.get('error_description')
+      const errorParam = searchParams.get('error');
+      const errorDescription = searchParams.get('error_description');
 
       if (errorParam) {
         this.error = errorDescription
           ? decodeURIComponent(errorDescription)
-          : 'Authentication failed. Please try again.'
+          : 'Authentication failed. Please try again.';
 
-        notificationsStore.error(this.error)
+        notificationsStore.error(this.error);
 
-        notificationsStore.error(this.error)
+        notificationsStore.error(this.error);
 
         setTimeout(() => {
-          this.$router.push({ name: 'landing' })
-        }, 3000)
-        return
+          this.$router.push({ name: 'landing' });
+        }, 3000);
+        return;
       }
 
       // Parse and store tokens
-      const success = authStore.handleAuthCallback(searchParams)
+      const success = authStore.handleAuthCallback(searchParams);
 
       if (success) {
-        notificationsStore.success('Successfully logged in')
+        notificationsStore.success('Successfully logged in');
         // Redirect to workspaces
-        this.$router.push({ name: 'workspaces' })
+        this.$router.push({ name: 'workspaces' });
       } else {
-        this.error = authStore.error || 'Invalid authentication response'
-        notificationsStore.error(this.error)
+        this.error = authStore.error || 'Invalid authentication response';
+        notificationsStore.error(this.error);
         setTimeout(() => {
-          this.$router.push({ name: 'landing' })
-        }, 3000)
+          this.$router.push({ name: 'landing' });
+        }, 3000);
       }
     },
   },
-}
+};
 </script>

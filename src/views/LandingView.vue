@@ -96,10 +96,10 @@
 </template>
 
 <script>
-import { useAuthStore } from '@/stores/auth'
-import LoginButton from '@/components/landing/LoginButton.vue'
-import ceosLogo from '@/assets/ceos-ard-logo.png'
-import { mdiGithub, mdiWeb, mdiFileDocument } from '@mdi/js'
+import { useAuthStore } from '@/stores/auth';
+import LoginButton from '@/components/landing/LoginButton.vue';
+import ceosLogo from '@/assets/ceos-ard-logo.png';
+import { mdiGithub, mdiWeb, mdiFileDocument } from '@mdi/js';
 
 export default {
   name: 'LandingView',
@@ -116,14 +116,14 @@ export default {
         web: mdiWeb,
         document: mdiFileDocument,
       },
-    }
+    };
   },
 
   methods: {
     handleGitHubLogin() {
-      const authStore = useAuthStore()
-      authStore.loginWithGitHub()
+      const authStore = useAuthStore();
+      authStore.loginWithGitHub();
     },
   },
-}
+};
 </script>
