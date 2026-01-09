@@ -90,7 +90,6 @@
                     variant="elevated"
                     :prepend-icon="icons.activate"
                     @click="handleToggleStatus"
-                    :loading="isToggling"
                   >
                     Activate Now
                   </v-btn>
@@ -108,9 +107,9 @@
 </template>
 
 <script>
-import { useAuthStore } from '@/stores/auth'
-import { useWorkspacesStore } from '@/stores/workspaces'
-import { useNotificationsStore } from '@/stores/notifications'
+import { useAuthStore } from '@/stores/auth';
+import { useWorkspacesStore } from '@/stores/workspaces';
+import { useNotificationsStore } from '@/stores/notifications';
 import {
   mdiAccountCircle,
   mdiLogout,
@@ -119,11 +118,11 @@ import {
   mdiAlert,
   mdiPackageUp,
   mdiClose,
-} from '@mdi/js'
-import EditorPane from '@/components/ide/EditorPane.vue'
-import FilesPane from '@/components/ide/FilesPane.vue'
-import PreviewPane from '@/components/ide/PreviewPane.vue'
-import { Splitpanes, Pane } from 'splitpanes'
+} from '@mdi/js';
+import EditorPane from '@/components/ide/EditorPane.vue';
+import FilesPane from '@/components/ide/FilesPane.vue';
+import PreviewPane from '@/components/ide/PreviewPane.vue';
+import { Splitpanes, Pane } from 'splitpanes';
 
 export default {
   name: 'EditorView',
@@ -140,7 +139,7 @@ export default {
       files: 15,
       editor: 50,
       preview: 35,
-    }
+    };
     return {
       icons: {
         accountCircle: mdiAccountCircle,
@@ -152,106 +151,101 @@ export default {
         close: mdiClose,
       },
       showUserMenu: false,
-      workspace: null,
-      loading: true,
-      isToggling: false,
       panelSizeDefaults: panelSizeDefaults,
       panelSizes: {
         files: localStorage.filesPanelSize ?? panelSizeDefaults.files,
         editor: localStorage.editorPanelSize ?? panelSizeDefaults.editor,
         preview: localStorage.previewPanelSize ?? panelSizeDefaults.preview,
       },
-    }
+    };
   },
 
   computed: {
+    loading() {
+      return this.workspacesStore.isWorkspaceLoading[this.workspaceId];
+    },
+
+    workspace() {
+      return this.workspacesStore.currentWorkspace;
+    },
+
     authStore() {
-      return useAuthStore()
+      return useAuthStore();
     },
 
     workspacesStore() {
-      return useWorkspacesStore()
+      return useWorkspacesStore();
     },
 
     notificationsStore() {
-      return useNotificationsStore()
+      return useNotificationsStore();
     },
 
     workspaceId() {
-      return this.$route.params.id
+      return this.$route.params.id;
     },
 
     isArchived() {
-      return this.workspace?.status === 'archived'
+      return this.workspace?.status === 'archived';
     },
   },
 
   async mounted() {
-    await this.loadWorkspace()
+    await this.loadWorkspace();
   },
 
   methods: {
     storePaneSizes: ({ panes }) => {
       if (panes.length === 3) {
-        localStorage.filesPanelSize = panes[0].size
-        localStorage.editorPanelSize = panes[1].size
-        localStorage.previewPanelSize = panes[2].size
+        localStorage.filesPanelSize = panes[0].size;
+        localStorage.editorPanelSize = panes[1].size;
+        localStorage.previewPanelSize = panes[2].size;
       }
     },
 
     async loadWorkspace() {
       try {
-        this.loading = true
-        this.workspace = await this.workspacesStore.getWorkspace(this.workspaceId)
+        await this.workspacesStore.getWorkspace(this.workspaceId);
       } catch (error) {
-        console.error('Failed to load workspace:', error)
-        this.notificationsStore.error(`Failed to load workspace: ${error.message}`)
-        this.$router.push({ name: 'workspaces' })
-      } finally {
-        this.loading = false
+        this.notificationsStore.error(`Failed to load workspace: ${error.message}`);
+        this.$router.push({ name: 'workspaces' });
       }
     },
 
     async handleToggleStatus() {
-      this.isToggling = true
       try {
-        await this.workspacesStore.toggleWorkspaceStatus(this.workspaceId)
-        // Reload workspace to get updated status
-        this.workspace = await this.workspacesStore.getWorkspace(this.workspaceId)
-        this.notificationsStore.success('Workspace activated successfully')
+        await this.workspacesStore.toggleWorkspaceStatus(this.workspaceId);
+        this.notificationsStore.success('Workspace activated successfully');
       } catch (error) {
-        console.error('Failed to toggle workspace status:', error)
-        this.notificationsStore.error(`Failed to activate workspace: ${error.message}`)
-      } finally {
-        this.isToggling = false
+        this.notificationsStore.error(`Failed to activate workspace: ${error.message}`);
       }
     },
 
     handlePropose() {
       // TODO: Implement propose functionality
-      console.log('Propose workspace:', this.workspaceId)
+      console.log('Propose workspace:', this.workspaceId);
     },
 
     async handleLogout() {
       try {
-        await this.authStore.logout()
-        this.notificationsStore.success('Successfully logged out')
-        this.$router.push({ name: 'landing' })
+        await this.authStore.logout();
+        this.notificationsStore.success('Successfully logged out');
+        this.$router.push({ name: 'landing' });
       } catch {
         // Even if logout fails on backend, we still clear local auth
         // Just notify user there might have been an issue
         if (this.authStore.error) {
-          this.notificationsStore.warning('Logged out locally. Server logout may have failed.')
+          this.notificationsStore.warning('Logged out locally. Server logout may have failed.');
         }
-        this.$router.push({ name: 'landing' })
+        this.$router.push({ name: 'landing' });
       }
     },
 
     goToWorkspaces() {
-      this.$router.push({ name: 'workspaces' })
+      this.$router.push({ name: 'workspaces' });
     },
   },
-}
+};
 </script>
 
 <style>

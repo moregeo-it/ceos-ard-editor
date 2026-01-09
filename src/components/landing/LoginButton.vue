@@ -16,7 +16,7 @@
 </template>
 
 <script>
-import { mdiGithub, mdiGoogle } from '@mdi/js'
+import { mdiGithub, mdiGoogle } from '@mdi/js';
 
 export default {
   name: 'LoginButton',
@@ -50,15 +50,15 @@ export default {
           color: '#4285f4',
           textColor: 'white',
         },
-      }
-      return configs[this.provider]
+      };
+      return configs[this.provider];
     },
   },
 
   methods: {
     handleClick() {
-      this.$emit('click')
+      this.$emit('click');
     },
   },
-}
+};
 </script>

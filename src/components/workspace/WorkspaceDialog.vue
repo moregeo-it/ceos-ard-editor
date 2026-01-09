@@ -71,7 +71,7 @@ import {
   mdiFileDocument,
   mdiText,
   mdiClose,
-} from '@mdi/js'
+} from '@mdi/js';
 
 export default {
   name: 'WorkspaceDialog',
@@ -120,33 +120,33 @@ export default {
           (v) => (v && v.length >= 3) || 'Title must be at least 3 characters',
         ],
       },
-    }
+    };
   },
 
   computed: {
     showDialog: {
       get() {
-        return this.modelValue
+        return this.modelValue;
       },
       set(value) {
-        this.$emit('update:modelValue', value)
+        this.$emit('update:modelValue', value);
       },
     },
 
     isUpdateMode() {
-      return this.mode === 'update'
+      return this.mode === 'update';
     },
 
     dialogTitle() {
-      return this.isUpdateMode ? 'Update Workspace' : 'Create New Workspace'
+      return this.isUpdateMode ? 'Update Workspace' : 'Create New Workspace';
     },
 
     dialogIcon() {
-      return this.isUpdateMode ? this.icons.folderEdit : this.icons.folderPlus
+      return this.isUpdateMode ? this.icons.folderEdit : this.icons.folderPlus;
     },
 
     submitButtonText() {
-      return this.isUpdateMode ? 'Update Workspace' : 'Create Workspace'
+      return this.isUpdateMode ? 'Update Workspace' : 'Create Workspace';
     },
   },
 
@@ -163,41 +163,41 @@ export default {
                 : [workspace.pfs]
               : [],
             description: workspace.description || '',
-          }
+          };
         }
       },
     },
 
     showDialog(val) {
       if (!val) {
-        this.resetForm()
+        this.resetForm();
       }
     },
   },
 
   methods: {
     async handleSubmit() {
-      const { valid } = await this.$refs.form.validate()
+      const { valid } = await this.$refs.form.validate();
 
-      if (!valid) return
+      if (!valid) return;
 
       const payload = {
         title: this.formData.title,
         description: this.formData.description || null,
         pfs: this.formData.pfs.length > 0 ? this.formData.pfs : null,
-      }
+      };
 
       // Include workspace ID for update mode
       if (this.isUpdateMode && this.workspace) {
-        payload.id = this.workspace.id
+        payload.id = this.workspace.id;
       }
 
-      this.$emit('submit', payload)
+      this.$emit('submit', payload);
     },
 
     handleClose() {
-      this.resetForm()
-      this.showDialog = false
+      this.resetForm();
+      this.showDialog = false;
     },
 
     resetForm() {
@@ -211,18 +211,18 @@ export default {
               : [this.workspace.pfs]
             : [],
           description: this.workspace.description || '',
-        }
-        this.$refs.form?.resetValidation()
+        };
+        this.$refs.form?.resetValidation();
       } else {
         // Clear form in create mode
         this.formData = {
           title: '',
           pfs: [],
           description: '',
-        }
-        this.$refs.form?.reset()
+        };
+        this.$refs.form?.reset();
       }
     },
   },
-}
+};
 </script>

@@ -33,7 +33,7 @@
 </template>
 
 <script>
-import { mdiClose } from '@mdi/js'
+import { mdiClose } from '@mdi/js';
 
 export default {
   name: 'ArchiveConfirmDialog',
@@ -57,28 +57,28 @@ export default {
       icons: {
         close: mdiClose,
       },
-    }
+    };
   },
 
   computed: {
     showDialog: {
       get() {
-        return this.modelValue
+        return this.modelValue;
       },
       set(value) {
-        this.$emit('update:modelValue', value)
+        this.$emit('update:modelValue', value);
       },
     },
   },
 
   methods: {
     handleConfirm() {
-      this.$emit('confirm')
+      this.$emit('confirm');
     },
 
     handleClose() {
-      this.showDialog = false
+      this.showDialog = false;
     },
   },
-}
+};
 </script>

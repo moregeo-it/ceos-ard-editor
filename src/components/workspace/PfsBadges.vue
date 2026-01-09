@@ -21,8 +21,8 @@ export default {
 
   computed: {
     hasPfs() {
-      return this.pfs && this.pfs.length > 0
+      return this.pfs && this.pfs.length > 0;
     },
   },
-}
+};
 </script>
