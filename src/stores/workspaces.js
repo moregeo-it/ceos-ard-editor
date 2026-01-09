@@ -3,12 +3,15 @@ import workspaceService from '@/services/workspace.service'
 
 export const useWorkspacesStore = defineStore('workspaces', {
   state: () => ({
-    workspaces: [],
-    currentWorkspace: null,
     pfsOptions: [],
-    isLoading: false,
-    isCreating: false,
     error: null,
+    // List of all workspaces
+    workspaces: [],
+    isLoading: false,
+    // A single workspace being viewed/edited
+    currentWorkspace: null,
+    isCreating: false,
+    isWorkspaceLoading: {},
   }),
 
   getters: {
@@ -57,6 +60,7 @@ export const useWorkspacesStore = defineStore('workspaces', {
     },
 
     async updateWorkspace(workspaceId, workspaceData) {
+      this.isWorkspaceLoading[workspaceId] = true
       this.error = null
 
       try {
@@ -77,10 +81,13 @@ export const useWorkspacesStore = defineStore('workspaces', {
       } catch (error) {
         this.error = error.message
         throw error
+      } finally {
+        this.isWorkspaceLoading[workspaceId] = false
       }
     },
 
     async toggleWorkspaceStatus(workspaceId) {
+      this.isWorkspaceLoading[workspaceId] = true
       this.error = null
 
       try {
@@ -110,10 +117,13 @@ export const useWorkspacesStore = defineStore('workspaces', {
       } catch (error) {
         this.error = error.message
         throw error
+      } finally {
+        this.isWorkspaceLoading[workspaceId] = false
       }
     },
 
     async deleteWorkspace(workspaceId) {
+      this.isWorkspaceLoading[workspaceId] = true
       this.error = null
 
       try {
@@ -129,6 +139,8 @@ export const useWorkspacesStore = defineStore('workspaces', {
       } catch (error) {
         this.error = error.message
         throw error
+      } finally {
+        this.isWorkspaceLoading[workspaceId] = false
       }
     },
 
@@ -143,14 +155,17 @@ export const useWorkspacesStore = defineStore('workspaces', {
     },
 
     async getWorkspace(workspaceId) {
+      this.isWorkspaceLoading[workspaceId] = true
+      this.error = null
+
       try {
-        const workspace = await workspaceService.getWorkspace(workspaceId)
-        console.log('🔧 Store: getWorkspace fetched:', workspace)
-        this.currentWorkspace = workspace
-        return workspace
+        this.currentWorkspace = await workspaceService.getWorkspace(workspaceId)
+        return this.currentWorkspace
       } catch (error) {
         this.error = error.message
         throw error
+      } finally {
+        this.isWorkspaceLoading[workspaceId] = false
       }
     },
   },

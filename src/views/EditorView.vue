@@ -90,7 +90,6 @@
                     variant="elevated"
                     :prepend-icon="icons.activate"
                     @click="handleToggleStatus"
-                    :loading="isToggling"
                   >
                     Activate Now
                   </v-btn>
@@ -152,9 +151,6 @@ export default {
         close: mdiClose,
       },
       showUserMenu: false,
-      workspace: null,
-      loading: true,
-      isToggling: false,
       panelSizeDefaults: panelSizeDefaults,
       panelSizes: {
         files: localStorage.filesPanelSize ?? panelSizeDefaults.files,
@@ -165,6 +161,14 @@ export default {
   },
 
   computed: {
+    loading() {
+      return this.workspacesStore.isWorkspaceLoading[this.workspaceId]
+    },
+
+    workspace() {
+      return this.workspacesStore.currentWorkspace
+    },
+
     authStore() {
       return useAuthStore()
     },
@@ -201,29 +205,19 @@ export default {
 
     async loadWorkspace() {
       try {
-        this.loading = true
-        this.workspace = await this.workspacesStore.getWorkspace(this.workspaceId)
+        await this.workspacesStore.getWorkspace(this.workspaceId)
       } catch (error) {
-        console.error('Failed to load workspace:', error)
         this.notificationsStore.error(`Failed to load workspace: ${error.message}`)
         this.$router.push({ name: 'workspaces' })
-      } finally {
-        this.loading = false
       }
     },
 
     async handleToggleStatus() {
-      this.isToggling = true
       try {
         await this.workspacesStore.toggleWorkspaceStatus(this.workspaceId)
-        // Reload workspace to get updated status
-        this.workspace = await this.workspacesStore.getWorkspace(this.workspaceId)
         this.notificationsStore.success('Workspace activated successfully')
       } catch (error) {
-        console.error('Failed to toggle workspace status:', error)
         this.notificationsStore.error(`Failed to activate workspace: ${error.message}`)
-      } finally {
-        this.isToggling = false
       }
     },
 
