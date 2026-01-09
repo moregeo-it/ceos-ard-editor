@@ -49,8 +49,8 @@ export default {
     };
   },
 
-  mounted() {
-    this.handleCallback();
+  async created() {
+    await this.handleCallback();
   },
 
   methods: {

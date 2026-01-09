@@ -59,7 +59,7 @@
       </v-container>
       <splitpanes v-else @resized="storePaneSizes" :dbl-click-splitter="false">
         <pane class="files" min-size="10" :size="panelSizes.files">
-          <FilesPane :workspace-id="workspaceId" />
+          <FilesPane />
         </pane>
         <pane class="editor" min-size="30" :size="panelSizes.editor">
           <EditorPane>
@@ -190,7 +190,7 @@ export default {
     },
   },
 
-  async mounted() {
+  async created() {
     await this.loadWorkspace();
   },
 
