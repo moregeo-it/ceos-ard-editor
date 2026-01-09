@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="pa-0 fill-height d-flex flex-column">
+  <v-container fluid class="pa-2 d-flex flex-column">
     <!-- Search Input -->
     <div class="px-2 pt-2">
       <v-text-field
