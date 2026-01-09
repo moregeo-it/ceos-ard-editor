@@ -61,49 +61,49 @@ export default {
       type: 'file',
       path: '',
       name: '',
-    }
+    };
   },
 
   computed: {
     internalShow: {
       get() {
-        return this.show
+        return this.show;
       },
       set(value) {
-        this.$emit('update:show', value)
+        this.$emit('update:show', value);
       },
     },
 
     hasExtension() {
-      if (!this.name) return false
-      const parts = this.name.split('.')
-      return parts.length > 1 && parts[parts.length - 1].length > 0
+      if (!this.name) return false;
+      const parts = this.name.split('.');
+      return parts.length > 1 && parts[parts.length - 1].length > 0;
     },
 
     nameError() {
       if (!this.name.trim()) {
-        return []
+        return [];
       }
       if (this.type === 'file' && !this.hasExtension) {
-        return ['File name must include an extension (e.g., .yaml, .json, .txt)']
+        return ['File name must include an extension (e.g., .yaml, .json, .txt)'];
       }
       if (this.type === 'folder' && this.hasExtension) {
-        return ['Folder names should not include file extensions']
+        return ['Folder names should not include file extensions'];
       }
-      return []
+      return [];
     },
 
     isValid() {
-      return this.name.trim() && this.nameError.length === 0
+      return this.name.trim() && this.nameError.length === 0;
     },
   },
 
   watch: {
     show(newVal) {
       if (!newVal) {
-        this.reset()
+        this.reset();
       } else if (this.initialPath) {
-        this.path = this.initialPath
+        this.path = this.initialPath;
       }
     },
   },
@@ -111,29 +111,29 @@ export default {
   methods: {
     handleCreate() {
       if (!this.isValid) {
-        return
+        return;
       }
 
       this.$emit('create', {
         type: this.type,
         path: this.path.trim(),
         name: this.name.trim(),
-      })
+      });
 
-      this.reset()
-      this.internalShow = false
+      this.reset();
+      this.internalShow = false;
     },
 
     handleCancel() {
-      this.reset()
-      this.internalShow = false
+      this.reset();
+      this.internalShow = false;
     },
 
     reset() {
-      this.type = 'file'
-      this.path = ''
-      this.name = ''
+      this.type = 'file';
+      this.path = '';
+      this.name = '';
     },
   },
-}
+};
 </script>

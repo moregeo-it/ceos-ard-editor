@@ -1,5 +1,5 @@
-import { defineStore } from 'pinia'
-import fileService from '@/services/file.service'
+import { defineStore } from 'pinia';
+import fileService from '@/services/file.service';
 
 export const useFilesStore = defineStore('files', {
   state: () => ({
@@ -16,18 +16,18 @@ export const useFilesStore = defineStore('files', {
      * Load files from server and build tree structure
      */
     async loadFileTree(workspaceId) {
-      this.isLoading = true
-      this.error = null
+      this.isLoading = true;
+      this.error = null;
       try {
-        this.files = await fileService.fetchFileTree(workspaceId)
-        this.fileTree = this.buildTree(this.files)
-        this.searchResults = []
-        this.searchQuery = ''
+        this.files = await fileService.fetchFileTree(workspaceId);
+        this.fileTree = this.buildTree(this.files);
+        this.searchResults = [];
+        this.searchQuery = '';
       } catch (error) {
-        this.error = error.message
-        throw error
+        this.error = error.message;
+        throw error;
       } finally {
-        this.isLoading = false
+        this.isLoading = false;
       }
     },
 
@@ -37,21 +37,21 @@ export const useFilesStore = defineStore('files', {
     async searchFiles(workspaceId, query) {
       if (!query.trim()) {
         // If query is empty, reload full tree
-        await this.loadFileTree(workspaceId)
-        return
+        await this.loadFileTree(workspaceId);
+        return;
       }
 
-      this.isLoading = true
-      this.error = null
+      this.isLoading = true;
+      this.error = null;
       try {
-        this.searchQuery = query
-        const results = await fileService.searchFiles(workspaceId, query)
-        this.searchResults = this.buildTree(results)
+        this.searchQuery = query;
+        const results = await fileService.searchFiles(workspaceId, query);
+        this.searchResults = this.buildTree(results);
       } catch (error) {
-        this.error = error.message
-        throw error
+        this.error = error.message;
+        throw error;
       } finally {
-        this.isLoading = false
+        this.isLoading = false;
       }
     },
 
@@ -60,8 +60,8 @@ export const useFilesStore = defineStore('files', {
      */
     buildTree(files) {
       // Create a map to store all nodes
-      const nodeMap = new Map()
-      const rootNodes = []
+      const nodeMap = new Map();
+      const rootNodes = [];
 
       // First pass: Create all nodes
       files.forEach((file) => {
@@ -71,33 +71,33 @@ export const useFilesStore = defineStore('files', {
           type: file.is_directory ? 'folder' : 'file',
           status: file.status,
           children: file.is_directory ? [] : undefined,
-        }
-        nodeMap.set(file.path, node)
-      })
+        };
+        nodeMap.set(file.path, node);
+      });
 
       // Second pass: Build hierarchy
       files.forEach((file) => {
-        const node = nodeMap.get(file.path)
-        const pathParts = file.path.split('/')
+        const node = nodeMap.get(file.path);
+        const pathParts = file.path.split('/');
 
         if (pathParts.length === 1) {
           // Root level item
-          rootNodes.push(node)
+          rootNodes.push(node);
         } else {
           // Find parent
-          const parentPath = pathParts.slice(0, -1).join('/')
-          const parent = nodeMap.get(parentPath)
+          const parentPath = pathParts.slice(0, -1).join('/');
+          const parent = nodeMap.get(parentPath);
 
           if (parent && parent.children) {
-            parent.children.push(node)
+            parent.children.push(node);
           } else {
             // If parent doesn't exist, add to root (fallback)
-            rootNodes.push(node)
+            rootNodes.push(node);
           }
         }
-      })
+      });
 
-      return rootNodes
+      return rootNodes;
     },
 
     /**
@@ -105,12 +105,12 @@ export const useFilesStore = defineStore('files', {
      */
     async createFile(workspaceId, path, name, type) {
       try {
-        await fileService.createFile(workspaceId, path, name, type)
+        await fileService.createFile(workspaceId, path, name, type);
         // Reload the file tree
-        await this.loadFileTree(workspaceId)
+        await this.loadFileTree(workspaceId);
       } catch (error) {
-        this.error = error.message
-        throw error
+        this.error = error.message;
+        throw error;
       }
     },
 
@@ -119,12 +119,12 @@ export const useFilesStore = defineStore('files', {
      */
     async renameFile(workspaceId, filePath, newName) {
       try {
-        await fileService.renameFile(workspaceId, filePath, newName)
+        await fileService.renameFile(workspaceId, filePath, newName);
         // Reload the file tree
-        await this.loadFileTree(workspaceId)
+        await this.loadFileTree(workspaceId);
       } catch (error) {
-        this.error = error.message
-        throw error
+        this.error = error.message;
+        throw error;
       }
     },
 
@@ -133,12 +133,12 @@ export const useFilesStore = defineStore('files', {
      */
     async deleteFile(workspaceId, filePath) {
       try {
-        await fileService.deleteFile(workspaceId, filePath)
+        await fileService.deleteFile(workspaceId, filePath);
         // Reload the file tree
-        await this.loadFileTree(workspaceId)
+        await this.loadFileTree(workspaceId);
       } catch (error) {
-        this.error = error.message
-        throw error
+        this.error = error.message;
+        throw error;
       }
     },
 
@@ -147,12 +147,12 @@ export const useFilesStore = defineStore('files', {
      */
     async saveFile(workspaceId, filePath, content) {
       try {
-        await fileService.saveFile(workspaceId, filePath, content)
+        await fileService.saveFile(workspaceId, filePath, content);
         // Reload the file tree to get updated status
-        await this.loadFileTree(workspaceId)
+        await this.loadFileTree(workspaceId);
       } catch (error) {
-        this.error = error.message
-        throw error
+        this.error = error.message;
+        throw error;
       }
     },
 
@@ -161,12 +161,12 @@ export const useFilesStore = defineStore('files', {
      */
     async revertFile(workspaceId, filePath) {
       try {
-        await fileService.revertFile(workspaceId, filePath)
+        await fileService.revertFile(workspaceId, filePath);
         // Reload the file tree to get updated status
-        await this.loadFileTree(workspaceId)
+        await this.loadFileTree(workspaceId);
       } catch (error) {
-        this.error = error.message
-        throw error
+        this.error = error.message;
+        throw error;
       }
     },
 
@@ -174,11 +174,11 @@ export const useFilesStore = defineStore('files', {
      * Clear all state
      */
     clearState() {
-      this.files = []
-      this.fileTree = []
-      this.searchResults = []
-      this.searchQuery = ''
-      this.error = null
+      this.files = [];
+      this.fileTree = [];
+      this.searchResults = [];
+      this.searchQuery = '';
+      this.error = null;
     },
   },
-})
+});

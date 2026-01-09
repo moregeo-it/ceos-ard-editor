@@ -27,7 +27,7 @@
 </template>
 
 <script>
-import { mdiAlertCircle } from '@mdi/js'
+import { mdiAlertCircle } from '@mdi/js';
 
 export default {
   name: 'DeleteConfirmDialog',
@@ -59,32 +59,32 @@ export default {
       icons: {
         alert: mdiAlertCircle,
       },
-    }
+    };
   },
 
   computed: {
     internalShow: {
       get() {
-        return this.show
+        return this.show;
       },
       set(value) {
-        this.$emit('update:show', value)
+        this.$emit('update:show', value);
       },
     },
 
     isFolder() {
-      return this.itemType === 'folder'
+      return this.itemType === 'folder';
     },
   },
 
   methods: {
     handleDelete() {
-      this.$emit('confirm')
+      this.$emit('confirm');
     },
 
     handleCancel() {
-      this.internalShow = false
+      this.internalShow = false;
     },
   },
-}
+};
 </script>

@@ -49,63 +49,65 @@ export default {
   data() {
     return {
       newName: '',
-    }
+    };
   },
 
   computed: {
     internalShow: {
       get() {
-        return this.show
+        return this.show;
       },
       set(value) {
-        this.$emit('update:show', value)
+        this.$emit('update:show', value);
       },
     },
 
     isFile() {
-      return this.itemType.toLowerCase() === 'file'
+      return this.itemType.toLowerCase() === 'file';
     },
 
     hasExtension() {
-      if (!this.newName) return false
-      const parts = this.newName.split('.')
-      return parts.length > 1 && parts[parts.length - 1].length > 0
+      if (!this.newName) return false;
+      const parts = this.newName.split('.');
+      return parts.length > 1 && parts[parts.length - 1].length > 0;
     },
 
     placeholder() {
-      return this.isFile ? 'example.yaml' : 'folder-name'
+      return this.isFile ? 'example.yaml' : 'folder-name';
     },
 
     hint() {
       return this.isFile
         ? 'File name must include extension (e.g., .yaml, .json)'
-        : 'Folder names should not include extensions'
+        : 'Folder names should not include extensions';
     },
 
     nameError() {
       if (!this.newName.trim()) {
-        return []
+        return [];
       }
       if (this.isFile && !this.hasExtension) {
-        return ['File name must include an extension']
+        return ['File name must include an extension'];
       }
       if (!this.isFile && this.hasExtension) {
-        return ['Folder names should not include extensions']
+        return ['Folder names should not include extensions'];
       }
-      return []
+      return [];
     },
 
     isValid() {
-      return this.newName.trim() && this.nameError.length === 0 && this.newName !== this.currentName
+      return (
+        this.newName.trim() && this.nameError.length === 0 && this.newName !== this.currentName
+      );
     },
   },
 
   watch: {
     show(newVal) {
       if (newVal) {
-        this.newName = this.currentName
+        this.newName = this.currentName;
       } else {
-        this.reset()
+        this.reset();
       }
     },
   },
@@ -113,22 +115,22 @@ export default {
   methods: {
     handleRename() {
       if (!this.isValid) {
-        return
+        return;
       }
 
-      this.$emit('rename', this.newName.trim())
-      this.reset()
-      this.internalShow = false
+      this.$emit('rename', this.newName.trim());
+      this.reset();
+      this.internalShow = false;
     },
 
     handleCancel() {
-      this.reset()
-      this.internalShow = false
+      this.reset();
+      this.internalShow = false;
     },
 
     reset() {
-      this.newName = ''
+      this.newName = '';
     },
   },
-}
+};
 </script>

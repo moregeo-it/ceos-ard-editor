@@ -20,10 +20,7 @@
     <!-- File Tree -->
     <div class="file-tree-container flex-grow-1 px-2 pt-2">
       <div v-if="filesStore.isLoading" class="text-center pa-4">
-        <v-progress-circular 
-          indeterminate 
-          color="primary"
-        />
+        <v-progress-circular indeterminate color="primary" />
       </div>
 
       <v-alert v-else-if="filesStore.error" type="error" variant="tonal" class="ma-2">
@@ -62,13 +59,7 @@
         <template v-slot:append="{ item }">
           <v-menu location="end">
             <template v-slot:activator="{ props }">
-              <v-btn
-                v-bind="props"
-                :icon="icons.menu"
-                size="x-small"
-                variant="text"
-                @click.stop
-              />
+              <v-btn v-bind="props" :icon="icons.menu" size="x-small" variant="text" @click.stop />
             </template>
             <v-list density="compact">
               <!-- Folder Actions -->
@@ -147,12 +138,12 @@
 </template>
 
 <script>
-import { useFilesStore } from '@/stores/files'
-import { useWorkspacesStore } from '@/stores/workspaces'
-import { useNotificationsStore } from '@/stores/notifications'
-import CreateFileDialog from './CreateFileDialog.vue'
-import RenameDialog from './RenameDialog.vue'
-import DeleteConfirmDialog from './DeleteConfirmDialog.vue'
+import { useFilesStore } from '@/stores/files';
+import { useWorkspacesStore } from '@/stores/workspaces';
+import { useNotificationsStore } from '@/stores/notifications';
+import CreateFileDialog from './CreateFileDialog.vue';
+import RenameDialog from './RenameDialog.vue';
+import DeleteConfirmDialog from './DeleteConfirmDialog.vue';
 import {
   mdiFileDocumentOutline,
   mdiFolderOutline,
@@ -164,7 +155,7 @@ import {
   mdiDeleteOutline,
   mdiContentSave,
   mdiUndoVariant,
-} from '@mdi/js'
+} from '@mdi/js';
 
 export default {
   name: 'FilesPane',
@@ -198,86 +189,86 @@ export default {
       itemToRename: null,
       showDeleteDialog: false,
       itemToDelete: null,
-    }
+    };
   },
 
   computed: {
     filesStore() {
-      return useFilesStore()
+      return useFilesStore();
     },
 
     workspacesStore() {
-      return useWorkspacesStore()
+      return useWorkspacesStore();
     },
 
     notificationsStore() {
-      return useNotificationsStore()
+      return useNotificationsStore();
     },
 
     workspaceId() {
-      return this.workspacesStore.currentWorkspace?.id
+      return this.workspacesStore.currentWorkspace?.id;
     },
 
     treeItems() {
       const sourceTree = this.filesStore.searchQuery
         ? this.filesStore.searchResults
-        : this.filesStore.fileTree
-      return this.buildTreeItems(sourceTree)
+        : this.filesStore.fileTree;
+      return this.buildTreeItems(sourceTree);
     },
   },
 
   async created() {
-    await this.loadFiles()
+    await this.loadFiles();
   },
 
   beforeUnmount() {
     if (this.searchDebounce) {
-      clearTimeout(this.searchDebounce)
+      clearTimeout(this.searchDebounce);
     }
   },
 
   methods: {
     async loadFiles() {
       try {
-        await this.filesStore.loadFileTree(this.workspaceId)
+        await this.filesStore.loadFileTree(this.workspaceId);
       } catch (error) {
-        this.notificationsStore.error(`Failed to load files: ${error.message}`)
+        this.notificationsStore.error(`Failed to load files: ${error.message}`);
       }
     },
 
     handleSearch(value) {
       // Clear existing timeout
       if (this.searchDebounce) {
-        clearTimeout(this.searchDebounce)
+        clearTimeout(this.searchDebounce);
       }
 
       // Debounce search to avoid too many requests
       this.searchDebounce = setTimeout(async () => {
         if (!value || !value.trim()) {
-          await this.loadFiles()
-          return
+          await this.loadFiles();
+          return;
         }
 
         try {
-          await this.filesStore.searchFiles(this.workspaceId, value)
+          await this.filesStore.searchFiles(this.workspaceId, value);
         } catch (error) {
-          this.notificationsStore.error(`Search failed: ${error.message}`)
+          this.notificationsStore.error(`Search failed: ${error.message}`);
         }
-      }, 300)
+      }, 300);
     },
 
     async handleClearSearch() {
-      this.searchQuery = ''
-      await this.loadFiles()
+      this.searchQuery = '';
+      await this.loadFiles();
     },
 
     async refreshTree() {
-      await this.loadFiles()
+      await this.loadFiles();
     },
 
     buildTreeItems(nodes, parentPath = '') {
       return nodes.map((node) => {
-        const fullPath = parentPath ? `${parentPath}/${node.name}` : node.path
+        const fullPath = parentPath ? `${parentPath}/${node.name}` : node.path;
         return {
           id: fullPath,
           name: node.name,
@@ -285,105 +276,107 @@ export default {
           path: fullPath,
           status: node.status,
           children: node.children ? this.buildTreeItems(node.children, fullPath) : undefined,
-        }
-      })
+        };
+      });
     },
 
     getFileIcon(item) {
       if (item.type === 'folder') {
-        return this.openFolders.includes(item.id) ? this.icons.folderOpen : this.icons.folder
+        return this.openFolders.includes(item.id) ? this.icons.folderOpen : this.icons.folder;
       }
-      return this.icons.file
+      return this.icons.file;
     },
 
     getIconColor(item) {
-      if (item.status === 'added') return 'success'
-      if (item.status === 'modified') return 'warning'
-      if (item.status === 'renamed') return 'info'
-      return undefined
+      if (item.status === 'added') return 'success';
+      if (item.status === 'modified') return 'warning';
+      if (item.status === 'renamed') return 'info';
+      return undefined;
     },
 
     getStatusColor(status) {
       switch (status) {
         case 'added':
-          return 'success'
+          return 'success';
         case 'modified':
-          return 'warning'
+          return 'warning';
         case 'renamed':
-          return 'info'
+          return 'info';
         default:
-          return 'default'
+          return 'default';
       }
     },
 
     handleCreateInFolder(item) {
-      this.createInitialPath = item.path
-      this.showCreateDialog = true
+      this.createInitialPath = item.path;
+      this.showCreateDialog = true;
     },
 
     async handleCreate({ type, path, name }) {
       try {
-        await this.filesStore.createFile(this.workspaceId, path, name, type)
+        await this.filesStore.createFile(this.workspaceId, path, name, type);
 
-        this.notificationsStore.success(`${type === 'folder' ? 'Folder' : 'File'} created successfully`)
-        this.createInitialPath = ''
+        this.notificationsStore.success(
+          `${type === 'folder' ? 'Folder' : 'File'} created successfully`,
+        );
+        this.createInitialPath = '';
       } catch (error) {
-        this.notificationsStore.error(`Failed to create: ${error.message}`)
+        this.notificationsStore.error(`Failed to create: ${error.message}`);
       }
     },
 
     handleRename(item) {
-      this.itemToRename = item
-      this.showRenameDialog = true
+      this.itemToRename = item;
+      this.showRenameDialog = true;
     },
 
     async handleRenameConfirm(newName) {
-      if (!this.itemToRename) return
+      if (!this.itemToRename) return;
 
       try {
-        await this.filesStore.renameFile(this.workspaceId, this.itemToRename.path, newName)
-        this.notificationsStore.success('Renamed successfully')
+        await this.filesStore.renameFile(this.workspaceId, this.itemToRename.path, newName);
+        this.notificationsStore.success('Renamed successfully');
       } catch (error) {
-        this.notificationsStore.error(`Failed to rename: ${error.message}`)
+        this.notificationsStore.error(`Failed to rename: ${error.message}`);
       } finally {
-        this.itemToRename = null
+        this.itemToRename = null;
       }
     },
 
     handleDelete(item) {
-      this.itemToDelete = item
-      this.showDeleteDialog = true
+      this.itemToDelete = item;
+      this.showDeleteDialog = true;
     },
 
     async handleDeleteConfirm() {
-      if (!this.itemToDelete) return
+      if (!this.itemToDelete) return;
 
       try {
-        await this.filesStore.deleteFile(this.workspaceId, this.itemToDelete.path)
-        this.notificationsStore.success('Deleted successfully')
-        this.showDeleteDialog = false
+        await this.filesStore.deleteFile(this.workspaceId, this.itemToDelete.path);
+        this.notificationsStore.success('Deleted successfully');
+        this.showDeleteDialog = false;
       } catch (error) {
-        this.notificationsStore.error(`Failed to delete: ${error.message}`)
+        this.notificationsStore.error(`Failed to delete: ${error.message}`);
       } finally {
-        this.itemToDelete = null
+        this.itemToDelete = null;
       }
     },
 
-    async handleSave(item) {
+    async handleSave() {
       // TODO: Integrate with editor to get file content
-      this.notificationsStore.info('Save functionality requires editor integration')
+      this.notificationsStore.info('Save functionality requires editor integration');
     },
 
     async handleRevert(item) {
       try {
-        await this.filesStore.revertFile(this.workspaceId, item.path)
-        this.notificationsStore.success('File reverted successfully')
+        await this.filesStore.revertFile(this.workspaceId, item.path);
+        this.notificationsStore.success('File reverted successfully');
       } catch (error) {
-        this.notificationsStore.error(`Failed to revert: ${error.message}`)
+        this.notificationsStore.error(`Failed to revert: ${error.message}`);
       }
     },
   },
-}
+};
 </script>
 
 <style scoped>

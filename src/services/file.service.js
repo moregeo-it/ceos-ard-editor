@@ -1,18 +1,18 @@
-import { api } from '@/utils/api'
+import { api } from '@/utils/api';
 
 export default {
   /**
    * Fetch file tree structure for a workspace
    */
   async fetchFileTree(workspaceId) {
-    return api.get(`/workspaces/${workspaceId}/files`)
+    return api.get(`/workspaces/${workspaceId}/files`);
   },
 
   /**
    * Search files and folders
    */
   async searchFiles(workspaceId, query) {
-    return api.get(`/workspaces/${workspaceId}/files/search?q=${encodeURIComponent(query)}`)
+    return api.get(`/workspaces/${workspaceId}/files/search?q=${encodeURIComponent(query)}`);
   },
 
   /**
@@ -23,7 +23,7 @@ export default {
       path,
       name,
       type,
-    })
+    });
   },
 
   /**
@@ -33,14 +33,14 @@ export default {
     return api.patch(`/workspaces/${workspaceId}/files/${encodeURIComponent(filePath)}`, {
       target: newName,
       operation: 'rename',
-    })
+    });
   },
 
   /**
    * Delete file or folder
    */
   async deleteFile(workspaceId, filePath) {
-    return api.delete(`/workspaces/${workspaceId}/files/${encodeURIComponent(filePath)}`)
+    return api.delete(`/workspaces/${workspaceId}/files/${encodeURIComponent(filePath)}`);
   },
 
   /**
@@ -49,7 +49,7 @@ export default {
   async saveFile(workspaceId, filePath, content) {
     return api.put(`/workspaces/${workspaceId}/files/${encodeURIComponent(filePath)}`, {
       content,
-    })
+    });
   },
 
   /**
@@ -58,6 +58,6 @@ export default {
   async revertFile(workspaceId, filePath) {
     return api.patch(`/workspaces/${workspaceId}/files/${encodeURIComponent(filePath)}`, {
       operation: 'revert',
-    })
+    });
   },
-}
+};
