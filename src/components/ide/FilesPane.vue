@@ -1,29 +1,30 @@
 <template>
-  <v-container fluid class="pa-2 fill-height d-flex flex-column">
-    <!-- Toolbar -->
-    <div class="mb-2 d-flex gap-2 align-center">
-      <v-btn
-        size="small"
-        :icon="icons.add"
-        @click="showCreateDialog = true"
-        title="New File or Folder"
-        variant="text"
-        density="comfortable"
+  <v-container fluid class="pa-0 fill-height d-flex flex-column">
+    <!-- Search Input -->
+    <div class="px-2 pt-2">
+      <v-text-field
+        v-model="searchQuery"
+        :prepend-inner-icon="icons.search"
+        placeholder="Search files and folders..."
+        density="compact"
+        variant="outlined"
+        hide-details
+        clearable
+        :disabled="filesStore.isLoading"
+        :loading="filesStore.isLoading"
+        @update:model-value="handleSearch"
+        @click:clear="handleClearSearch"
       />
-      <v-btn
-        size="small"
-        :icon="icons.refresh"
-        @click="refreshTree"
-        title="Refresh"
-        variant="text"
-        density="comfortable"
-      />
-      <v-spacer />
     </div>
 
     <!-- File Tree -->
-    <div class="file-tree-container flex-grow-1">
-      <v-progress-linear v-if="filesStore.isLoading" indeterminate />
+    <div class="file-tree-container flex-grow-1 px-2 pt-2">
+      <div v-if="filesStore.isLoading" class="text-center pa-4">
+        <v-progress-circular 
+          indeterminate 
+          color="primary"
+        />
+      </div>
 
       <v-alert v-else-if="filesStore.error" type="error" variant="tonal" class="ma-2">
         {{ filesStore.error }}
@@ -32,6 +33,8 @@
       <v-treeview
         v-else-if="filesStore.fileTree.length > 0"
         :items="treeItems"
+        :indent-lines="true"
+        :separate-roots="true"
         item-value="id"
         item-title="name"
         density="compact"
@@ -55,6 +58,65 @@
             </v-chip>
           </div>
         </template>
+
+        <template v-slot:append="{ item }">
+          <v-menu location="end">
+            <template v-slot:activator="{ props }">
+              <v-btn
+                v-bind="props"
+                :icon="icons.menu"
+                size="x-small"
+                variant="text"
+                @click.stop
+              />
+            </template>
+            <v-list density="compact">
+              <!-- Folder Actions -->
+              <template v-if="item.type === 'folder'">
+                <v-list-item @click="handleCreateInFolder(item)">
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.add" size="small" />
+                  </template>
+                  <v-list-item-title>Create</v-list-item-title>
+                </v-list-item>
+                <v-list-item @click="handleDelete(item)">
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.delete" size="small" color="error" />
+                  </template>
+                  <v-list-item-title class="text-error">Delete</v-list-item-title>
+                </v-list-item>
+              </template>
+
+              <!-- File Actions -->
+              <template v-else>
+                <v-list-item @click="handleSave(item)" :disabled="!item.status">
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.save" size="small" />
+                  </template>
+                  <v-list-item-title>Save</v-list-item-title>
+                </v-list-item>
+                <v-list-item @click="handleRevert(item)" :disabled="!item.status">
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.revert" size="small" />
+                  </template>
+                  <v-list-item-title>Revert</v-list-item-title>
+                </v-list-item>
+                <v-list-item @click="handleRename(item)">
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.rename" size="small" />
+                  </template>
+                  <v-list-item-title>Rename</v-list-item-title>
+                </v-list-item>
+                <v-list-item @click="handleDelete(item)">
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.delete" size="small" color="error" />
+                  </template>
+                  <v-list-item-title class="text-error">Delete</v-list-item-title>
+                </v-list-item>
+              </template>
+            </v-list>
+          </v-menu>
+        </template>
       </v-treeview>
 
       <div v-else class="empty-state text-center pa-4">
@@ -63,21 +125,45 @@
       </div>
     </div>
 
-    <!-- Create File/Folder Dialog -->
-    <CreateFileDialog v-model:show="showCreateDialog" @create="handleCreate" />
+    <!-- Dialogs -->
+    <CreateFileDialog
+      v-model:show="showCreateDialog"
+      :initial-path="createInitialPath"
+      @create="handleCreate"
+    />
+    <RenameDialog
+      v-model:show="showRenameDialog"
+      :current-name="itemToRename?.name"
+      :item-type="itemToRename?.type"
+      @rename="handleRenameConfirm"
+    />
+    <DeleteConfirmDialog
+      v-model:show="showDeleteDialog"
+      :item-name="itemToDelete?.name"
+      :item-type="itemToDelete?.type"
+      @confirm="handleDeleteConfirm"
+    />
   </v-container>
 </template>
 
 <script>
 import { useFilesStore } from '@/stores/files'
+import { useWorkspacesStore } from '@/stores/workspaces'
 import { useNotificationsStore } from '@/stores/notifications'
 import CreateFileDialog from './CreateFileDialog.vue'
+import RenameDialog from './RenameDialog.vue'
+import DeleteConfirmDialog from './DeleteConfirmDialog.vue'
 import {
   mdiFileDocumentOutline,
   mdiFolderOutline,
   mdiFolderOpenOutline,
-  mdiRefresh,
+  mdiMagnify,
   mdiPlus,
+  mdiDotsVertical,
+  mdiPencilOutline,
+  mdiDeleteOutline,
+  mdiContentSave,
+  mdiUndoVariant,
 } from '@mdi/js'
 
 export default {
@@ -85,13 +171,8 @@ export default {
 
   components: {
     CreateFileDialog,
-  },
-
-  props: {
-    workspaceId: {
-      type: [String, Number],
-      required: true,
-    },
+    RenameDialog,
+    DeleteConfirmDialog,
   },
 
   data() {
@@ -100,11 +181,23 @@ export default {
         file: mdiFileDocumentOutline,
         folder: mdiFolderOutline,
         folderOpen: mdiFolderOpenOutline,
-        refresh: mdiRefresh,
+        search: mdiMagnify,
         add: mdiPlus,
+        menu: mdiDotsVertical,
+        rename: mdiPencilOutline,
+        delete: mdiDeleteOutline,
+        save: mdiContentSave,
+        revert: mdiUndoVariant,
       },
       openFolders: [],
+      searchQuery: '',
+      searchDebounce: null,
       showCreateDialog: false,
+      createInitialPath: '',
+      showRenameDialog: false,
+      itemToRename: null,
+      showDeleteDialog: false,
+      itemToDelete: null,
     }
   },
 
@@ -113,17 +206,34 @@ export default {
       return useFilesStore()
     },
 
+    workspacesStore() {
+      return useWorkspacesStore()
+    },
+
     notificationsStore() {
       return useNotificationsStore()
     },
 
+    workspaceId() {
+      return this.workspacesStore.currentWorkspace?.id
+    },
+
     treeItems() {
-      return this.buildTreeItems(this.filesStore.fileTree)
+      const sourceTree = this.filesStore.searchQuery
+        ? this.filesStore.searchResults
+        : this.filesStore.fileTree
+      return this.buildTreeItems(sourceTree)
     },
   },
 
-  async mounted() {
+  async created() {
     await this.loadFiles()
+  },
+
+  beforeUnmount() {
+    if (this.searchDebounce) {
+      clearTimeout(this.searchDebounce)
+    }
   },
 
   methods: {
@@ -133,6 +243,32 @@ export default {
       } catch (error) {
         this.notificationsStore.error(`Failed to load files: ${error.message}`)
       }
+    },
+
+    handleSearch(value) {
+      // Clear existing timeout
+      if (this.searchDebounce) {
+        clearTimeout(this.searchDebounce)
+      }
+
+      // Debounce search to avoid too many requests
+      this.searchDebounce = setTimeout(async () => {
+        if (!value || !value.trim()) {
+          await this.loadFiles()
+          return
+        }
+
+        try {
+          await this.filesStore.searchFiles(this.workspaceId, value)
+        } catch (error) {
+          this.notificationsStore.error(`Search failed: ${error.message}`)
+        }
+      }, 300)
+    },
+
+    async handleClearSearch() {
+      this.searchQuery = ''
+      await this.loadFiles()
     },
 
     async refreshTree() {
@@ -180,14 +316,70 @@ export default {
       }
     },
 
+    handleCreateInFolder(item) {
+      this.createInitialPath = item.path
+      this.showCreateDialog = true
+    },
+
     async handleCreate({ type, path, name }) {
       try {
-        const isDirectory = type === 'folder'
-        await this.filesStore.createFile(this.workspaceId, path, name, isDirectory)
+        await this.filesStore.createFile(this.workspaceId, path, name, type)
 
-        this.notificationsStore.success(`${isDirectory ? 'Folder' : 'File'} created successfully`)
+        this.notificationsStore.success(`${type === 'folder' ? 'Folder' : 'File'} created successfully`)
+        this.createInitialPath = ''
       } catch (error) {
         this.notificationsStore.error(`Failed to create: ${error.message}`)
+      }
+    },
+
+    handleRename(item) {
+      this.itemToRename = item
+      this.showRenameDialog = true
+    },
+
+    async handleRenameConfirm(newName) {
+      if (!this.itemToRename) return
+
+      try {
+        await this.filesStore.renameFile(this.workspaceId, this.itemToRename.path, newName)
+        this.notificationsStore.success('Renamed successfully')
+      } catch (error) {
+        this.notificationsStore.error(`Failed to rename: ${error.message}`)
+      } finally {
+        this.itemToRename = null
+      }
+    },
+
+    handleDelete(item) {
+      this.itemToDelete = item
+      this.showDeleteDialog = true
+    },
+
+    async handleDeleteConfirm() {
+      if (!this.itemToDelete) return
+
+      try {
+        await this.filesStore.deleteFile(this.workspaceId, this.itemToDelete.path)
+        this.notificationsStore.success('Deleted successfully')
+        this.showDeleteDialog = false
+      } catch (error) {
+        this.notificationsStore.error(`Failed to delete: ${error.message}`)
+      } finally {
+        this.itemToDelete = null
+      }
+    },
+
+    async handleSave(item) {
+      // TODO: Integrate with editor to get file content
+      this.notificationsStore.info('Save functionality requires editor integration')
+    },
+
+    async handleRevert(item) {
+      try {
+        await this.filesStore.revertFile(this.workspaceId, item.path)
+        this.notificationsStore.success('File reverted successfully')
+      } catch (error) {
+        this.notificationsStore.error(`Failed to revert: ${error.message}`)
       }
     },
   },

@@ -5,6 +5,8 @@ export const useFilesStore = defineStore('files', {
   state: () => ({
     files: [], // Flat list from API
     fileTree: [], // Hierarchical structure
+    searchResults: [], // Search results
+    searchQuery: '',
     isLoading: false,
     error: null,
   }),
@@ -19,6 +21,32 @@ export const useFilesStore = defineStore('files', {
       try {
         this.files = await fileService.fetchFileTree(workspaceId)
         this.fileTree = this.buildTree(this.files)
+        this.searchResults = []
+        this.searchQuery = ''
+      } catch (error) {
+        this.error = error.message
+        throw error
+      } finally {
+        this.isLoading = false
+      }
+    },
+
+    /**
+     * Search files and folders
+     */
+    async searchFiles(workspaceId, query) {
+      if (!query.trim()) {
+        // If query is empty, reload full tree
+        await this.loadFileTree(workspaceId)
+        return
+      }
+
+      this.isLoading = true
+      this.error = null
+      try {
+        this.searchQuery = query
+        const results = await fileService.searchFiles(workspaceId, query)
+        this.searchResults = this.buildTree(results)
       } catch (error) {
         this.error = error.message
         throw error
@@ -75,10 +103,66 @@ export const useFilesStore = defineStore('files', {
     /**
      * Create new file or folder
      */
-    async createFile(workspaceId, path, name, isDirectory) {
+    async createFile(workspaceId, path, name, type) {
       try {
-        await fileService.createFile(workspaceId, path, name, isDirectory)
+        await fileService.createFile(workspaceId, path, name, type)
         // Reload the file tree
+        await this.loadFileTree(workspaceId)
+      } catch (error) {
+        this.error = error.message
+        throw error
+      }
+    },
+
+    /**
+     * Rename file or folder
+     */
+    async renameFile(workspaceId, filePath, newName) {
+      try {
+        await fileService.renameFile(workspaceId, filePath, newName)
+        // Reload the file tree
+        await this.loadFileTree(workspaceId)
+      } catch (error) {
+        this.error = error.message
+        throw error
+      }
+    },
+
+    /**
+     * Delete file or folder
+     */
+    async deleteFile(workspaceId, filePath) {
+      try {
+        await fileService.deleteFile(workspaceId, filePath)
+        // Reload the file tree
+        await this.loadFileTree(workspaceId)
+      } catch (error) {
+        this.error = error.message
+        throw error
+      }
+    },
+
+    /**
+     * Save file content (placeholder - needs editor integration)
+     */
+    async saveFile(workspaceId, filePath, content) {
+      try {
+        await fileService.saveFile(workspaceId, filePath, content)
+        // Reload the file tree to get updated status
+        await this.loadFileTree(workspaceId)
+      } catch (error) {
+        this.error = error.message
+        throw error
+      }
+    },
+
+    /**
+     * Revert file to last saved state
+     */
+    async revertFile(workspaceId, filePath) {
+      try {
+        await fileService.revertFile(workspaceId, filePath)
+        // Reload the file tree to get updated status
         await this.loadFileTree(workspaceId)
       } catch (error) {
         this.error = error.message
@@ -92,6 +176,8 @@ export const useFilesStore = defineStore('files', {
     clearState() {
       this.files = []
       this.fileTree = []
+      this.searchResults = []
+      this.searchQuery = ''
       this.error = null
     },
   },

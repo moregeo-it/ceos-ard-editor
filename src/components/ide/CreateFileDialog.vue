@@ -48,6 +48,10 @@ export default {
       type: Boolean,
       required: true,
     },
+    initialPath: {
+      type: String,
+      default: '',
+    },
   },
 
   emits: ['update:show', 'create'],
@@ -98,6 +102,8 @@ export default {
     show(newVal) {
       if (!newVal) {
         this.reset()
+      } else if (this.initialPath) {
+        this.path = this.initialPath
       }
     },
   },
