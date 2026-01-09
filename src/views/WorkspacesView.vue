@@ -111,12 +111,14 @@
             xl="4"
           >
             <WorkspaceCard
+              v-if="!workspacesStore.isWorkspaceLoading[workspace.id]"
               :workspace="workspace"
               @view="handleViewWorkspace"
               @edit="handleEditWorkspace"
               @toggle-status="handleToggleStatus"
               @delete="confirmDelete"
             />
+            <v-skeleton-loader v-else type="card"></v-skeleton-loader>
           </v-col>
         </v-row>
       </v-container>
@@ -128,7 +130,11 @@
       :mode="workspaceDialogMode"
       :workspace="workspaceToEdit"
       :pfs-options="workspacesStore.pfsOptions"
-      :loading="isSubmitting"
+      :loading="
+        workspaceDialogMode === 'create'
+          ? workspacesStore.isCreating
+          : workspacesStore.isWorkspaceLoading[workspaceToEdit?.id]
+      "
       @submit="handleWorkspaceSubmit"
     />
 
@@ -136,14 +142,14 @@
     <ArchiveConfirmDialog
       v-model="showArchiveDialog"
       :workspace="workspacesStore.workspaces.find((w) => w.id === workspaceToArchive)"
-      :loading="isTogglingStatus"
+      :loading="workspacesStore.isWorkspaceLoading[workspaceToArchive?.id]"
       @confirm="handleArchiveWorkspace"
     />
 
     <!-- Delete Confirmation Dialog -->
     <DeleteConfirmDialog
       v-model="showDeleteDialog"
-      :loading="isDeleting"
+      :loading="workspacesStore.isWorkspaceLoading[workspaceToDelete?.id]"
       @confirm="handleDeleteWorkspace"
     />
   </v-app>
@@ -192,13 +198,10 @@ export default {
       workspaceDialogMode: 'create',
       workspaceToEdit: null,
       showUserMenu: false,
-      isSubmitting: false,
       showArchiveDialog: false,
       workspaceToArchive: null,
       showDeleteDialog: false,
       workspaceToDelete: null,
-      isDeleting: false,
-      isTogglingStatus: false,
       filter: 'all', // 'all', 'active', 'archived'
     }
   },
@@ -255,7 +258,6 @@ export default {
     },
 
     async handleWorkspaceSubmit(workspaceData) {
-      this.isSubmitting = true
       try {
         if (this.workspaceDialogMode === 'create') {
           await this.workspacesStore.createWorkspace(workspaceData)
@@ -274,8 +276,6 @@ export default {
         console.error('Failed to save workspace:', error)
         const action = this.workspaceDialogMode === 'create' ? 'create' : 'update'
         this.notificationsStore.error(`Failed to ${action} workspace: ${error.message}`)
-      } finally {
-        this.isSubmitting = false
       }
     },
 
@@ -304,21 +304,17 @@ export default {
         this.showArchiveDialog = true
       } else {
         // If workspace is archived, reactivate immediately without confirmation
-        this.isTogglingStatus = true
         try {
           await this.workspacesStore.toggleWorkspaceStatus(workspaceId)
           this.notificationsStore.success('Workspace activated successfully')
         } catch (error) {
           console.error('Failed to reactivate workspace:', error)
           this.notificationsStore.error(`Failed to activate workspace: ${error.message}`)
-        } finally {
-          this.isTogglingStatus = false
         }
       }
     },
 
     async handleArchiveWorkspace() {
-      this.isTogglingStatus = true
       try {
         await this.workspacesStore.toggleWorkspaceStatus(this.workspaceToArchive)
         this.notificationsStore.success('Workspace archived successfully')
@@ -328,8 +324,6 @@ export default {
         console.error('Failed to archive workspace:', error)
         this.notificationsStore.error(`Failed to archive workspace: ${error.message}`)
         // Keep dialog open so user can try again
-      } finally {
-        this.isTogglingStatus = false
       }
     },
 
@@ -339,7 +333,6 @@ export default {
     },
 
     async handleDeleteWorkspace() {
-      this.isDeleting = true
       try {
         await this.workspacesStore.deleteWorkspace(this.workspaceToDelete)
         this.notificationsStore.success('Workspace deleted successfully')
@@ -349,8 +342,6 @@ export default {
         console.error('Failed to delete workspace:', error)
         this.notificationsStore.error(`Failed to delete workspace: ${error.message}`)
         // Keep dialog open so user can try again
-      } finally {
-        this.isDeleting = false
       }
     },
 
