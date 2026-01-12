@@ -80,12 +80,6 @@
 
               <!-- File Actions -->
               <template v-else>
-                <v-list-item @click="handleSave(item)" :disabled="!item.status">
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.save" size="small" />
-                  </template>
-                  <v-list-item-title>Save</v-list-item-title>
-                </v-list-item>
                 <v-list-item @click="handleRevert(item)" :disabled="!item.status">
                   <template v-slot:prepend>
                     <v-icon :icon="icons.revert" size="small" />
@@ -153,7 +147,6 @@ import {
   mdiDotsVertical,
   mdiPencilOutline,
   mdiDeleteOutline,
-  mdiContentSave,
   mdiUndoVariant,
 } from '@mdi/js';
 
@@ -177,7 +170,6 @@ export default {
         menu: mdiDotsVertical,
         rename: mdiPencilOutline,
         delete: mdiDeleteOutline,
-        save: mdiContentSave,
         revert: mdiUndoVariant,
       },
       openFolders: [],
@@ -360,11 +352,6 @@ export default {
       } finally {
         this.itemToDelete = null;
       }
-    },
-
-    async handleSave() {
-      // TODO: Integrate with editor to get file content
-      this.notificationsStore.info('Save functionality requires editor integration');
     },
 
     async handleRevert(item) {
