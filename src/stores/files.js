@@ -15,11 +15,11 @@ export const useFilesStore = defineStore('files', {
     /**
      * Load files from server and build tree structure
      */
-    async loadFileTree(workspaceId) {
+    async loadFileTree(workspaceId, path = '/') {
       this.isLoading = true;
       this.error = null;
       try {
-        this.files = await fileService.fetchFileTree(workspaceId);
+        this.files = await fileService.fetchFileTree(workspaceId, path);
         this.fileTree = this.buildTree(this.files);
         this.searchResults = [];
         this.searchQuery = '';
