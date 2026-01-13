@@ -286,6 +286,7 @@ export default {
       if (item.status === 'added') return 'success';
       if (item.status === 'modified') return 'warning';
       if (item.status === 'renamed') return 'info';
+      if (item.status === 'deleted') return 'error';
       return undefined;
     },
 
@@ -297,6 +298,8 @@ export default {
           return 'warning';
         case 'renamed':
           return 'info';
+        case 'deleted':
+          return 'error';
         default:
           return 'default';
       }
