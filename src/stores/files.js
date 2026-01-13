@@ -206,7 +206,7 @@ export const useFilesStore = defineStore('files', {
      * Clear all state
      */
     clearState() {
-      this.files = [];
+      this.files = {};
       this.fileTree = [];
       this.searchResults = [];
       this.searchQuery = '';

@@ -25,7 +25,7 @@
         color="error"
         class="mr-4"
         :prepend-icon="icons.close"
-        @click="goToWorkspaces"
+        @click="closeWorkspace"
       >
         Close
       </v-btn>
@@ -108,6 +108,7 @@
 
 <script>
 import { useAuthStore } from '@/stores/auth';
+import { useFilesStore } from '@/stores/files';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
 import {
@@ -171,6 +172,10 @@ export default {
 
     authStore() {
       return useAuthStore();
+    },
+
+    filesStore() {
+      return useFilesStore();
     },
 
     workspacesStore() {
@@ -241,7 +246,8 @@ export default {
       }
     },
 
-    goToWorkspaces() {
+    async closeWorkspace() {
+      this.filesStore.clearState();
       this.$router.push({ name: 'workspaces' });
     },
   },
