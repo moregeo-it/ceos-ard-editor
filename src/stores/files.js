@@ -7,7 +7,8 @@ export const useFilesStore = defineStore('files', {
     fileTree: [], // Hierarchical structure
     searchResults: [], // Search results
     searchQuery: '',
-    isLoading: false,
+    isSearchLoading: false,
+    isPathLoading: [],
     error: null,
   }),
 
@@ -20,7 +21,7 @@ export const useFilesStore = defineStore('files', {
         // Already loaded
         return;
       }
-      this.isLoading = true;
+      this.isPathLoading.push(path);
       this.error = null;
       try {
         const files = await fileService.fetchFileTree(workspaceId, path);
@@ -40,7 +41,10 @@ export const useFilesStore = defineStore('files', {
         this.error = error.message;
         throw error;
       } finally {
-        this.isLoading = false;
+        const ix = this.isPathLoading.indexOf(path);
+        if (ix !== -1) {
+          this.isPathLoading.splice(ix, 1);
+        }
       }
     },
 
@@ -54,7 +58,7 @@ export const useFilesStore = defineStore('files', {
         return;
       }
 
-      this.isLoading = true;
+      this.isSearchLoading = true;
       this.error = null;
       try {
         this.searchQuery = query;
@@ -64,7 +68,7 @@ export const useFilesStore = defineStore('files', {
         this.error = error.message;
         throw error;
       } finally {
-        this.isLoading = false;
+        this.isSearchLoading = false;
       }
     },
 
@@ -207,6 +211,8 @@ export const useFilesStore = defineStore('files', {
       this.searchResults = [];
       this.searchQuery = '';
       this.error = null;
+      this.isPathLoading = [];
+      this.isSearchLoading = false;
     },
   },
 });
