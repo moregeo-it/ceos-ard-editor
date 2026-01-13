@@ -10,8 +10,7 @@
         variant="outlined"
         hide-details
         clearable
-        :disabled="filesStore.isLoading"
-        :loading="filesStore.isLoading"
+        :loading="filesStore.isSearchLoading"
         @update:model-value="handleSearch"
         @click:clear="handleClearSearch"
       />
@@ -40,7 +39,7 @@
             key="prepend-toggle"
             density="compact"
             :icon="props.toggleIcon"
-            :loading="pathLoading === item.path"
+            :loading="filesStore.isPathLoading.includes(item.path)"
             variant="text"
             @click="props.onClick"
           >
@@ -113,7 +112,7 @@
         </template>
       </v-treeview>
 
-      <div v-else-if="filesStore.isLoading" class="text-center pa-4">
+      <div v-else-if="filesStore.isPathLoading.includes('/')" class="text-center pa-4">
         <v-progress-circular indeterminate color="primary" />
       </div>
 
@@ -191,7 +190,6 @@ export default {
       createInitialPath: null,
       itemToRename: null,
       itemToDelete: null,
-      pathLoading: null,
     };
   },
 
@@ -265,9 +263,7 @@ export default {
 
   methods: {
     async loadFolder(item) {
-      this.pathLoading = item.path;
       await this.loadFiles(item.path);
-      this.pathLoading = null;
     },
 
     async loadFiles(path = '/') {
