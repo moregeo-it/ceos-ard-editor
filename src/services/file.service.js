@@ -5,7 +5,7 @@ export default {
    * Fetch file tree structure for a workspace
    */
   async fetchFileTree(workspaceId, path = '/') {
-    return api.get(`/workspaces/${workspaceId}/files?recurse=true&path=${path}`);
+    return api.get(`/workspaces/${workspaceId}/files?path=${path}`);
   },
 
   /**

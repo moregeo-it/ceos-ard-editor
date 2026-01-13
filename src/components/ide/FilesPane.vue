@@ -19,11 +19,7 @@
 
     <!-- File Tree -->
     <div class="file-tree-container flex-grow-1 px-2 pt-2">
-      <div v-if="filesStore.isLoading" class="text-center pa-4">
-        <v-progress-circular indeterminate color="primary" />
-      </div>
-
-      <v-alert v-else-if="filesStore.error" type="error" variant="tonal" class="ma-2">
+      <v-alert v-if="filesStore.error" type="error" variant="tonal" class="ma-2">
         {{ filesStore.error }}
       </v-alert>
 
@@ -32,10 +28,9 @@
         :items="treeItems"
         :indent-lines="true"
         :separate-roots="true"
-        item-value="id"
-        item-title="name"
         density="compact"
         open-strategy="multiple"
+        :load-children="loadFolder"
       >
         <template v-slot:prepend="{ item }">
           <v-icon :icon="getFileIcon(item)" size="small" :color="getIconColor(item)" />
@@ -103,6 +98,10 @@
           </v-menu>
         </template>
       </v-treeview>
+
+      <div v-else-if="filesStore.isLoading" class="text-center pa-4">
+        <v-progress-circular indeterminate color="primary" />
+      </div>
 
       <div v-else class="empty-state text-center pa-4">
         <v-icon :icon="icons.folder" size="48" color="grey-lighten-1" />
@@ -220,9 +219,13 @@ export default {
   },
 
   methods: {
-    async loadFiles() {
+    async loadFolder(item) {
+      await this.loadFiles(item.path);
+    },
+
+    async loadFiles(path = '/') {
       try {
-        await this.filesStore.loadFileTree(this.workspaceId);
+        await this.filesStore.loadFileTree(this.workspaceId, path);
       } catch (error) {
         this.notificationsStore.error(`Failed to load files: ${error.message}`);
       }

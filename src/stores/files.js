@@ -3,7 +3,7 @@ import fileService from '@/services/file.service';
 
 export const useFilesStore = defineStore('files', {
   state: () => ({
-    files: [], // Flat list from API
+    files: {},
     fileTree: [], // Hierarchical structure
     searchResults: [], // Search results
     searchQuery: '',
@@ -16,11 +16,24 @@ export const useFilesStore = defineStore('files', {
      * Load files from server and build tree structure
      */
     async loadFileTree(workspaceId, path = '/') {
+      if (Array.isArray(this.files[path])) {
+        // Already loaded
+        return;
+      }
       this.isLoading = true;
       this.error = null;
       try {
-        this.files = await fileService.fetchFileTree(workspaceId, path);
-        this.fileTree = this.buildTree(this.files);
+        const files = await fileService.fetchFileTree(workspaceId, path);
+        this.files[path] = this.convertToFileTree(files);
+        if (path === '/') {
+          this.fileTree = this.files[path];
+        } else {
+          const parentPath = path.substring(0, path.lastIndexOf('/')) || '/';
+          const item = this.files[parentPath].find((f) => f.path === path);
+          if (item) {
+            item.children = this.files[path];
+          }
+        }
         this.searchResults = [];
         this.searchQuery = '';
       } catch (error) {
@@ -53,6 +66,21 @@ export const useFilesStore = defineStore('files', {
       } finally {
         this.isLoading = false;
       }
+    },
+
+    /**
+     * Build hierarchical tree from flat file list
+     */
+    convertToFileTree(files) {
+      return files.map((file) => {
+        return {
+          name: file.name,
+          path: file.path,
+          type: file.is_directory ? 'folder' : 'file',
+          status: file.status,
+          children: file.is_directory ? [] : undefined,
+        };
+      });
     },
 
     /**
