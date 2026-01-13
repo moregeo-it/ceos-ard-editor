@@ -174,11 +174,8 @@ export default {
       openFolders: [],
       searchQuery: '',
       searchDebounce: null,
-      showCreateDialog: false,
-      createInitialPath: '',
-      showRenameDialog: false,
+      createInitialPath: null,
       itemToRename: null,
-      showDeleteDialog: false,
       itemToDelete: null,
     };
   },
@@ -198,6 +195,39 @@ export default {
 
     workspaceId() {
       return this.workspacesStore.currentWorkspace?.id;
+    },
+
+    showCreateDialog: {
+      get() {
+        return this.createInitialPath !== null;
+      },
+      set(value) {
+        if (!value) {
+          this.createInitialPath = null;
+        }
+      },
+    },
+
+    showRenameDialog: {
+      get() {
+        return !!this.itemToRename;
+      },
+      set(value) {
+        if (!value) {
+          this.itemToRename = null;
+        }
+      },
+    },
+
+    showDeleteDialog: {
+      get() {
+        return !!this.itemToDelete;
+      },
+      set(value) {
+        if (!value) {
+          this.itemToDelete = null;
+        }
+      },
     },
 
     treeItems() {
@@ -307,7 +337,6 @@ export default {
 
     handleCreateInFolder(item) {
       this.createInitialPath = item.path;
-      this.showCreateDialog = true;
     },
 
     async handleCreate({ type, path, name }) {
@@ -317,7 +346,7 @@ export default {
         this.notificationsStore.success(
           `${type === 'folder' ? 'Folder' : 'File'} created successfully`,
         );
-        this.createInitialPath = '';
+        this.createInitialPath = null;
       } catch (error) {
         this.notificationsStore.error(`Failed to create: ${error.message}`);
       }
@@ -325,7 +354,6 @@ export default {
 
     handleRename(item) {
       this.itemToRename = item;
-      this.showRenameDialog = true;
     },
 
     async handleRenameConfirm(newName) {
@@ -343,7 +371,6 @@ export default {
 
     handleDelete(item) {
       this.itemToDelete = item;
-      this.showDeleteDialog = true;
     },
 
     async handleDeleteConfirm() {
@@ -352,7 +379,7 @@ export default {
       try {
         await this.filesStore.deleteFile(this.workspaceId, this.itemToDelete.path);
         this.notificationsStore.success('Deleted successfully');
-        this.showDeleteDialog = false;
+        this.itemToDelete = null;
       } catch (error) {
         this.notificationsStore.error(`Failed to delete: ${error.message}`);
       } finally {
