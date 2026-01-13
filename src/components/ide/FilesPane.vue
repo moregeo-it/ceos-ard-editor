@@ -29,11 +29,25 @@
         :indent-lines="true"
         :separate-roots="true"
         density="compact"
-        open-strategy="multiple"
         :load-children="loadFolder"
       >
         <template v-slot:prepend="{ item }">
           <v-icon :icon="getFileIcon(item)" size="small" :color="getIconColor(item)" />
+        </template>
+
+        <template v-slot:toggle="{ props, item }">
+          <VBtn
+            key="prepend-toggle"
+            density="compact"
+            :icon="props.toggleIcon"
+            :loading="pathLoading === item.path"
+            variant="text"
+            @click="props.onClick"
+          >
+            <template v-slot:loader>
+              <VProgressCircular indeterminate="disable-shrink" size="20" width="2" />
+            </template>
+          </VBtn>
         </template>
 
         <template v-slot:title="{ item }">
@@ -177,6 +191,7 @@ export default {
       createInitialPath: null,
       itemToRename: null,
       itemToDelete: null,
+      pathLoading: null,
     };
   },
 
@@ -250,7 +265,9 @@ export default {
 
   methods: {
     async loadFolder(item) {
+      this.pathLoading = item.path;
       await this.loadFiles(item.path);
+      this.pathLoading = null;
     },
 
     async loadFiles(path = '/') {
