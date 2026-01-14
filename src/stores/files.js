@@ -16,8 +16,8 @@ export const useFilesStore = defineStore('files', {
     /**
      * Load files from server and build tree structure
      */
-    async loadFileTree(workspaceId, path = '/') {
-      if (Array.isArray(this.files[path])) {
+    async loadFileTree(workspaceId, path = '/', force = false) {
+      if (Array.isArray(this.files[path]) && !force) {
         // Already loaded
         return;
       }
@@ -138,8 +138,8 @@ export const useFilesStore = defineStore('files', {
     async createFile(workspaceId, path, name, type) {
       try {
         await fileService.createFile(workspaceId, path, name, type);
-        // Reload the file tree
-        await this.loadFileTree(workspaceId);
+        // force reload the file tree to include the new file/folder
+        await this.loadFileTree(workspaceId, path, true);
       } catch (error) {
         this.error = error.message;
         throw error;
@@ -152,8 +152,9 @@ export const useFilesStore = defineStore('files', {
     async renameFile(workspaceId, filePath, newName) {
       try {
         await fileService.renameFile(workspaceId, filePath, newName);
-        // Reload the file tree
-        await this.loadFileTree(workspaceId);
+        const path = filePath.substring(0, filePath.lastIndexOf('/')) || '/';
+        // force reload the parent directory to reflect the rename
+        await this.loadFileTree(workspaceId, path, true);
       } catch (error) {
         this.error = error.message;
         throw error;
@@ -166,8 +167,9 @@ export const useFilesStore = defineStore('files', {
     async deleteFile(workspaceId, filePath) {
       try {
         await fileService.deleteFile(workspaceId, filePath);
-        // Reload the file tree
-        await this.loadFileTree(workspaceId);
+        // force reload the parent directory to reflect the deletion
+        const path = filePath.substring(0, filePath.lastIndexOf('/')) || '/';
+        await this.loadFileTree(workspaceId, path, true);
       } catch (error) {
         this.error = error.message;
         throw error;
@@ -195,7 +197,8 @@ export const useFilesStore = defineStore('files', {
       try {
         await fileService.revertFile(workspaceId, filePath);
         // Reload the file tree to get updated status
-        await this.loadFileTree(workspaceId);
+        const path = filePath.substring(0, filePath.lastIndexOf('/')) || '/';
+        await this.loadFileTree(workspaceId, path, true);
       } catch (error) {
         this.error = error.message;
         throw error;
