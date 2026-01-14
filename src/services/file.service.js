@@ -12,7 +12,7 @@ export default {
    * Search files and folders
    */
   async searchFiles(workspaceId, query) {
-    return api.get(`/workspaces/${workspaceId}/files/search?q=${encodeURIComponent(query)}`);
+    return api.get(`/workspaces/${workspaceId}/search?query=${encodeURIComponent(query)}`);
   },
 
   /**

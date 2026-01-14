@@ -6,7 +6,6 @@ export const useFilesStore = defineStore('files', {
     files: {},
     fileTree: [], // Hierarchical structure
     searchResults: [], // Search results
-    searchQuery: '',
     isSearchLoading: false,
     isPathLoading: [],
     error: null,
@@ -36,7 +35,6 @@ export const useFilesStore = defineStore('files', {
           }
         }
         this.searchResults = [];
-        this.searchQuery = '';
       } catch (error) {
         this.error = error.message;
         throw error;
@@ -61,9 +59,8 @@ export const useFilesStore = defineStore('files', {
       this.isSearchLoading = true;
       this.error = null;
       try {
-        this.searchQuery = query;
-        const results = await fileService.searchFiles(workspaceId, query);
-        this.searchResults = this.buildTree(results);
+        const files = await fileService.searchFiles(workspaceId, query);
+        this.searchResults = this.convertToFileTree(files);
       } catch (error) {
         this.error = error.message;
         throw error;
@@ -77,59 +74,15 @@ export const useFilesStore = defineStore('files', {
      */
     convertToFileTree(files) {
       return files.map((file) => {
-        return {
-          name: file.name,
-          path: file.path,
-          type: file.is_directory ? 'folder' : 'file',
-          status: file.status,
-          children: file.is_directory ? [] : undefined,
-        };
-      });
-    },
-
-    /**
-     * Build hierarchical tree from flat file list
-     */
-    buildTree(files) {
-      // Create a map to store all nodes
-      const nodeMap = new Map();
-      const rootNodes = [];
-
-      // First pass: Create all nodes
-      files.forEach((file) => {
-        const node = {
-          name: file.name,
-          path: file.path,
-          type: file.is_directory ? 'folder' : 'file',
-          status: file.status,
-          children: file.is_directory ? [] : undefined,
-        };
-        nodeMap.set(file.path, node);
-      });
-
-      // Second pass: Build hierarchy
-      files.forEach((file) => {
-        const node = nodeMap.get(file.path);
-        const pathParts = file.path.split('/');
-
-        if (pathParts.length === 1) {
-          // Root level item
-          rootNodes.push(node);
-        } else {
-          // Find parent
-          const parentPath = pathParts.slice(0, -1).join('/');
-          const parent = nodeMap.get(parentPath);
-
-          if (parent && parent.children) {
-            parent.children.push(node);
-          } else {
-            // If parent doesn't exist, add to root (fallback)
-            rootNodes.push(node);
-          }
+        const obj = Object.assign({}, file);
+        obj.type = file.is_directory ? 'folder' : 'file';
+        obj.children = file.is_directory ? [] : undefined;
+        if (file.type) {
+          obj.resultType = file.type;
         }
+        console.log(obj);
+        return obj;
       });
-
-      return rootNodes;
     },
 
     /**
@@ -212,7 +165,6 @@ export const useFilesStore = defineStore('files', {
       this.files = {};
       this.fileTree = [];
       this.searchResults = [];
-      this.searchQuery = '';
       this.error = null;
       this.isPathLoading = [];
       this.isSearchLoading = false;
