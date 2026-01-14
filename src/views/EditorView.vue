@@ -25,7 +25,7 @@
         color="error"
         class="mr-4"
         :prepend-icon="icons.close"
-        @click="goToWorkspaces"
+        @click="closeWorkspace"
       >
         Close
       </v-btn>
@@ -57,7 +57,7 @@
       <v-container v-if="loading" class="fill-height d-flex align-center justify-center">
         <v-progress-circular indeterminate color="primary" size="64" />
       </v-container>
-      <splitpanes @resized="storePaneSizes" :dbl-click-splitter="false">
+      <splitpanes v-else @resized="storePaneSizes" :dbl-click-splitter="false">
         <pane class="files" min-size="10" :size="panelSizes.files">
           <FilesPane />
         </pane>
@@ -108,6 +108,7 @@
 
 <script>
 import { useAuthStore } from '@/stores/auth';
+import { useFilesStore } from '@/stores/files';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
 import {
@@ -136,8 +137,8 @@ export default {
 
   data() {
     const panelSizeDefaults = {
-      files: 20,
-      editor: 45,
+      files: 15,
+      editor: 50,
       preview: 35,
     };
     return {
@@ -173,6 +174,10 @@ export default {
       return useAuthStore();
     },
 
+    filesStore() {
+      return useFilesStore();
+    },
+
     workspacesStore() {
       return useWorkspacesStore();
     },
@@ -190,7 +195,7 @@ export default {
     },
   },
 
-  async mounted() {
+  async created() {
     await this.loadWorkspace();
   },
 
@@ -241,7 +246,8 @@ export default {
       }
     },
 
-    goToWorkspaces() {
+    async closeWorkspace() {
+      this.filesStore.clearState();
       this.$router.push({ name: 'workspaces' });
     },
   },
