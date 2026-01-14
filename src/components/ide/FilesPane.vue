@@ -88,19 +88,19 @@
 
               <!-- File Actions -->
               <template v-else>
-                <v-list-item @click="handleRevert(item)" :disabled="!item.status">
+                <v-list-item v-if="item.status" @click="handleRevert(item)">
                   <template v-slot:prepend>
                     <v-icon :icon="icons.revert" size="small" />
                   </template>
                   <v-list-item-title>Revert</v-list-item-title>
                 </v-list-item>
-                <v-list-item @click="handleRename(item)">
+                <v-list-item v-if="item.status !== 'deleted'" @click="handleRename(item)">
                   <template v-slot:prepend>
                     <v-icon :icon="icons.rename" size="small" />
                   </template>
                   <v-list-item-title>Rename</v-list-item-title>
                 </v-list-item>
-                <v-list-item @click="handleDelete(item)">
+                <v-list-item v-if="item.status !== 'deleted'" @click="handleDelete(item)">
                   <template v-slot:prepend>
                     <v-icon :icon="icons.delete" size="small" color="error" />
                   </template>
