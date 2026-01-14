@@ -1,7 +1,6 @@
 <template>
   <v-container fluid class="pa-2 d-flex flex-column">
     <!-- Search Input -->
-    <!-- Hide until implemented
     <div class="px-2 pt-2">
       <v-text-field
         v-model="searchQuery"
@@ -16,7 +15,6 @@
         @click:clear="handleClearSearch"
       />
     </div>
-    -->
 
     <!-- File Tree -->
     <div class="file-tree-container flex-grow-1 px-2 pt-2">
@@ -64,6 +62,9 @@
             >
               {{ item.status }}
             </v-chip>
+          </div>
+          <div class="text-caption text-pre-wrap text-grey-darken-1">
+            {{ item.excerpt }}
           </div>
         </template>
 
@@ -247,10 +248,7 @@ export default {
     },
 
     treeItems() {
-      const sourceTree = this.filesStore.searchQuery
-        ? this.filesStore.searchResults
-        : this.filesStore.fileTree;
-      return this.buildTreeItems(sourceTree);
+      return this.searchQuery ? this.filesStore.searchResults : this.filesStore.fileTree;
     },
   },
 
@@ -305,20 +303,6 @@ export default {
 
     async refreshTree() {
       await this.loadFiles();
-    },
-
-    buildTreeItems(nodes, parentPath = '') {
-      return nodes.map((node) => {
-        const fullPath = parentPath ? `${parentPath}/${node.name}` : node.path;
-        return {
-          id: fullPath,
-          name: node.name,
-          type: node.type,
-          path: fullPath,
-          status: node.status,
-          children: node.children ? this.buildTreeItems(node.children, fullPath) : undefined,
-        };
-      });
     },
 
     getFileIcon(item) {
