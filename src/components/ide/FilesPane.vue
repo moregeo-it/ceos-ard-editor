@@ -1,6 +1,7 @@
 <template>
   <v-container fluid class="pa-2 d-flex flex-column">
     <!-- Search Input -->
+    <!-- Hide until implemented
     <div class="px-2 pt-2">
       <v-text-field
         v-model="searchQuery"
@@ -15,6 +16,7 @@
         @click:clear="handleClearSearch"
       />
     </div>
+    -->
 
     <!-- File Tree -->
     <div class="file-tree-container flex-grow-1 px-2 pt-2">
@@ -29,6 +31,7 @@
         :separate-roots="true"
         density="compact"
         :load-children="loadFolder"
+        open-on-click
       >
         <template v-slot:prepend="{ item }">
           <v-icon :icon="getFileIcon(item)" size="small" :color="getIconColor(item)" />
