@@ -11,10 +11,13 @@
           >?
         </p>
         <v-alert v-if="isFolder" type="warning" variant="tonal" density="compact">
-          This will permanently delete the folder and all files inside it.
+          This will delete the folder and all files inside it. If under version control, the
+          deletion can be reverted. For files that are not under version control, the delete is
+          permanent.
         </v-alert>
         <v-alert v-else type="info" variant="tonal" density="compact">
-          This action cannot be undone.
+          This will delete the selected file. If under version control, the deletion can be
+          reverted. For files that are not under version control, the delete is permanent.
         </v-alert>
       </v-card-text>
       <v-card-actions>
