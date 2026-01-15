@@ -12,7 +12,13 @@
         scroll-to-active
         show-arrows
       >
-        <v-tab v-for="file in openedFiles" :key="file.path" :value="file.path" slim>
+        <v-tab
+          v-for="file in openedFiles"
+          :key="file.path"
+          :value="file.path"
+          slim
+          @click.middle="editorStore.close(file.path)"
+        >
           <span class="text-none">{{ file.name }}</span>
           <template v-slot:append>
             <v-btn

@@ -8,6 +8,9 @@
 </template>
 
 <script>
+// todo: make the editor readonly and wrap lines
+// todo: Add Markdown, JSON and YAML highlighting
+// todo: see the legacy editor for more potential features
 import { Codemirror } from 'vue-codemirror';
 
 export default {
