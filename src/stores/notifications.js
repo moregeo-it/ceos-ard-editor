@@ -1,12 +1,14 @@
 import { defineStore } from 'pinia';
 
+const getDefaults = () => ({
+  show: false,
+  message: '',
+  type: 'info', // 'success', 'error', 'warning', 'info'
+  timeout: 5000,
+});
+
 export const useNotificationsStore = defineStore('notifications', {
-  state: () => ({
-    show: false,
-    message: '',
-    type: 'info', // 'success', 'error', 'warning', 'info'
-    timeout: 5000,
-  }),
+  state: () => getDefaults(),
 
   actions: {
     showNotification({ message, type = 'info', timeout = 5000 }) {
@@ -34,6 +36,10 @@ export const useNotificationsStore = defineStore('notifications', {
 
     hide() {
       this.show = false;
+    },
+
+    reset() {
+      Object.assign(this, getDefaults());
     },
   },
 });

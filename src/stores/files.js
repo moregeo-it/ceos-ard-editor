@@ -1,15 +1,17 @@
 import { defineStore } from 'pinia';
 import fileService from '@/services/file.service';
 
+const getDefaults = () => ({
+  files: {},
+  fileTree: [], // Hierarchical structure
+  searchResults: [], // Search results
+  isSearchLoading: false,
+  isPathLoading: [],
+  error: null,
+});
+
 export const useFilesStore = defineStore('files', {
-  state: () => ({
-    files: {},
-    fileTree: [], // Hierarchical structure
-    searchResults: [], // Search results
-    isSearchLoading: false,
-    isPathLoading: [],
-    error: null,
-  }),
+  state: () => getDefaults(),
 
   actions: {
     /**
@@ -161,13 +163,8 @@ export const useFilesStore = defineStore('files', {
     /**
      * Clear all state
      */
-    clearState() {
-      this.files = {};
-      this.fileTree = [];
-      this.searchResults = [];
-      this.error = null;
-      this.isPathLoading = [];
-      this.isSearchLoading = false;
+    reset() {
+      Object.assign(this, getDefaults());
     },
   },
 });

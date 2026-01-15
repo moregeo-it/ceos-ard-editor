@@ -247,7 +247,8 @@ export default {
     },
 
     async closeWorkspace() {
-      this.filesStore.clearState();
+      this.notificationsStore.reset();
+      this.filesStore.reset();
       this.$router.push({ name: 'workspaces' });
     },
   },
