@@ -82,6 +82,12 @@
                   </template>
                   <v-list-item-title>Create</v-list-item-title>
                 </v-list-item>
+                <v-list-item @click="handleRename(item)">
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.rename" size="small" />
+                  </template>
+                  <v-list-item-title>Rename</v-list-item-title>
+                </v-list-item>
                 <v-list-item @click="handleDelete(item)">
                   <template v-slot:prepend>
                     <v-icon :icon="icons.delete" size="small" color="error" />
