@@ -82,7 +82,6 @@ export const useFilesStore = defineStore('files', {
         if (file.type) {
           obj.resultType = file.type;
         }
-        console.log(obj);
         return obj;
       });
     },
