@@ -10,22 +10,7 @@
       <v-spacer></v-spacer>
 
       <!-- User Menu -->
-      <v-menu v-model="showUserMenu" location="bottom end">
-        <template v-slot:activator="{ props }">
-          <v-btn v-bind="props" variant="text" :prepend-icon="icons.accountCircle">
-            {{ authStore.username }}
-            <v-icon :icon="icons.menuDown" />
-          </v-btn>
-        </template>
-        <v-list>
-          <v-list-item @click="handleLogout">
-            <template v-slot:prepend>
-              <v-icon :icon="icons.logout" />
-            </template>
-            <v-list-item-title>Logout</v-list-item-title>
-          </v-list-item>
-        </v-list>
-      </v-menu>
+      <UserMenu />
     </v-app-bar>
 
     <!-- Main Content -->
@@ -163,15 +148,8 @@ import WorkspaceCard from '@/components/workspace/WorkspaceCard.vue';
 import WorkspaceDialog from '@/components/workspace/dialogs/WorkspaceDialog.vue';
 import ArchiveConfirmDialog from '@/components/workspace/dialogs/ArchiveConfirmDialog.vue';
 import DeleteConfirmDialog from '@/components/workspace/dialogs/DeleteConfirmDialog.vue';
-import {
-  mdiFolderMultiple,
-  mdiAccountCircle,
-  mdiLogout,
-  mdiPlus,
-  mdiFolderOff,
-  mdiMenuDown,
-  mdiClose,
-} from '@mdi/js';
+import UserMenu from '@/components/workspace/UserMenu.vue';
+import { mdiFolderMultiple, mdiPlus, mdiFolderOff } from '@mdi/js';
 
 export default {
   name: 'WorkspacesView',
@@ -181,28 +159,24 @@ export default {
     WorkspaceDialog,
     ArchiveConfirmDialog,
     DeleteConfirmDialog,
+    UserMenu,
   },
 
   data() {
     return {
       icons: {
         folderMultiple: mdiFolderMultiple,
-        accountCircle: mdiAccountCircle,
-        logout: mdiLogout,
         plus: mdiPlus,
         folderOff: mdiFolderOff,
-        menuDown: mdiMenuDown,
-        close: mdiClose,
       },
       showWorkspaceDialog: false,
       workspaceDialogMode: 'create',
       workspaceToEdit: null,
-      showUserMenu: false,
       showArchiveDialog: false,
       workspaceToArchive: null,
       showDeleteDialog: false,
       workspaceToDelete: null,
-      filter: 'all', // 'all', 'active', 'archived'
+      filter: 'active', // 'all', 'active', 'archived'
     };
   },
 
@@ -345,21 +319,6 @@ export default {
         console.error('Failed to delete workspace:', error);
         this.notificationsStore.error(`Failed to delete workspace: ${error.message}`);
         // Keep dialog open so user can try again
-      }
-    },
-
-    async handleLogout() {
-      try {
-        await this.authStore.logout();
-        this.notificationsStore.success('Successfully logged out');
-        this.$router.push({ name: 'landing' });
-      } catch {
-        // Even if logout fails on backend, we still clear local auth
-        // Just notify user there might have been an issue
-        if (this.authStore.error) {
-          this.notificationsStore.warning('Logged out locally. Server logout may have failed.');
-        }
-        this.$router.push({ name: 'landing' });
       }
     },
   },

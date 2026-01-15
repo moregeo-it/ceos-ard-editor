@@ -33,23 +33,7 @@
       <v-spacer />
 
       <!-- User Menu -->
-      <v-menu v-model="showUserMenu" location="bottom end">
-        <template v-slot:activator="{ props }">
-          <v-btn v-bind="props" variant="text" :prepend-icon="icons.accountCircle">
-            {{ authStore.username }}
-            <v-icon :icon="icons.menuDown" />
-          </v-btn>
-        </template>
-
-        <v-list>
-          <v-list-item @click="handleLogout">
-            <template v-slot:prepend>
-              <v-icon :icon="icons.logout" />
-            </template>
-            <v-list-item-title>Logout</v-list-item-title>
-          </v-list-item>
-        </v-list>
-      </v-menu>
+      <UserMenu />
     </v-app-bar>
 
     <!-- Main Content Area -->
@@ -111,18 +95,11 @@ import { useAuthStore } from '@/stores/auth';
 import { useFilesStore } from '@/stores/files';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
-import {
-  mdiAccountCircle,
-  mdiLogout,
-  mdiCheckCircle,
-  mdiMenuDown,
-  mdiAlert,
-  mdiPackageUp,
-  mdiClose,
-} from '@mdi/js';
+import { mdiCheckCircle, mdiAlert, mdiPackageUp, mdiClose } from '@mdi/js';
 import EditorPane from '@/components/ide/EditorPane.vue';
 import FilesPane from '@/components/ide/FilesPane.vue';
 import PreviewPane from '@/components/ide/PreviewPane.vue';
+import UserMenu from '@/components/workspace/UserMenu.vue';
 import { Splitpanes, Pane } from 'splitpanes';
 
 export default {
@@ -133,6 +110,7 @@ export default {
     Pane,
     PreviewPane,
     Splitpanes,
+    UserMenu,
   },
 
   data() {
@@ -143,15 +121,11 @@ export default {
     };
     return {
       icons: {
-        accountCircle: mdiAccountCircle,
-        logout: mdiLogout,
         propose: mdiCheckCircle,
-        menuDown: mdiMenuDown,
         activate: mdiPackageUp,
         alert: mdiAlert,
         close: mdiClose,
       },
-      showUserMenu: false,
       panelSizeDefaults: panelSizeDefaults,
       panelSizes: {
         files: localStorage.filesPanelSize ?? panelSizeDefaults.files,
@@ -229,21 +203,6 @@ export default {
     handlePropose() {
       // TODO: Implement propose functionality
       console.log('Propose workspace:', this.workspaceId);
-    },
-
-    async handleLogout() {
-      try {
-        await this.authStore.logout();
-        this.notificationsStore.success('Successfully logged out');
-        this.$router.push({ name: 'landing' });
-      } catch {
-        // Even if logout fails on backend, we still clear local auth
-        // Just notify user there might have been an issue
-        if (this.authStore.error) {
-          this.notificationsStore.warning('Logged out locally. Server logout may have failed.');
-        }
-        this.$router.push({ name: 'landing' });
-      }
     },
 
     async closeWorkspace() {
