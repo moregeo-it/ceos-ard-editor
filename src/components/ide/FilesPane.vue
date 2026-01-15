@@ -92,7 +92,10 @@
 
               <!-- File Actions -->
               <template v-else>
-                <v-list-item v-if="item.status" @click="handleRevert(item)">
+                <v-list-item
+                  v-if="item.status && item.status !== 'added'"
+                  @click="handleRevert(item)"
+                >
                   <template v-slot:prepend>
                     <v-icon :icon="icons.revert" size="small" />
                   </template>
