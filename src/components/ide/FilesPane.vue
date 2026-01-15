@@ -151,9 +151,9 @@
 import { useFilesStore } from '@/stores/files';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
-import CreateFileDialog from './CreateFileDialog.vue';
-import RenameDialog from './RenameDialog.vue';
-import DeleteConfirmDialog from './DeleteConfirmDialog.vue';
+import CreateFileDialog from './dialogs/CreateFileDialog.vue';
+import RenameDialog from './dialogs/RenameDialog.vue';
+import DeleteConfirmDialog from './dialogs/DeleteConfirmDialog.vue';
 import {
   mdiFileDocumentOutline,
   mdiFolderOutline,

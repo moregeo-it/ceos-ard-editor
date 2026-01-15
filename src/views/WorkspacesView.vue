@@ -160,9 +160,9 @@ import { useAuthStore } from '@/stores/auth';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
 import WorkspaceCard from '@/components/workspace/WorkspaceCard.vue';
-import WorkspaceDialog from '@/components/workspace/WorkspaceDialog.vue';
-import ArchiveConfirmDialog from '@/components/workspace/ArchiveConfirmDialog.vue';
-import DeleteConfirmDialog from '@/components/workspace/DeleteConfirmDialog.vue';
+import WorkspaceDialog from '@/components/workspace/dialogs/WorkspaceDialog.vue';
+import ArchiveConfirmDialog from '@/components/workspace/dialogs/ArchiveConfirmDialog.vue';
+import DeleteConfirmDialog from '@/components/workspace/dialogs/DeleteConfirmDialog.vue';
 import {
   mdiFolderMultiple,
   mdiAccountCircle,
