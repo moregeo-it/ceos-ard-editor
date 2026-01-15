@@ -27,10 +27,13 @@
     ]
   },
   "dependencies": {
+    "@codemirror/lang-yaml": "^6.1.2",
     "@mdi/js": "^7.4.47",
+    "codemirror": "^6.0.2",
     "pinia": "^3.0.4",
     "splitpanes": "^4.0.4",
     "vue": "^3.5.25",
+    "vue-codemirror": "^6.1.1",
     "vue-router": "^4.6.3",
     "vuetify": "^3.11.3"
   },

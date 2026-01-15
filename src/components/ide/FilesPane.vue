@@ -11,8 +11,8 @@
         hide-details
         clearable
         :loading="filesStore.isSearchLoading"
-        @update:model-value="handleSearch"
-        @click:clear="handleClearSearch"
+        @update:model-value="search"
+        @click:clear="clearSearch"
       />
     </div>
 
@@ -23,13 +23,17 @@
       </v-alert>
 
       <v-treeview
-        v-else-if="filesStore.fileTree.length > 0"
+        v-else-if="treeItems.length > 0"
+        activatable
         :items="treeItems"
         :indent-lines="true"
         :separate-roots="true"
         density="compact"
         :load-children="loadFolder"
         open-on-click
+        item-title="name"
+        item-value="path"
+        @update:activated="openFile"
       >
         <template v-slot:prepend="{ item }">
           <v-icon :icon="getFileIcon(item)" size="small" :color="getIconColor(item)" />
@@ -157,6 +161,7 @@
 </template>
 
 <script>
+import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
@@ -207,22 +212,18 @@ export default {
   },
 
   computed: {
+    editorStore() {
+      return useEditorStore();
+    },
     filesStore() {
       return useFilesStore();
     },
-
     workspacesStore() {
       return useWorkspacesStore();
     },
-
     notificationsStore() {
       return useNotificationsStore();
     },
-
-    workspaceId() {
-      return this.workspacesStore.currentWorkspace?.id;
-    },
-
     showCreateDialog: {
       get() {
         return this.createInitialPath !== null;
@@ -233,7 +234,6 @@ export default {
         }
       },
     },
-
     showRenameDialog: {
       get() {
         return !!this.itemToRename;
@@ -244,7 +244,6 @@ export default {
         }
       },
     },
-
     showDeleteDialog: {
       get() {
         return !!this.itemToDelete;
@@ -255,9 +254,8 @@ export default {
         }
       },
     },
-
     treeItems() {
-      return this.searchQuery ? this.filesStore.searchResults : this.filesStore.fileTree;
+      return this.filesStore.searchResults ?? this.filesStore.fileTree;
     },
   },
 
@@ -278,13 +276,22 @@ export default {
 
     async loadFiles(path = '/') {
       try {
-        await this.filesStore.loadFileTree(this.workspaceId, path);
+        await this.filesStore.loadFiles(path);
       } catch (error) {
         this.notificationsStore.error(`Failed to load files: ${error.message}`);
       }
     },
 
-    handleSearch(value) {
+    openFile(activated) {
+      if (activated.length === 0) {
+        return;
+      }
+
+      const path = activated[0];
+      this.editorStore.show(path);
+    },
+
+    search(value) {
       // Clear existing timeout
       if (this.searchDebounce) {
         clearTimeout(this.searchDebounce);
@@ -293,25 +300,21 @@ export default {
       // Debounce search to avoid too many requests
       this.searchDebounce = setTimeout(async () => {
         if (!value || !value.trim()) {
-          await this.loadFiles();
+          this.clearSearch();
           return;
         }
 
         try {
-          await this.filesStore.searchFiles(this.workspaceId, value);
+          await this.filesStore.searchFiles(value);
         } catch (error) {
           this.notificationsStore.error(`Search failed: ${error.message}`);
         }
       }, 300);
     },
 
-    async handleClearSearch() {
+    async clearSearch() {
       this.searchQuery = '';
-      await this.loadFiles();
-    },
-
-    async refreshTree() {
-      await this.loadFiles();
+      this.filesStore.searchResults = null;
     },
 
     getFileIcon(item) {
@@ -350,7 +353,7 @@ export default {
 
     async handleCreate({ type, path, name }) {
       try {
-        await this.filesStore.createFile(this.workspaceId, path, name, type);
+        await this.filesStore.createFile(path, name, type);
 
         this.notificationsStore.success(
           `${type === 'folder' ? 'Folder' : 'File'} created successfully`,
@@ -369,7 +372,7 @@ export default {
       if (!this.itemToRename) return;
 
       try {
-        await this.filesStore.renameFile(this.workspaceId, this.itemToRename.path, newName);
+        await this.filesStore.renameFile(this.itemToRename.path, newName);
         this.notificationsStore.success('Renamed successfully');
       } catch (error) {
         this.notificationsStore.error(`Failed to rename: ${error.message}`);
@@ -386,7 +389,7 @@ export default {
       if (!this.itemToDelete) return;
 
       try {
-        await this.filesStore.deleteFile(this.workspaceId, this.itemToDelete.path);
+        await this.filesStore.deleteFile(this.itemToDelete.path);
         this.notificationsStore.success('Deleted successfully');
         this.itemToDelete = null;
       } catch (error) {
@@ -398,7 +401,7 @@ export default {
 
     async handleRevert(item) {
       try {
-        await this.filesStore.revertFile(this.workspaceId, item.path);
+        await this.filesStore.revertFile(item.path);
         this.notificationsStore.success('File reverted successfully');
       } catch (error) {
         this.notificationsStore.error(`Failed to revert: ${error.message}`);
