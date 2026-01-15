@@ -176,7 +176,7 @@ export default {
       workspaceToArchive: null,
       showDeleteDialog: false,
       workspaceToDelete: null,
-      filter: 'all', // 'all', 'active', 'archived'
+      filter: 'active', // 'all', 'active', 'archived'
     };
   },
 
