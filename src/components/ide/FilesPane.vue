@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="pa-2 d-flex flex-column">
+  <div class="d-flex flex-column fill-height">
     <!-- Search Input -->
     <div class="px-2 pt-2">
       <v-text-field
@@ -16,14 +16,15 @@
       />
     </div>
 
-    <!-- File Tree -->
-    <div class="file-tree-container flex-grow-1 px-2 pt-2">
-      <v-alert v-if="filesStore.error" type="error" variant="tonal" class="ma-2">
-        {{ filesStore.error }}
-      </v-alert>
+    <v-alert v-if="filesStore.error" type="error" variant="tonal" class="ma-2">
+      {{ filesStore.error }}
+    </v-alert>
 
+    <!-- File Tree -->
+    <div class="flex-grow-1 overflow-hidden pa-0 fill-height">
       <v-treeview
-        v-else-if="treeItems.length > 0"
+        v-if="treeItems.length > 0"
+        class="fill-height"
         activatable
         :items="treeItems"
         :indent-lines="true"
@@ -157,7 +158,7 @@
       :item-type="itemToDelete?.type"
       @confirm="handleDeleteConfirm"
     />
-  </v-container>
+  </div>
 </template>
 
 <script>
@@ -412,10 +413,6 @@ export default {
 </script>
 
 <style scoped>
-.file-tree-container {
-  overflow-y: auto;
-}
-
 .file-item {
   user-select: none;
 }

@@ -1,8 +1,9 @@
 <template>
-  <v-container fluid class="pa-0">
+  <div class="d-flex flex-column fill-height">
     <template v-if="activeFile">
       <v-tabs
         v-model="model"
+        class="editor-tabs"
         bg-color="grey-lighten-3"
         color="primary"
         density="compact"
@@ -25,8 +26,13 @@
         </v-tab>
       </v-tabs>
 
-      <v-tabs-window v-model="model" crossfade>
-        <v-tabs-window-item v-for="file in openedFiles" :key="file.path" :value="file.path">
+      <v-tabs-window v-model="model" crossfade class="editor-content flex-grow-1">
+        <v-tabs-window-item
+          v-for="file in openedFiles"
+          :key="file.path"
+          :value="file.path"
+          class="fill-height"
+        >
           <v-container
             v-if="!editorStore.data[file.path]"
             class="fill-height d-flex align-center justify-center"
@@ -34,7 +40,6 @@
             <v-progress-circular indeterminate color="primary" size="64" />
           </v-container>
           <component
-            v-else
             :is="editorType"
             v-model="editorStore.data[file.path]"
             :file="file"
@@ -43,13 +48,11 @@
         </v-tabs-window-item>
       </v-tabs-window>
     </template>
-    <v-row v-else class="fill-height pa-4" justify="center">
-      <v-col class="text-center">
-        <div class="text-h6">No file is currently opened.</div>
-        <div class="text-subtitle-1 mt-2">Please open a file to start editing.</div>
-      </v-col>
-    </v-row>
-  </v-container>
+    <div v-else class="fill-height d-flex flex-column align-center justify-center">
+      <div class="text-h6 text-grey">No file is currently opened.</div>
+      <div class="text-subtitle-1 text-grey mt-2">Please open a file to start editing.</div>
+    </div>
+  </div>
 </template>
 
 <script>
@@ -106,3 +109,12 @@ export default {
   },
 };
 </script>
+
+<style lang="css" scoped>
+.editor-tabs {
+  min-height: var(--v-tabs-height);
+}
+:deep(.editor-content > .v-window__container) {
+  height: 100%;
+}
+</style>

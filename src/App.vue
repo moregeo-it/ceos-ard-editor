@@ -1,21 +1,19 @@
 <template>
-  <v-app>
-    <router-view />
+  <router-view />
 
-    <!-- Global Snackbar -->
-    <v-snackbar
-      v-model="notificationsStore.show"
-      :color="snackbarColor"
-      :timeout="notificationsStore.timeout"
-      location="bottom end"
-      multi-line
-    >
-      {{ notificationsStore.message }}
-      <template v-slot:actions>
-        <v-btn color="white" variant="outlined" @click="notificationsStore.hide()"> Close </v-btn>
-      </template>
-    </v-snackbar>
-  </v-app>
+  <!-- Global Snackbar -->
+  <v-snackbar
+    v-model="notificationsStore.show"
+    :color="snackbarColor"
+    :timeout="notificationsStore.timeout"
+    location="bottom end"
+    multi-line
+  >
+    {{ notificationsStore.message }}
+    <template v-slot:actions>
+      <v-btn color="white" variant="outlined" @click="notificationsStore.hide()"> Close </v-btn>
+    </template>
+  </v-snackbar>
 </template>
 
 <script>

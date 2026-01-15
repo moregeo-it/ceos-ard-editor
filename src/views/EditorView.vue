@@ -1,5 +1,5 @@
 <template>
-  <v-app>
+  <v-app id="editor">
     <!-- Top Navigation Bar -->
     <v-app-bar color="primary" elevation="2">
       <!-- Workspace Name -->
@@ -192,6 +192,14 @@ export default {
 <style>
 @import '../../node_modules/splitpanes/dist/splitpanes.css';
 
+#editor,
+#editor > * {
+  height: 100vh !important;
+}
+#editor .v-main {
+  height: calc(100vh - var(--v-layout-top)) !important;
+}
+
 .splitpanes .splitpanes__splitter {
   background-color: rgba(var(--v-border-color), var(--v-border-opacity));
   min-width: 4px;
@@ -205,13 +213,10 @@ export default {
 </style>
 
 <style scoped>
-.files {
-  overflow: auto;
-}
-.editor {
-  overflow: auto;
-}
+.files,
+.editor,
 .preview {
-  overflow: auto;
+  max-height: 100%;
+  overflow: hidden;
 }
 </style>
