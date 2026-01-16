@@ -4,7 +4,6 @@
       <v-tabs
         v-model="model"
         class="editor-tabs"
-        density="compact"
         mandatory
         center-active
         scroll-to-active
