@@ -68,7 +68,7 @@
               {{ item.status }}
             </v-chip>
           </div>
-          <div class="text-caption text-pre-wrap text-grey-darken-1">
+          <div class="text-caption text-pre-wrap text-subtle">
             {{ item.excerpt }}
           </div>
         </template>
@@ -135,8 +135,8 @@
       </div>
 
       <div v-else class="empty-state text-center pa-4">
-        <v-icon :icon="icons.folder" size="48" color="grey-lighten-1" />
-        <p class="text-grey-lighten-1 mt-2">No files found</p>
+        <v-icon :icon="icons.folder" size="48" class="text-subtle" />
+        <p class="text-subtle mt-2">No files found</p>
       </div>
     </div>
 

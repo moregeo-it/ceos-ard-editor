@@ -63,8 +63,8 @@
         <!-- Empty State -->
         <v-row v-else-if="filteredWorkspaces.length === 0">
           <v-col cols="12">
-            <v-card class="pa-8 text-center" variant="outlined">
-              <v-icon :icon="icons.folderOff" size="64" color="grey" class="mb-4"></v-icon>
+            <v-card class="pa-8 text-center text-subtle" variant="outlined">
+              <v-icon :icon="icons.folderOff" size="64" class="mb-4"></v-icon>
               <h3 class="text-h6 mb-2">No workspaces found</h3>
               <p class="text-body-2 text-medium-emphasis mb-4">
                 {{

@@ -44,4 +44,13 @@ export default {
 :root {
   --ceos-primary: #3e5265;
 }
+.text-subtle {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+  .text-subtle {
+    color: rgba(255, 255, 255, 0.6);
+  }
+}
 </style>

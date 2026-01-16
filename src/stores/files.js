@@ -202,17 +202,15 @@ export const useFilesStore = defineStore('files', {
     },
 
     /**
-     * Save file content (placeholder - needs editor integration)
+     * Save file content
      */
     async save(filePath, content) {
-      const workspaceId = workspaces.currentWorkspace.id;
-      try {
-        const fileData = await fileService.saveFile(workspaceId, filePath, content);
-        this.updateFile(fileData);
-      } catch (error) {
-        this.error = error.message;
-        throw error;
-      }
+      const fileData = await fileService.saveFile(
+        workspaces.currentWorkspace.id,
+        filePath,
+        content,
+      );
+      this.updateFile(fileData);
     },
 
     /**
