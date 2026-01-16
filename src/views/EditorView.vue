@@ -1,5 +1,5 @@
 <template>
-  <v-app>
+  <v-app id="editor">
     <!-- Top Navigation Bar -->
     <v-app-bar color="primary" elevation="2">
       <!-- Workspace Name -->
@@ -46,65 +46,36 @@
           <FilesPane />
         </pane>
         <pane class="editor" min-size="30" :size="panelSizes.editor">
-          <EditorPane>
-            <template #message>
-              <!-- Archived Workspace Banner -->
-              <v-alert
-                v-if="isArchived"
-                type="warning"
-                variant="tonal"
-                prominent
-                class="mb-4"
-                :icon="icons.alert"
-              >
-                <v-alert-title>This workspace is archived (Read-Only)</v-alert-title>
-                <div class="mt-2">
-                  You are viewing this workspace in read-only mode.
-                  <strong>Activate it to make changes or propose updates.</strong>
-                </div>
-                <template v-if="workspace?.deletion_at">
-                  <div class="mt-2 text-caption">
-                    Scheduled for deletion on:
-                    <strong>{{ new Date(workspace.deletion_at).toLocaleDateString() }}</strong>
-                  </div>
-                </template>
-                <template v-slot:append>
-                  <v-btn
-                    color="success"
-                    variant="elevated"
-                    :prepend-icon="icons.activate"
-                    @click="handleToggleStatus"
-                  >
-                    Activate Now
-                  </v-btn>
-                </template>
-              </v-alert>
-            </template>
-          </EditorPane>
+          <EditorPane />
         </pane>
         <pane class="preview" min-size="0" :size="panelSizes.preview">
           <PreviewPane />
         </pane>
       </splitpanes>
+
+      <ArchivedDialog v-if="isArchived" :workspace="workspace" @activate="handleToggleStatus" />
     </v-main>
   </v-app>
 </template>
 
 <script>
 import { useAuthStore } from '@/stores/auth';
+import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
-import { mdiCheckCircle, mdiAlert, mdiPackageUp, mdiClose } from '@mdi/js';
+import { mdiCheckCircle, mdiMenuDown, mdiClose } from '@mdi/js';
 import EditorPane from '@/components/ide/EditorPane.vue';
 import FilesPane from '@/components/ide/FilesPane.vue';
 import PreviewPane from '@/components/ide/PreviewPane.vue';
 import UserMenu from '@/components/workspace/UserMenu.vue';
+import ArchivedDialog from '@/components/ide/dialogs/ArchivedDialog.vue';
 import { Splitpanes, Pane } from 'splitpanes';
 
 export default {
   name: 'EditorView',
   components: {
+    ArchivedDialog,
     EditorPane,
     FilesPane,
     Pane,
@@ -122,8 +93,7 @@ export default {
     return {
       icons: {
         propose: mdiCheckCircle,
-        activate: mdiPackageUp,
-        alert: mdiAlert,
+        menuDown: mdiMenuDown,
         close: mdiClose,
       },
       panelSizeDefaults: panelSizeDefaults,
@@ -146,6 +116,10 @@ export default {
 
     authStore() {
       return useAuthStore();
+    },
+
+    editorStore() {
+      return useEditorStore();
     },
 
     filesStore() {
@@ -202,12 +176,13 @@ export default {
 
     handlePropose() {
       // TODO: Implement propose functionality
-      console.log('Propose workspace:', this.workspaceId);
+      alert('Propose workspace feature is not implemented yet.');
     },
 
     async closeWorkspace() {
       this.notificationsStore.reset();
       this.filesStore.reset();
+      this.editorStore.reset();
       this.$router.push({ name: 'workspaces' });
     },
   },
@@ -216,6 +191,14 @@ export default {
 
 <style>
 @import '../../node_modules/splitpanes/dist/splitpanes.css';
+
+#editor,
+#editor > * {
+  height: 100vh !important;
+}
+#editor .v-main {
+  height: calc(100vh - var(--v-layout-top)) !important;
+}
 
 .splitpanes .splitpanes__splitter {
   background-color: rgba(var(--v-border-color), var(--v-border-opacity));
@@ -230,13 +213,10 @@ export default {
 </style>
 
 <style scoped>
-.files {
-  overflow: auto;
-}
-.editor {
-  overflow: auto;
-}
+.files,
+.editor,
 .preview {
-  overflow: auto;
+  max-height: 100%;
+  overflow: hidden;
 }
 </style>
