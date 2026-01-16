@@ -69,12 +69,15 @@ export const useFilesStore = defineStore('files', {
         return; // Already loaded
       }
       try {
+        this.isPathLoading.push(path);
         const context = await fileService.loadFileContext(workspaces.currentWorkspace.id, path);
         this.all[path] = context;
         return context;
       } catch (error) {
         this.error = error.message;
         throw error;
+      } finally {
+        this.resetPathLoading(path);
       }
     },
     /**
@@ -94,10 +97,14 @@ export const useFilesStore = defineStore('files', {
         this.error = error.message;
         throw error;
       } finally {
-        const ix = this.isPathLoading.indexOf(path);
-        if (ix !== -1) {
-          this.isPathLoading.splice(ix, 1);
-        }
+        this.resetPathLoading(path);
+      }
+    },
+
+    resetPathLoading(path) {
+      const ix = this.isPathLoading.indexOf(path);
+      if (ix !== -1) {
+        this.isPathLoading.splice(ix, 1);
       }
     },
 
