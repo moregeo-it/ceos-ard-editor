@@ -1,22 +1,18 @@
 <template>
   <div class="d-flex flex-column fill-height">
-    <div class="pa-2 d-flex align-center border-b">
-      <span class="text-subtitle-1 font-weight-medium">Preview</span>
-
-      <v-spacer></v-spacer>
-
+    <div class="pa-2 pt-3 d-flex align-center border-b-sm">
       <v-select
         v-model="selectedPfs"
         :items="pfsOptions"
-        label="Select PFS"
+        label="Select PFS for Preview"
         multiple
         chips
         density="compact"
         variant="outlined"
         hide-details
-        clearable
-        class="preview-select mr-2"
+        class="preview-select mr-2 flex-grow-1"
         :prepend-inner-icon="icons.product"
+        @update:focused="handleSelect"
       >
         <template v-slot:chip="{ item, props }">
           <v-chip v-bind="props" size="small">
@@ -24,17 +20,6 @@
           </v-chip>
         </template>
       </v-select>
-
-      <v-btn
-        color="primary"
-        variant="elevated"
-        density="comfortable"
-        :prepend-icon="icons.generate"
-        :loading="isGenerating"
-        @click="handleGenerate"
-      >
-        Generate
-      </v-btn>
     </div>
 
     <div class="flex-grow-1 pa-4">
@@ -44,8 +29,7 @@
 
       <v-alert v-else-if="!previewHtml" type="info" variant="tonal">
         <div v-if="!hasGenerated">
-          Click "Generate" to create a preview using the workspace's PFS, or select specific PFS
-          types above.
+          Select at least one PFS from the list above to create a preview.
         </div>
         <div v-else>No preview generated. Please try again.</div>
       </v-alert>
@@ -71,7 +55,7 @@ import { useEditorStore } from '@/stores/editor';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import previewService from '@/services/preview.service';
-import { mdiFileDocumentOutline, mdiAutoFix } from '@mdi/js';
+import { mdiFileDocumentOutline } from '@mdi/js';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -81,9 +65,9 @@ export default {
     return {
       icons: {
         product: mdiFileDocumentOutline,
-        generate: mdiAutoFix,
       },
       selectedPfs: [],
+      oldSelectedPfs: null,
       previewHtml: '',
       isGenerating: false,
       hasGenerated: false,
@@ -91,6 +75,9 @@ export default {
         value: { x: 0, y: 0 },
       },
     };
+  },
+  created() {
+    this.selectedPfs = this.workspacesStore.currentWorkspace.pfs;
   },
   computed: {
     authStore() {
@@ -106,7 +93,7 @@ export default {
       return useWorkspacesStore();
     },
     workspaceId() {
-      return this.workspacesStore.currentWorkspace?.id;
+      return this.workspacesStore?.currentWorkspace?.id;
     },
     pfsOptions() {
       return this.workspacesStore?.pfsOptions || [];
@@ -229,12 +216,19 @@ export default {
 
       return doc;
     },
-    async handleGenerate() {
-      await this.generatePreview(this.selectedPfs.length > 0 ? this.selectedPfs : null);
+    async handleSelect(focus) {
+      if (focus) {
+        this.oldSelectedPfs = this.selectedPfs;
+        return;
+      }
+      if (this.oldSelectedPfs === this.selectedPfs) {
+        return;
+      }
+      await this.generatePreview(this.selectedPfs);
+      this.oldSelectedPfs = null;
     },
     async generatePreview(pfs = []) {
-      if (!this.workspaceId) {
-        this.notificationsStore.error('No workspace loaded');
+      if (pfs.length === 0) {
         return;
       }
       this.isGenerating = true;
@@ -250,14 +244,3 @@ export default {
   },
 };
 </script>
-
-<style scoped>
-.border-b {
-  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-}
-
-.preview-select {
-  max-width: 350px;
-  min-width: 250px;
-}
-</style>
