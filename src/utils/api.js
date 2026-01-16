@@ -89,6 +89,11 @@ function parseErrorMessage(errorData, status) {
  * Helper methods for common HTTP methods
  */
 export const api = {
+  async getText(endpoint, options = {}) {
+    const response = await fetchWithAuth(endpoint, { ...options, method: 'GET' });
+    return response.text();
+  },
+
   async get(endpoint, options = {}) {
     const response = await fetchWithAuth(endpoint, { ...options, method: 'GET' });
     return response.json();
@@ -103,13 +108,17 @@ export const api = {
     return response.json();
   },
 
-  async put(endpoint, data, options = {}) {
+  async putRaw(endpoint, body, options = {}) {
     const response = await fetchWithAuth(endpoint, {
       ...options,
       method: 'PUT',
-      body: JSON.stringify(data),
+      body,
     });
     return response.json();
+  },
+
+  async put(endpoint, data, options = {}) {
+    return await api.putRaw(endpoint, JSON.stringify(data), options);
   },
 
   async patch(endpoint, data, options = {}) {

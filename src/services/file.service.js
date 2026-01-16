@@ -44,12 +44,17 @@ export default {
   },
 
   /**
+   * Load the file content of a file
+   */
+  async loadFile(workspaceId, filePath) {
+    return api.getText(`/workspaces/${workspaceId}/files/${encodeURIComponent(filePath)}`);
+  },
+
+  /**
    * Save file content
    */
   async saveFile(workspaceId, filePath, content) {
-    return api.put(`/workspaces/${workspaceId}/files/${encodeURIComponent(filePath)}`, {
-      content,
-    });
+    return api.putRaw(`/workspaces/${workspaceId}/files/${encodeURIComponent(filePath)}`, content);
   },
 
   /**
