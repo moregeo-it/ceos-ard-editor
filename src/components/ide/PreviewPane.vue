@@ -51,9 +51,9 @@
       </v-alert>
 
       <!-- Preview Document -->
-      <!-- <div v-else>
-        <div v-html="previewHtml"></div>
-      </div> -->
+      <div v-else class="fill-height">
+        <PreviewHtmlRenderer v-if="previewHtml" :html="previewHtml" />
+      </div>
     </div>
   </div>
 </template>
@@ -63,10 +63,13 @@ import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
 import previewService from '@/services/preview.service';
 import { mdiFileDocumentOutline, mdiAutoFix } from '@mdi/js';
+import PreviewHtmlRenderer from './PreviewHtmlRenderer.vue';
 
 export default {
   name: 'PreviewPane',
-
+  components: {
+    PreviewHtmlRenderer,
+  },
   data() {
     return {
       icons: {
@@ -79,40 +82,32 @@ export default {
       hasGenerated: false,
     };
   },
-
   computed: {
     workspacesStore() {
       return useWorkspacesStore();
     },
-
     notificationsStore() {
       return useNotificationsStore();
     },
-
     pfsOptions() {
       return this.workspacesStore.pfsOptions || [];
     },
-
     workspaceId() {
       return this.workspacesStore.currentWorkspace?.id;
     },
   },
-
   async mounted() {
     await this.generatePreview();
   },
-
   methods: {
     async handleGenerate() {
       await this.generatePreview(this.selectedPfs.length > 0 ? this.selectedPfs : null);
     },
-
     async generatePreview(pfs = []) {
       if (!this.workspaceId) {
         this.notificationsStore.error('No workspace loaded');
         return;
       }
-
       this.isGenerating = true;
       try {
         this.previewHtml = await previewService.generatePreview(this.workspaceId, pfs);

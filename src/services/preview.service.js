@@ -13,4 +13,9 @@ export default {
     }
     return api.get(url);
   },
+
+  async getPreviewStaticFile(workspaceId, filePath) {
+    const url = `/workspaces/${workspaceId}/previews/${encodeURIComponent(filePath)}`;
+    return api.get(url);
+  },
 };
