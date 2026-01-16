@@ -1,6 +1,5 @@
 <template>
-  <v-container fluid class="pa-0 d-flex flex-column">
-    <!-- Header with PFS Selector -->
+  <div class="d-flex flex-column fill-height">
     <div class="pa-2 d-flex align-center border-b">
       <span class="text-subtitle-1 font-weight-medium">Preview</span>
 
@@ -38,14 +37,11 @@
       </v-btn>
     </div>
 
-    <!-- Preview Content -->
-    <div class="flex-grow-1 pa-4 preview-content">
-      <!-- Loading State -->
+    <div class="flex-grow-1 pa-4">
       <div v-if="isGenerating" class="text-center pa-8">
         <v-progress-circular indeterminate color="primary" size="64" />
       </div>
 
-      <!-- Empty State -->
       <v-alert v-else-if="!previewHtml" type="info" variant="tonal">
         <div v-if="!hasGenerated">
           Click "Generate" to create a preview using the workspace's PFS, or select specific PFS
@@ -55,8 +51,11 @@
       </v-alert>
 
       <!-- Preview Document -->
+      <!-- <div v-else>
+        <div v-html="previewHtml"></div>
+      </div> -->
     </div>
-  </v-container>
+  </div>
 </template>
 
 <script>
@@ -136,30 +135,5 @@ export default {
 .preview-select {
   max-width: 350px;
   min-width: 250px;
-}
-
-.preview-content {
-  overflow-y: auto;
-}
-
-.preview-html {
-  max-height: 600px;
-  overflow-y: auto;
-}
-
-.preview-html :deep(img) {
-  max-width: 100%;
-  height: auto;
-}
-
-.preview-html :deep(table) {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.preview-html :deep(table td),
-.preview-html :deep(table th) {
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  padding: 8px;
 }
 </style>
