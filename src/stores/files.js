@@ -64,13 +64,28 @@ export const useFilesStore = defineStore('files', {
   },
 
   actions: {
+    async loadFileContext(path, force = false) {
+      if (Array.isArray(this.all[path]) && typeof this.all[path].usage !== 'undefined' && !force) {
+        return this.all[path]; // Already loaded
+      }
+      try {
+        this.isPathLoading.push(path);
+        const context = await fileService.loadFileContext(workspaces.currentWorkspace.id, path);
+        this.all[path] = context;
+        return context;
+      } catch (error) {
+        this.error = error.message;
+        throw error;
+      } finally {
+        this.resetPathLoading(path);
+      }
+    },
     /**
      * Load files from server and build tree structure
      */
     async loadFiles(path = '/', force = false) {
       if (Array.isArray(this.folders[path]) && !force) {
-        // Already loaded
-        return;
+        return; // Already loaded
       }
       const workspaceId = workspaces.currentWorkspace.id;
       this.isPathLoading.push(path);
@@ -82,10 +97,14 @@ export const useFilesStore = defineStore('files', {
         this.error = error.message;
         throw error;
       } finally {
-        const ix = this.isPathLoading.indexOf(path);
-        if (ix !== -1) {
-          this.isPathLoading.splice(ix, 1);
-        }
+        this.resetPathLoading(path);
+      }
+    },
+
+    resetPathLoading(path) {
+      const ix = this.isPathLoading.indexOf(path);
+      if (ix !== -1) {
+        this.isPathLoading.splice(ix, 1);
       }
     },
 
@@ -164,10 +183,18 @@ export const useFilesStore = defineStore('files', {
       }
     },
 
-    async load(filePath) {
-      const workspaceId = workspaces.currentWorkspace.id;
+    async loadContext(filePath) {
       try {
-        return await fileService.loadFile(workspaceId, filePath);
+        return await fileService.loadFile(workspaces.currentWorkspace.id, filePath);
+      } catch (error) {
+        this.error = error.message;
+        throw error;
+      }
+    },
+
+    async load(filePath) {
+      try {
+        return await fileService.loadFile(workspaces.currentWorkspace.id, filePath);
       } catch (error) {
         this.error = error.message;
         throw error;

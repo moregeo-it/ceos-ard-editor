@@ -72,12 +72,13 @@ import { useEditorStore } from '@/stores/editor';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { defineAsyncComponent } from 'vue';
 import { mdiClose } from '@mdi/js';
+import SourceCodeEditor from './editors/SourceCodeEditor.vue';
 
 export default {
   name: 'EditorPane',
 
   components: {
-    SourceCodeEditor: defineAsyncComponent(() => import('./editors/SourceCodeEditor.vue')),
+    SourceCodeEditor,
     PfsDocumentEditor: defineAsyncComponent(() => import('./editors/PfsDocumentEditor.vue')),
   },
 

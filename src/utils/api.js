@@ -96,6 +96,10 @@ export const api = {
 
   async get(endpoint, options = {}) {
     const response = await fetchWithAuth(endpoint, { ...options, method: 'GET' });
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) {
+      return response.text();
+    }
     return response.json();
   },
 
