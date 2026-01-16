@@ -47,7 +47,7 @@ export default {
    * Load the file content of a file
    */
   async loadFileContext(workspaceId, filePath) {
-    return api.getText(`/workspaces/${workspaceId}/files/${encodeURIComponent(filePath)}/context`);
+    return api.get(`/workspaces/${workspaceId}/context/${encodeURIComponent(filePath)}`);
   },
 
   /**

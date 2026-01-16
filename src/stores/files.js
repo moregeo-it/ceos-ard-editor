@@ -66,7 +66,7 @@ export const useFilesStore = defineStore('files', {
   actions: {
     async loadFileContext(path, force = false) {
       if (Array.isArray(this.all[path]) && typeof this.all[path].usage !== 'undefined' && !force) {
-        return; // Already loaded
+        return this.all[path]; // Already loaded
       }
       try {
         this.isPathLoading.push(path);
