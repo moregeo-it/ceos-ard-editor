@@ -7,19 +7,11 @@
             <v-card elevation="0" class="pa-8 pa-md-12">
               <v-row align="center">
                 <!-- Left side - Logo and branding -->
-                <v-col cols="12" md="6" class="text-center text-md-left">
+                <v-col cols="12" md="6" class="text-center">
                   <!-- CEOS Logo -->
-                  <div class="mb-6">
-                    <img
-                      :src="ceosLogo"
-                      alt="CEOS Analysis Ready Data"
-                      style="max-width: 200px; width: 100%; height: auto"
-                    />
-                  </div>
+                  <img :src="ceosLogo" alt="CEOS Analysis Ready Data" class="logo" />
 
-                  <h1 class="text-h4 font-weight-bold mb-3" style="color: var(--ceos-primary)">
-                    CEOS-ARD Editor
-                  </h1>
+                  <h1 class="text-h4 font-weight-bold mt-6 mb-3">CEOS-ARD Editor</h1>
 
                   <p class="text-body-1 text-medium-emphasis">
                     Collaborative Product Specification Editor for<br class="d-none d-md-inline" />
@@ -29,11 +21,9 @@
 
                 <!-- Right side - Login buttons -->
                 <v-col cols="12" md="6" class="d-flex flex-column align-center">
-                  <div style="max-width: 360px; width: 100%">
-                    <p class="text-h6 mb-6 text-center">Sign in to get started</p>
+                  <p class="text-h6 mb-6 text-center">Sign in to get started</p>
 
-                    <LoginButton provider="github" @click="handleGitHubLogin" />
-                  </div>
+                  <LoginButton provider="github" @click="handleGitHubLogin" />
                 </v-col>
               </v-row>
             </v-card>
@@ -127,3 +117,19 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+h1 {
+  color: var(--ceos-primary);
+}
+@media (prefers-color-scheme: dark) {
+  h1 {
+    color: white;
+  }
+}
+.logo {
+  max-width: 200px;
+  width: 100%;
+  height: auto;
+}
+</style>

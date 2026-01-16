@@ -7,7 +7,7 @@
     :loading="loading"
     elevation="2"
     class="text-none"
-    @click="handleClick"
+    @click="$emit('click')"
   >
     <span :style="{ color: buttonConfig.textColor }">
       {{ buttonConfig.label }}
@@ -47,17 +47,11 @@ export default {
         google: {
           label: 'Continue with Google',
           icon: mdiGoogle,
-          color: '#4285f4',
+          color: '#4285F4',
           textColor: 'white',
         },
       };
       return configs[this.provider];
-    },
-  },
-
-  methods: {
-    handleClick() {
-      this.$emit('click');
     },
   },
 };
