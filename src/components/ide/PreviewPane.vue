@@ -224,16 +224,16 @@ export default {
       if (this.oldSelectedPfs === this.selectedPfs) {
         return;
       }
-      await this.generatePreview(this.selectedPfs);
+      await this.generatePreview();
       this.oldSelectedPfs = null;
     },
-    async generatePreview(pfs = []) {
-      if (pfs.length === 0) {
+    async generatePreview() {
+      if (this.selectedPfs.length === 0) {
         return;
       }
       this.isGenerating = true;
       try {
-        this.previewHtml = await previewService.generatePreview(this.workspaceId, pfs);
+        this.previewHtml = await previewService.generatePreview(this.workspaceId, this.selectedPfs);
       } catch (error) {
         this.notificationsStore.error(`Failed to generate preview: ${error.message}`);
         this.previewHtml = '';
