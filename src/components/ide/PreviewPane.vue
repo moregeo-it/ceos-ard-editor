@@ -51,25 +51,32 @@
       </v-alert>
 
       <!-- Preview Document -->
-      <div v-else class="fill-height">
-        <PreviewHtmlRenderer v-if="previewHtml" :html="previewHtml" />
+      <div v-show="!isGenerating && previewHtml" class="fill-height">
+        <iframe
+          ref="iframe"
+          class="preview-iframe"
+          frameborder="0"
+          width="100%"
+          height="100%"
+          sandbox="allow-same-origin"
+        ></iframe>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { useWorkspacesStore } from '@/stores/workspaces';
+import { useAuthStore } from '@/stores/auth';
+import { useEditorStore } from '@/stores/editor';
 import { useNotificationsStore } from '@/stores/notifications';
+import { useWorkspacesStore } from '@/stores/workspaces';
 import previewService from '@/services/preview.service';
 import { mdiFileDocumentOutline, mdiAutoFix } from '@mdi/js';
-import PreviewHtmlRenderer from './PreviewHtmlRenderer.vue';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export default {
   name: 'PreviewPane',
-  components: {
-    PreviewHtmlRenderer,
-  },
   data() {
     return {
       icons: {
@@ -80,26 +87,148 @@ export default {
       previewHtml: '',
       isGenerating: false,
       hasGenerated: false,
+      scrollPosition: {
+        value: { x: 0, y: 0 },
+      },
     };
   },
   computed: {
-    workspacesStore() {
-      return useWorkspacesStore();
+    authStore() {
+      return useAuthStore();
+    },
+    editorStore() {
+      return useEditorStore();
     },
     notificationsStore() {
       return useNotificationsStore();
     },
-    pfsOptions() {
-      return this.workspacesStore.pfsOptions || [];
+    workspacesStore() {
+      return useWorkspacesStore();
     },
     workspaceId() {
       return this.workspacesStore.currentWorkspace?.id;
+    },
+    pfsOptions() {
+      return this.workspacesStore?.pfsOptions || [];
     },
   },
   async mounted() {
     await this.generatePreview();
   },
+  watch: {
+    previewHtml() {
+      this.updateIframeContent();
+    },
+  },
   methods: {
+    updateIframeContent() {
+      const previewFrame = this.$refs.iframe;
+      console.log(previewFrame);
+      if (!previewFrame) {
+        return;
+      }
+
+      const iframe = previewFrame;
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+
+      // Save current scroll position before updating content
+      if (iframe.contentWindow) {
+        this.scrollPosition = {
+          x: iframe.contentWindow.scrollX,
+          y: iframe.contentWindow.scrollY,
+        };
+      }
+
+      // Write content to iframe
+      iframeDoc.open();
+      iframeDoc.write(this.previewHtml);
+      iframeDoc.close();
+
+      // Fix relative URLs in the iframe content
+      this.enhanceHtml(iframeDoc);
+
+      // Restore scroll position after content has been updated and rendered
+      setTimeout(() => {
+        if (iframe.contentWindow) {
+          iframe.contentWindow.scrollTo(this.scrollPosition.x, this.scrollPosition.y);
+        }
+      }, 100);
+    },
+    enhanceHtml(doc) {
+      const token = this.authStore.accessToken;
+
+      // Fix relative links
+      const links = doc.querySelectorAll('a[href]');
+      links.forEach((link) => {
+        const href = link.getAttribute('href');
+        if (href && !href.startsWith('http') && !href.startsWith('#')) {
+          link.setAttribute(
+            'href',
+            `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${href}?authorization=${token}`,
+          );
+        }
+      });
+
+      // Fix relative images
+      const images = doc.querySelectorAll('img[src]');
+      images.forEach((img) => {
+        const src = img.getAttribute('src');
+        if (src && !src.startsWith('http')) {
+          img.setAttribute(
+            'src',
+            `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${src}?authorization=${token}`,
+          );
+        }
+      });
+
+      // Fix relative stylesheets
+      const stylesheets = doc.querySelectorAll('link[rel="stylesheet"]');
+      stylesheets.forEach((sheet) => {
+        const href = sheet.getAttribute('href');
+        if (href && !href.startsWith('http')) {
+          sheet.setAttribute(
+            'href',
+            `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${href}?authorization=${token}`,
+          );
+        }
+      });
+
+      // Make Edit buttons clickable
+      const editBtns = doc.querySelectorAll('button[class="edit"]');
+      editBtns.forEach((btn) => {
+        const href = btn.getAttribute('value');
+        if (href) {
+          btn.addEventListener('click', () => {
+            this.editorStore
+              .show(href)
+              .catch((error) => console.error('Error opening file in editor:', error));
+          });
+          btn.addEventListener('mouseover', () => {
+            btn.style.backgroundColor = '#0069d9';
+          });
+          btn.addEventListener('focus', () => {
+            btn.style.backgroundColor = '#0069d9';
+          });
+          btn.addEventListener('mouseout', () => {
+            btn.style.backgroundColor = '#007bff';
+          });
+          btn.addEventListener('blur', () => {
+            btn.style.backgroundColor = '#007bff';
+          });
+          btn.style.float = 'right';
+          btn.style.margin = `0 0 0.5rem 0.5rem`;
+          btn.style.padding = '0.3rem 0.8rem';
+          btn.style.backgroundColor = '#007bff';
+          btn.style.color = 'white';
+          btn.style.border = 0;
+          btn.style.borderRadius = '4px';
+          btn.style.cursor = 'pointer';
+          btn.style.transition = 'all 0.2s ease';
+        }
+      });
+
+      return doc;
+    },
     async handleGenerate() {
       await this.generatePreview(this.selectedPfs.length > 0 ? this.selectedPfs : null);
     },

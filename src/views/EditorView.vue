@@ -1,10 +1,10 @@
 <template>
-  <v-app id="editor">
+  <v-app v-if="workspace" id="editor">
     <!-- Top Navigation Bar -->
     <v-app-bar color="primary" elevation="2">
       <!-- Workspace Name -->
       <v-app-bar-title>
-        {{ workspace?.title || 'Loading...' }}
+        {{ workspace.title }}
       </v-app-bar-title>
 
       <!-- Action Buttons -->
@@ -56,6 +56,9 @@
       <ArchivedDialog v-if="isArchived" :workspace="workspace" @activate="handleToggleStatus" />
     </v-main>
   </v-app>
+  <v-container v-else class="fill-height d-flex align-center justify-center">
+    <v-progress-circular indeterminate color="primary" size="64" />
+  </v-container>
 </template>
 
 <script>
