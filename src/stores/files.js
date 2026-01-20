@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia';
 
+import { usePreviewStore } from './preview';
+const previewStore = usePreviewStore();
+
 import { useWorkspacesStore } from './workspaces';
 const workspaces = useWorkspacesStore();
 
@@ -148,6 +151,9 @@ export const useFilesStore = defineStore('files', {
       const workspaceId = workspaces.currentWorkspace.id;
       try {
         await fileService.createFile(workspaceId, path, name, type);
+        // Trigger preview regeneration, but don't await it to avoid UI delays
+        // and we also don't want to fail on preview errors here
+        previewStore.generatePreview();
         await this.refresh(path);
       } catch (error) {
         this.error = error.message;
@@ -162,6 +168,9 @@ export const useFilesStore = defineStore('files', {
       const workspaceId = workspaces.currentWorkspace.id;
       try {
         await fileService.renameFile(workspaceId, filePath, newName);
+        // Trigger preview regeneration, but don't await it to avoid UI delays
+        // and we also don't want to fail on preview errors here
+        previewStore.generatePreview();
         await this.refresh(filePath);
       } catch (error) {
         this.error = error.message;
@@ -176,6 +185,9 @@ export const useFilesStore = defineStore('files', {
       const workspaceId = workspaces.currentWorkspace.id;
       try {
         await fileService.deleteFile(workspaceId, filePath);
+        // Trigger preview regeneration, but don't await it to avoid UI delays
+        // and we also don't want to fail on preview errors here
+        previewStore.generatePreview();
         await this.refresh(filePath);
       } catch (error) {
         this.error = error.message;
@@ -210,6 +222,9 @@ export const useFilesStore = defineStore('files', {
         filePath,
         content,
       );
+      // Trigger preview regeneration, but don't await it to avoid UI delays
+      // and we also don't want to fail on preview errors here
+      previewStore.generatePreview();
       this.updateFile(fileData);
     },
 
@@ -220,6 +235,9 @@ export const useFilesStore = defineStore('files', {
       const workspaceId = workspaces.currentWorkspace.id;
       try {
         await fileService.revertFile(workspaceId, filePath);
+        // Trigger preview regeneration, but don't await it to avoid UI delays
+        // and we also don't want to fail on preview errors here
+        previewStore.generatePreview();
         await this.refresh(filePath);
       } catch (error) {
         this.error = error.message;

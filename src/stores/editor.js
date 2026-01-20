@@ -1,10 +1,8 @@
 import { defineStore } from 'pinia';
 
 import { useFilesStore } from './files';
-const files = useFilesStore();
-
 import { useNotificationsStore } from './notifications';
-const notifications = useNotificationsStore();
+import { usePreviewStore } from './preview';
 
 const getDefaults = () => ({
   opened: [], // Opened files
@@ -20,6 +18,7 @@ export const useEditorStore = defineStore('editor', {
 
   actions: {
     async show(path) {
+      const files = useFilesStore();
       let file = files.all[path];
       if (!file) {
         file = await files.loadFileContext(path);
@@ -43,10 +42,11 @@ export const useEditorStore = defineStore('editor', {
       this.data[path] = content;
       this.changed[path] = this.original[path] !== content;
     },
-    async save(path) {
+    async save(path, regenerate = true) {
       if (!this.changed[path]) {
         return;
       }
+      const files = useFilesStore();
       const file = files.all[path];
       if (!file) {
         return;
@@ -55,13 +55,28 @@ export const useEditorStore = defineStore('editor', {
       try {
         const data = this.data[path];
         await files.save(path, data);
+        if (regenerate) {
+          // Trigger preview regeneration, but don't await it to avoid UI delays
+          // and we also don't want to fail on preview errors here
+          const previewStore = usePreviewStore();
+          previewStore.generatePreview();
+        }
         this.original[path] = data;
         this.changed[path] = false;
       } catch (error) {
+        const notifications = useNotificationsStore();
         notifications.error(`Failed to save file ${path}: ${error.message}`);
       } finally {
         this.saving[path] = false;
       }
+    },
+    async saveAll() {
+      const savePromises = this.opened.map((file) => this.save(file.path, false));
+      await Promise.all(savePromises);
+      // Trigger preview regeneration, but don't await it to avoid UI delays
+      // and we also don't want to fail on preview errors here
+      const previewStore = usePreviewStore();
+      previewStore.generatePreview();
     },
     close(path) {
       const index = this.opened.findIndex((f) => f.path === path);
