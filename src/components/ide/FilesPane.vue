@@ -164,8 +164,8 @@
 <script>
 import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
-import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
+import { useWorkspacesStore } from '@/stores/workspaces';
 import CreateFileDialog from './dialogs/CreateFileDialog.vue';
 import RenameDialog from './dialogs/RenameDialog.vue';
 import DeleteConfirmDialog from './dialogs/DeleteConfirmDialog.vue';
@@ -219,11 +219,11 @@ export default {
     filesStore() {
       return useFilesStore();
     },
-    workspacesStore() {
-      return useWorkspacesStore();
-    },
     notificationsStore() {
       return useNotificationsStore();
+    },
+    workspacesStore() {
+      return useWorkspacesStore();
     },
     showCreateDialog: {
       get() {
@@ -355,7 +355,6 @@ export default {
     async handleCreate({ type, path, name }) {
       try {
         await this.filesStore.createFile(path, name, type);
-
         this.notificationsStore.success(
           `${type === 'folder' ? 'Folder' : 'File'} created successfully`,
         );

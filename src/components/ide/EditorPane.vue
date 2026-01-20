@@ -48,6 +48,7 @@
             <v-progress-circular indeterminate color="primary" size="64" />
           </v-container>
           <component
+            v-else
             :is="editorType"
             :value="editorStore.original[file.path]"
             @update="(val) => editorStore.sync(file.path, val)"
@@ -58,6 +59,31 @@
           />
         </v-tabs-window-item>
       </v-tabs-window>
+
+      <v-toolbar density="compact">
+        <!--
+        <template v-slot:prepend>
+          <v-btn :icon="icons.menu"></v-btn>
+        </template>
+
+        <v-toolbar-title> Used in: ... </v-toolbar-title>
+        -->
+
+        <template v-slot:append>
+          <v-btn
+            :disabled="isActiveSaving || !hasActiveChanges"
+            :loading="isActiveSaving"
+            @click="editorStore.save(activeFile.path)"
+            ><v-icon :icon="icons.save" /> Save</v-btn
+          >
+          <v-btn
+            :disabled="isAnySaving || !hasAnyChanges"
+            :loading="isAnySaving"
+            @click="editorStore.saveAll()"
+            ><v-icon :icon="icons.saveAll" /> Save All</v-btn
+          >
+        </template>
+      </v-toolbar>
     </template>
     <div v-else class="fill-height d-flex flex-column align-center justify-center">
       <div class="text-h6 text-subtle">No file is currently opened.</div>
@@ -70,8 +96,8 @@
 import { useEditorStore } from '@/stores/editor';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { defineAsyncComponent } from 'vue';
-import { mdiClose } from '@mdi/js';
 import SourceCodeEditor from './editors/SourceCodeEditor.vue';
+import { mdiClose, mdiContentSave, mdiContentSaveAll, mdiMenu } from '@mdi/js';
 
 export default {
   name: 'EditorPane',
@@ -85,6 +111,9 @@ export default {
     return {
       icons: {
         close: mdiClose,
+        menu: mdiMenu,
+        save: mdiContentSave,
+        saveAll: mdiContentSaveAll,
       },
     };
   },
@@ -109,11 +138,11 @@ export default {
         this.editorStore.show(value);
       },
     },
-    workspacesStore() {
-      return useWorkspacesStore();
-    },
     editorStore() {
       return useEditorStore();
+    },
+    workspacesStore() {
+      return useWorkspacesStore();
     },
     activeFile() {
       return this.editorStore.active;
@@ -128,6 +157,18 @@ export default {
       // Determine if the current workspace is read-only (archived)
       const workspace = this.workspacesStore.current;
       return workspace ? workspace.isArchived : false;
+    },
+    hasActiveChanges() {
+      return this.activeFile && this.editorStore.changed[this.activeFile.path];
+    },
+    isActiveSaving() {
+      return this.activeFile && this.editorStore.saving[this.activeFile.path];
+    },
+    hasAnyChanges() {
+      return this.openedFiles.some((file) => this.editorStore.changed[file.path]);
+    },
+    isAnySaving() {
+      return Object.values(this.editorStore.saving).some((isSaving) => isSaving);
     },
   },
   methods: {

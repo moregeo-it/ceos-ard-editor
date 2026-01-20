@@ -1,6 +1,6 @@
 <template>
   <div class="d-flex flex-column fill-height">
-    <div class="pa-2 pt-3 d-flex align-center border-b-sm">
+    <div v-if="pfsOptions.length > 0" class="pa-2 pt-3 d-flex align-center border-b-sm">
       <v-select
         v-model="selectedPfs"
         :items="pfsOptions"
@@ -28,10 +28,10 @@
       </div>
 
       <v-alert v-else-if="!previewHtml" type="info" variant="tonal">
-        <div v-if="!hasGenerated">
+        <template v-if="!previewStore.hasSelectedPfs">
           Select at least one PFS from the list above to create a preview.
-        </div>
-        <div v-else>No preview generated. Please try again.</div>
+        </template>
+        <template v-else>No preview generated. Please try again.</template>
       </v-alert>
 
       <!-- Preview Document -->
@@ -52,9 +52,8 @@
 <script>
 import { useAuthStore } from '@/stores/auth';
 import { useEditorStore } from '@/stores/editor';
-import { useNotificationsStore } from '@/stores/notifications';
+import { usePreviewStore } from '@/stores/preview';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import previewService from '@/services/preview.service';
 import { mdiFileDocumentOutline } from '@mdi/js';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -66,18 +65,7 @@ export default {
       icons: {
         product: mdiFileDocumentOutline,
       },
-      selectedPfs: [],
-      oldSelectedPfs: null,
-      previewHtml: '',
-      isGenerating: false,
-      hasGenerated: false,
-      scrollPosition: {
-        value: { x: 0, y: 0 },
-      },
     };
-  },
-  created() {
-    this.selectedPfs = this.workspacesStore.currentWorkspace.pfs;
   },
   computed: {
     authStore() {
@@ -86,60 +74,94 @@ export default {
     editorStore() {
       return useEditorStore();
     },
-    notificationsStore() {
-      return useNotificationsStore();
+    previewStore() {
+      return usePreviewStore();
     },
     workspacesStore() {
       return useWorkspacesStore();
     },
     workspaceId() {
-      return this.workspacesStore?.currentWorkspace?.id;
+      return this.currentWorkspace?.id;
+    },
+    currentWorkspace() {
+      return this.workspacesStore?.currentWorkspace;
     },
     pfsOptions() {
       return this.workspacesStore?.pfsOptions || [];
     },
+    selectedPfs: {
+      get() {
+        return this.previewStore.selectedPfs;
+      },
+      set(value) {
+        this.previewStore.setSelectedPfs(value);
+      },
+    },
+    previewHtml() {
+      return this.previewStore.previewHtml;
+    },
+    isGenerating() {
+      return this.previewStore.isGenerating;
+    },
+  },
+  async created() {
+    if (this.pfsOptions.length === 0) {
+      await this.workspacesStore.fetchPfs();
+    }
   },
   async mounted() {
-    await this.generatePreview();
+    await this.previewStore.generatePreview();
   },
   watch: {
     previewHtml() {
       this.updateIframeContent();
     },
+    currentWorkspace: {
+      handler(newVal) {
+        this.selectedPfs = newVal?.pfs || [];
+      },
+      immediate: true,
+    },
   },
   methods: {
     updateIframeContent() {
-      const previewFrame = this.$refs.iframe;
-      console.log(previewFrame);
-      if (!previewFrame) {
+      const iframe = this.$refs.iframe;
+      if (!iframe) {
         return;
       }
 
-      const iframe = previewFrame;
-      const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-
-      // Save current scroll position before updating content
-      if (iframe.contentWindow) {
-        this.scrollPosition = {
-          x: iframe.contentWindow.scrollX,
-          y: iframe.contentWindow.scrollY,
-        };
-      }
+      // Save old scroll position to ensure scrollend event doesn't override it
+      const oldPosition = this.previewStore.scrollPosition.slice(0);
 
       // Write content to iframe
-      iframeDoc.open();
-      iframeDoc.write(this.previewHtml);
-      iframeDoc.close();
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(this.previewHtml);
+      doc.close();
+
+      // Add scrollend listener to track scroll position for restoration after regeneration
+      doc.addEventListener('scrollend', () => {
+        if (iframe.contentWindow) {
+          this.previewStore.setScrollPosition(
+            iframe.contentWindow.scrollX,
+            iframe.contentWindow.scrollY,
+          );
+        }
+      });
+
+      // Restore scroll position after all resources (stylesheets, images) are loaded
+      iframe.addEventListener(
+        'load',
+        () => {
+          if (iframe.contentWindow) {
+            iframe.contentWindow.scrollTo(...oldPosition);
+          }
+        },
+        { once: true },
+      );
 
       // Fix relative URLs in the iframe content
-      this.enhanceHtml(iframeDoc);
-
-      // Restore scroll position after content has been updated and rendered
-      setTimeout(() => {
-        if (iframe.contentWindow) {
-          iframe.contentWindow.scrollTo(this.scrollPosition.x, this.scrollPosition.y);
-        }
-      }, 100);
+      this.enhanceHtml(doc);
     },
     enhanceHtml(doc) {
       const token = this.authStore.accessToken;
@@ -213,33 +235,17 @@ export default {
           btn.style.transition = 'all 0.2s ease';
         }
       });
-
-      return doc;
     },
     async handleSelect(focus) {
       if (focus) {
-        this.oldSelectedPfs = this.selectedPfs;
+        this.previewStore.storeOldSelection();
         return;
       }
-      if (this.oldSelectedPfs === this.selectedPfs) {
+      if (!this.previewStore.hasSelectionChanged) {
         return;
       }
-      await this.generatePreview();
-      this.oldSelectedPfs = null;
-    },
-    async generatePreview() {
-      if (this.selectedPfs.length === 0) {
-        return;
-      }
-      this.isGenerating = true;
-      try {
-        this.previewHtml = await previewService.generatePreview(this.workspaceId, this.selectedPfs);
-      } catch (error) {
-        this.notificationsStore.error(`Failed to generate preview: ${error.message}`);
-        this.previewHtml = '';
-      } finally {
-        this.isGenerating = false;
-      }
+      await this.previewStore.generatePreview();
+      this.previewStore.clearOldSelection();
     },
   },
 };

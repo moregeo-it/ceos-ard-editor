@@ -65,8 +65,9 @@
 import { useAuthStore } from '@/stores/auth';
 import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
-import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
+import { usePreviewStore } from '@/stores/preview';
+import { useWorkspacesStore } from '@/stores/workspaces';
 import { mdiCheckCircle, mdiMenuDown, mdiClose } from '@mdi/js';
 import EditorPane from '@/components/ide/EditorPane.vue';
 import FilesPane from '@/components/ide/FilesPane.vue';
@@ -112,37 +113,33 @@ export default {
     loading() {
       return this.workspacesStore.isWorkspaceLoading[this.workspaceId];
     },
-
     workspace() {
       return this.workspacesStore.currentWorkspace;
+    },
+    workspaceId() {
+      return this.$route.params.id;
+    },
+    isArchived() {
+      return this.workspace?.status === 'archived';
     },
 
     authStore() {
       return useAuthStore();
     },
-
     editorStore() {
       return useEditorStore();
     },
-
     filesStore() {
       return useFilesStore();
     },
-
+    previewStore() {
+      return usePreviewStore();
+    },
     workspacesStore() {
       return useWorkspacesStore();
     },
-
     notificationsStore() {
       return useNotificationsStore();
-    },
-
-    workspaceId() {
-      return this.$route.params.id;
-    },
-
-    isArchived() {
-      return this.workspace?.status === 'archived';
     },
   },
 
@@ -186,6 +183,7 @@ export default {
       this.notificationsStore.reset();
       this.filesStore.reset();
       this.editorStore.reset();
+      this.previewStore.reset();
       this.$router.push({ name: 'workspaces' });
     },
   },
