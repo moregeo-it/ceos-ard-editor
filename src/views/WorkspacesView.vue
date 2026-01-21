@@ -185,12 +185,12 @@ export default {
       return useAuthStore();
     },
 
-    notificationsStore() {
-      return useNotificationsStore();
-    },
-
     workspacesStore() {
       return useWorkspacesStore();
+    },
+
+    notificationsStore() {
+      return useNotificationsStore();
     },
 
     username() {
