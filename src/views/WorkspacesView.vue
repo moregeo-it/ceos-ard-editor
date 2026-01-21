@@ -143,7 +143,6 @@
 <script>
 import { useAuthStore } from '@/stores/auth';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import { useNotificationsStore } from '@/stores/notifications';
 import WorkspaceCard from '@/components/workspace/WorkspaceCard.vue';
 import WorkspaceDialog from '@/components/workspace/dialogs/WorkspaceDialog.vue';
 import ArchiveConfirmDialog from '@/components/workspace/dialogs/ArchiveConfirmDialog.vue';
@@ -189,10 +188,6 @@ export default {
       return useWorkspacesStore();
     },
 
-    notificationsStore() {
-      return useNotificationsStore();
-    },
-
     username() {
       return this.authStore.getUsername;
     },
@@ -217,15 +212,7 @@ export default {
 
   methods: {
     async loadData() {
-      try {
-        await Promise.all([
-          this.workspacesStore.fetchWorkspaces(),
-          this.workspacesStore.fetchPfs(),
-        ]);
-      } catch (error) {
-        console.error('Failed to load data:', error);
-        this.notificationsStore.error(`Failed to load data: ${error.message}`);
-      }
+      await Promise.all([this.workspacesStore.fetchWorkspaces(), this.workspacesStore.fetchPfs()]);
     },
 
     openCreateDialog() {
@@ -235,25 +222,17 @@ export default {
     },
 
     async handleWorkspaceSubmit(workspaceData) {
-      try {
-        if (this.workspaceDialogMode === 'create') {
-          await this.workspacesStore.createWorkspace(workspaceData);
-          this.notificationsStore.success('Workspace created successfully');
-        } else {
-          await this.workspacesStore.updateWorkspace(workspaceData.id, {
-            title: workspaceData.title,
-            pfs: workspaceData.pfs,
-            description: workspaceData.description,
-          });
-          this.notificationsStore.success('Workspace updated successfully');
-        }
-        this.showWorkspaceDialog = false;
-        this.workspaceToEdit = null;
-      } catch (error) {
-        console.error('Failed to save workspace:', error);
-        const action = this.workspaceDialogMode === 'create' ? 'create' : 'update';
-        this.notificationsStore.error(`Failed to ${action} workspace: ${error.message}`);
+      if (this.workspaceDialogMode === 'create') {
+        await this.workspacesStore.createWorkspace(workspaceData);
+      } else {
+        await this.workspacesStore.updateWorkspace(workspaceData.id, {
+          title: workspaceData.title,
+          pfs: workspaceData.pfs,
+          description: workspaceData.description,
+        });
       }
+      this.showWorkspaceDialog = false;
+      this.workspaceToEdit = null;
     },
 
     handleViewWorkspace(workspaceId) {
@@ -281,27 +260,14 @@ export default {
         this.showArchiveDialog = true;
       } else {
         // If workspace is archived, reactivate immediately without confirmation
-        try {
-          await this.workspacesStore.toggleWorkspaceStatus(workspaceId);
-          this.notificationsStore.success('Workspace activated successfully');
-        } catch (error) {
-          console.error('Failed to reactivate workspace:', error);
-          this.notificationsStore.error(`Failed to activate workspace: ${error.message}`);
-        }
+        await this.workspacesStore.toggleWorkspaceStatus(workspaceId);
       }
     },
 
     async handleArchiveWorkspace() {
-      try {
-        await this.workspacesStore.toggleWorkspaceStatus(this.workspaceToArchive);
-        this.notificationsStore.success('Workspace archived successfully');
-        this.showArchiveDialog = false;
-        this.workspaceToArchive = null;
-      } catch (error) {
-        console.error('Failed to archive workspace:', error);
-        this.notificationsStore.error(`Failed to archive workspace: ${error.message}`);
-        // Keep dialog open so user can try again
-      }
+      await this.workspacesStore.toggleWorkspaceStatus(this.workspaceToArchive);
+      this.showArchiveDialog = false;
+      this.workspaceToArchive = null;
     },
 
     confirmDelete(workspaceId) {
@@ -310,16 +276,9 @@ export default {
     },
 
     async handleDeleteWorkspace() {
-      try {
-        await this.workspacesStore.deleteWorkspace(this.workspaceToDelete);
-        this.notificationsStore.success('Workspace deleted successfully');
-        this.showDeleteDialog = false;
-        this.workspaceToDelete = null;
-      } catch (error) {
-        console.error('Failed to delete workspace:', error);
-        this.notificationsStore.error(`Failed to delete workspace: ${error.message}`);
-        // Keep dialog open so user can try again
-      }
+      await this.workspacesStore.deleteWorkspace(this.workspaceToDelete);
+      this.showDeleteDialog = false;
+      this.workspaceToDelete = null;
     },
   },
 };
