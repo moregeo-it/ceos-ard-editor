@@ -12,7 +12,6 @@ export const useAuthStore = defineStore('auth', {
     expiresAt: null,
     isAuthenticated: false,
     isLoading: false,
-    error: null,
   }),
 
   getters: {
@@ -67,8 +66,6 @@ export const useAuthStore = defineStore('auth', {
      */
     handleAuthCallback(searchParams) {
       try {
-        this.error = null;
-
         // Parse authentication data from URL
         const authData = authService.parseAuthCallback(searchParams);
 
@@ -85,9 +82,8 @@ export const useAuthStore = defineStore('auth', {
         this.isAuthenticated = true;
 
         return true;
+        // eslint-disable-next-line no-unused-vars
       } catch (error) {
-        this.error = error.message;
-        console.error('Auth callback error:', error);
         return false;
       }
     },
@@ -122,8 +118,8 @@ export const useAuthStore = defineStore('auth', {
         this.isAuthenticated = true;
 
         return true;
+        // eslint-disable-next-line no-unused-vars
       } catch (error) {
-        this.error = error.message;
         this.clearAuth();
         return false;
       } finally {
@@ -139,10 +135,6 @@ export const useAuthStore = defineStore('auth', {
         if (this.accessToken) {
           await authService.logout(this.accessToken);
         }
-      } catch (error) {
-        console.error('Logout error:', error);
-        // Store error but don't throw - still clear local auth
-        this.error = error.message;
       } finally {
         this.clearAuth();
       }
@@ -159,7 +151,6 @@ export const useAuthStore = defineStore('auth', {
       this.provider = null;
       this.expiresAt = null;
       this.isAuthenticated = false;
-      this.error = null;
       tokenService.clearAuth();
     },
   },

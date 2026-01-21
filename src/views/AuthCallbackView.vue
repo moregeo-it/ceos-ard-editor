@@ -38,7 +38,6 @@
 
 <script>
 import { useAuthStore } from '@/stores/auth';
-import { useNotificationsStore } from '@/stores/notifications';
 
 export default {
   name: 'AuthCallbackView',
@@ -56,7 +55,6 @@ export default {
   methods: {
     async handleCallback() {
       const authStore = useAuthStore();
-      const notificationsStore = useNotificationsStore();
       const searchParams = new URLSearchParams(window.location.search);
 
       // Check for error from backend
@@ -68,28 +66,30 @@ export default {
           ? decodeURIComponent(errorDescription)
           : 'Authentication failed. Please try again.';
 
-        notificationsStore.error(this.error);
-
-        notificationsStore.error(this.error);
-
         setTimeout(() => {
           this.$router.push({ name: 'landing' });
         }, 3000);
         return;
       }
 
-      // Parse and store tokens
-      const success = authStore.handleAuthCallback(searchParams);
+      try {
+        // Parse and store tokens
+        const success = authStore.handleAuthCallback(searchParams);
 
-      if (success) {
-        // Redirect to workspaces
-        this.$router.push({ name: 'workspaces' });
-      } else {
-        this.error = authStore.error || 'Invalid authentication response';
-        notificationsStore.error(this.error);
+        if (success) {
+          this.$router.push({ name: 'workspaces' });
+        } else {
+          this.error = 'Authentication failed. Please try again.';
+          setTimeout(() => {
+            this.$router.push({ name: 'landing' });
+          }, 3000);
+        }
+      } catch (error) {
+        this.error = `Authentication error: ${error.message}`;
         setTimeout(() => {
           this.$router.push({ name: 'landing' });
         }, 3000);
+        return;
       }
     },
   },
