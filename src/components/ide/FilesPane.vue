@@ -160,6 +160,7 @@
 <script>
 import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
+import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import CreateFileDialog from './dialogs/CreateFileDialog.vue';
 import RenameDialog from './dialogs/RenameDialog.vue';
@@ -213,6 +214,9 @@ export default {
     },
     filesStore() {
       return useFilesStore();
+    },
+    notificationsStore() {
+      return useNotificationsStore();
     },
     workspacesStore() {
       return useWorkspacesStore();
@@ -268,7 +272,11 @@ export default {
     },
 
     async loadFiles(path = '/') {
-      await this.filesStore.loadFiles(path);
+      try {
+        await this.filesStore.loadFiles(path);
+      } catch (error) {
+        this.notificationsStore.error(`Failed to load files: ${error.message}`);
+      }
     },
 
     openFile(activated) {
@@ -293,7 +301,11 @@ export default {
           return;
         }
 
-        await this.filesStore.searchFiles(value);
+        try {
+          await this.filesStore.searchFiles(value);
+        } catch (error) {
+          this.notificationsStore.error(`Search failed: ${error.message}`);
+        }
       }, 300);
     },
 
@@ -337,8 +349,15 @@ export default {
     },
 
     async handleCreate({ type, path, name }) {
-      await this.filesStore.createFile(path, name, type);
-      this.createInitialPath = null;
+      try {
+        await this.filesStore.createFile(path, name, type);
+        this.notificationsStore.success(
+          `${type === 'folder' ? 'Folder' : 'File'} created successfully`,
+        );
+        this.createInitialPath = null;
+      } catch (error) {
+        this.notificationsStore.error(`Failed to create: ${error.message}`);
+      }
     },
 
     handleRename(item) {
@@ -348,8 +367,14 @@ export default {
     async handleRenameConfirm(newName) {
       if (!this.itemToRename) return;
 
-      await this.filesStore.renameFile(this.itemToRename.path, newName);
-      this.itemToRename = null;
+      try {
+        await this.filesStore.renameFile(this.itemToRename.path, newName);
+        this.notificationsStore.success('Renamed successfully');
+      } catch (error) {
+        this.notificationsStore.error(`Failed to rename: ${error.message}`);
+      } finally {
+        this.itemToRename = null;
+      }
     },
 
     handleDelete(item) {
@@ -359,12 +384,24 @@ export default {
     async handleDeleteConfirm() {
       if (!this.itemToDelete) return;
 
-      await this.filesStore.deleteFile(this.itemToDelete.path);
-      this.itemToDelete = null;
+      try {
+        await this.filesStore.deleteFile(this.itemToDelete.path);
+        this.notificationsStore.success('Deleted successfully');
+        this.itemToDelete = null;
+      } catch (error) {
+        this.notificationsStore.error(`Failed to delete: ${error.message}`);
+      } finally {
+        this.itemToDelete = null;
+      }
     },
 
     async handleRevert(item) {
-      await this.filesStore.revertFile(item.path);
+      try {
+        await this.filesStore.revertFile(item.path);
+        this.notificationsStore.success('File reverted successfully');
+      } catch (error) {
+        this.notificationsStore.error(`Failed to revert: ${error.message}`);
+      }
     },
   },
 };

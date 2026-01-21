@@ -1,8 +1,5 @@
 import { defineStore } from 'pinia';
 import workspaceService from '@/services/workspace.service';
-import { useNotificationsStore } from './notifications';
-
-const notificationsStore = useNotificationsStore();
 
 export const useWorkspacesStore = defineStore('workspaces', {
   state: () => ({
@@ -36,9 +33,6 @@ export const useWorkspacesStore = defineStore('workspaces', {
 
       try {
         this.workspaces = await workspaceService.fetchWorkspaces();
-      } catch (error) {
-        notificationsStore.error(`Failed to load data: ${error.message}`);
-        throw error;
       } finally {
         this.isLoading = false;
       }
@@ -51,11 +45,7 @@ export const useWorkspacesStore = defineStore('workspaces', {
         const newWorkspace = await workspaceService.createWorkspace(workspaceData);
         this.workspaces.unshift(newWorkspace);
 
-        notificationsStore.success('Workspace created successfully');
         return newWorkspace;
-      } catch (error) {
-        notificationsStore.error(`Failed to create workspace: ${error.message}`);
-        throw error;
       } finally {
         this.isCreating = false;
       }
@@ -78,11 +68,7 @@ export const useWorkspacesStore = defineStore('workspaces', {
           this.currentWorkspace = updatedWorkspace;
         }
 
-        notificationsStore.success('Workspace updated successfully');
         return updatedWorkspace;
-      } catch (error) {
-        notificationsStore.error(`Failed to update workspace: ${error.message}`);
-        throw error;
       } finally {
         this.isWorkspaceLoading[workspaceId] = false;
       }
@@ -114,13 +100,7 @@ export const useWorkspacesStore = defineStore('workspaces', {
           this.currentWorkspace = updatedWorkspace;
         }
 
-        notificationsStore.success(
-          `Workspace ${newStatus === 'active' ? 'activated' : 'archived'} successfully`,
-        );
         return updatedWorkspace;
-      } catch (error) {
-        notificationsStore.error(`Failed to toggle workspace status: ${error.message}`);
-        throw error;
       } finally {
         this.isWorkspaceLoading[workspaceId] = false;
       }
@@ -139,22 +119,13 @@ export const useWorkspacesStore = defineStore('workspaces', {
         if (this.currentWorkspace?.id === workspaceId) {
           this.currentWorkspace = null;
         }
-        notificationsStore.success('Workspace deleted successfully');
-      } catch (error) {
-        notificationsStore.error(`Failed to delete workspace: ${error.message}`);
-        throw error;
       } finally {
         this.isWorkspaceLoading[workspaceId] = false;
       }
     },
 
     async fetchPfs() {
-      try {
-        this.pfsOptions = await workspaceService.fetchPfs();
-      } catch (error) {
-        notificationsStore.error(`Failed to load PFS options: ${error.message}`);
-        throw error;
-      }
+      this.pfsOptions = await workspaceService.fetchPfs();
     },
 
     async getWorkspace(workspaceId) {
@@ -163,9 +134,6 @@ export const useWorkspacesStore = defineStore('workspaces', {
       try {
         this.currentWorkspace = await workspaceService.getWorkspace(workspaceId);
         return this.currentWorkspace;
-      } catch (error) {
-        notificationsStore.error(`Failed to load workspace: ${error.message}`);
-        throw error;
       } finally {
         this.isWorkspaceLoading[workspaceId] = false;
       }
