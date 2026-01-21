@@ -241,7 +241,7 @@ export default {
         this.previewStore.storeOldSelection();
         return;
       }
-      if (!this.previewStore.hasSelectionChanged) {
+      if (this.previewStore.oldSelectedPfs === this.previewStore.selectedPfs) {
         return;
       }
       await this.previewStore.generatePreview();
