@@ -189,7 +189,7 @@ export const useFilesStore = defineStore('files', {
         // and we also don't want to fail on preview errors here
         previewStore.generatePreview();
 
-        if (fileData && fileData.tracked) {
+        if (fileData && fileData.path) {
           this.updateFile(fileData);
         } else {
           this.deleteFileFromStore(filePath);
@@ -243,6 +243,7 @@ export const useFilesStore = defineStore('files', {
         // Trigger preview regeneration, but don't await it to avoid UI delays
         // and we also don't want to fail on preview errors here
         previewStore.generatePreview();
+        this.deleteFileFromStore(filePath);
         this.updateFile(fileData);
       } catch (error) {
         this.error = error.message;
