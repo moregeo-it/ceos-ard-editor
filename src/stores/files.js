@@ -139,9 +139,8 @@ export const useFilesStore = defineStore('files', {
       this.all[file.path] = file;
     },
 
-    async refresh(filePath) {
-      // force reload the parent directory to reflect the rename
-      await this.loadFiles(getParentPath(filePath), true);
+    deleteFileFromStore(filePath) {
+      delete this.all[filePath];
     },
 
     /**
@@ -150,11 +149,11 @@ export const useFilesStore = defineStore('files', {
     async createFile(path, name, type) {
       const workspaceId = workspaces.currentWorkspace.id;
       try {
-        await fileService.createFile(workspaceId, path, name, type);
+        const fileData = await fileService.createFile(workspaceId, path, name, type);
         // Trigger preview regeneration, but don't await it to avoid UI delays
         // and we also don't want to fail on preview errors here
         previewStore.generatePreview();
-        await this.refresh(path);
+        this.updateFile(fileData);
       } catch (error) {
         this.error = error.message;
         throw error;
@@ -167,11 +166,12 @@ export const useFilesStore = defineStore('files', {
     async renameFile(filePath, newName) {
       const workspaceId = workspaces.currentWorkspace.id;
       try {
-        await fileService.renameFile(workspaceId, filePath, newName);
+        const fileData = await fileService.renameFile(workspaceId, filePath, newName);
         // Trigger preview regeneration, but don't await it to avoid UI delays
         // and we also don't want to fail on preview errors here
         previewStore.generatePreview();
-        await this.refresh(filePath);
+        this.deleteFileFromStore(filePath);
+        this.updateFile(fileData);
       } catch (error) {
         this.error = error.message;
         throw error;
@@ -184,11 +184,16 @@ export const useFilesStore = defineStore('files', {
     async deleteFile(filePath) {
       const workspaceId = workspaces.currentWorkspace.id;
       try {
-        await fileService.deleteFile(workspaceId, filePath);
+        const fileData = await fileService.deleteFile(workspaceId, filePath);
         // Trigger preview regeneration, but don't await it to avoid UI delays
         // and we also don't want to fail on preview errors here
         previewStore.generatePreview();
-        await this.refresh(filePath);
+
+        if (fileData && fileData.tracked) {
+          this.updateFile(fileData);
+        } else {
+          this.deleteFileFromStore(filePath);
+        }
       } catch (error) {
         this.error = error.message;
         throw error;
@@ -234,11 +239,11 @@ export const useFilesStore = defineStore('files', {
     async revertFile(filePath) {
       const workspaceId = workspaces.currentWorkspace.id;
       try {
-        await fileService.revertFile(workspaceId, filePath);
+        const fileData = await fileService.revertFile(workspaceId, filePath);
         // Trigger preview regeneration, but don't await it to avoid UI delays
         // and we also don't want to fail on preview errors here
         previewStore.generatePreview();
-        await this.refresh(filePath);
+        this.updateFile(fileData);
       } catch (error) {
         this.error = error.message;
         throw error;
