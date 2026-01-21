@@ -6,6 +6,9 @@ const previewStore = usePreviewStore();
 import { useWorkspacesStore } from './workspaces';
 const workspaces = useWorkspacesStore();
 
+import { useNotificationsStore } from './notifications';
+const notifications = useNotificationsStore();
+
 import fileService from '@/services/file.service';
 
 const getDefaults = () => ({
@@ -13,7 +16,6 @@ const getDefaults = () => ({
   searchResults: null, // Search results
   isSearchLoading: false,
   isPathLoading: [],
-  error: null,
 });
 
 const getParentPath = (filePath) => {
@@ -77,7 +79,7 @@ export const useFilesStore = defineStore('files', {
         this.all[path] = context;
         return context;
       } catch (error) {
-        this.error = error.message;
+        notifications.error(`Failed to load file context: ${error.message}`);
         throw error;
       } finally {
         this.resetPathLoading(path);
@@ -92,12 +94,11 @@ export const useFilesStore = defineStore('files', {
       }
       const workspaceId = workspaces.currentWorkspace.id;
       this.isPathLoading.push(path);
-      this.error = null;
       try {
         const files = await fileService.fetchFileTree(workspaceId, path);
         files.forEach((file) => (this.all[file.path] = file));
       } catch (error) {
-        this.error = error.message;
+        notifications.error(`Failed to load files: ${error.message}`);
         throw error;
       } finally {
         this.resetPathLoading(path);
@@ -123,12 +124,11 @@ export const useFilesStore = defineStore('files', {
       }
 
       this.isSearchLoading = true;
-      this.error = null;
       try {
         const files = await fileService.searchFiles(workspaceId, query);
         this.searchResults = files.map(toFileTreeObject);
       } catch (error) {
-        this.error = error.message;
+        notifications.error(`Failed to search files: ${error.message}`);
         throw error;
       } finally {
         this.isSearchLoading = false;
@@ -154,8 +154,11 @@ export const useFilesStore = defineStore('files', {
         // and we also don't want to fail on preview errors here
         previewStore.generatePreview();
         this.updateFile(fileData);
+        notifications.success(
+          `${type.charAt(0).toUpperCase() + type.slice(1)} created successfully`,
+        );
       } catch (error) {
-        this.error = error.message;
+        notifications.error(error.message);
         throw error;
       }
     },
@@ -172,8 +175,9 @@ export const useFilesStore = defineStore('files', {
         previewStore.generatePreview();
         this.deleteFileFromStore(filePath);
         this.updateFile(fileData);
+        notifications.success('Renamed successfully');
       } catch (error) {
-        this.error = error.message;
+        notifications.error(error.message);
         throw error;
       }
     },
@@ -191,11 +195,15 @@ export const useFilesStore = defineStore('files', {
 
         if (fileData && fileData.path) {
           this.updateFile(fileData);
+          notifications.warning('A tracked file has been deleted, it could be reverted.');
         } else {
           this.deleteFileFromStore(filePath);
+          notifications.warning(
+            "An untracked file has been deleted permanently, it can't be restored.",
+          );
         }
       } catch (error) {
-        this.error = error.message;
+        notifications.error(`Failed to delete file: ${error.message}`);
         throw error;
       }
     },
@@ -204,7 +212,7 @@ export const useFilesStore = defineStore('files', {
       try {
         return await fileService.loadFile(workspaces.currentWorkspace.id, filePath);
       } catch (error) {
-        this.error = error.message;
+        notifications.error(`Failed to load file context: ${error.message}`);
         throw error;
       }
     },
@@ -213,7 +221,7 @@ export const useFilesStore = defineStore('files', {
       try {
         return await fileService.loadFile(workspaces.currentWorkspace.id, filePath);
       } catch (error) {
-        this.error = error.message;
+        notifications.error(`Failed to load file: ${error.message}`);
         throw error;
       }
     },
@@ -245,8 +253,9 @@ export const useFilesStore = defineStore('files', {
         previewStore.generatePreview();
         this.deleteFileFromStore(filePath);
         this.updateFile(fileData);
+        notifications.success('File reverted successfully');
       } catch (error) {
-        this.error = error.message;
+        notifications.error(`Failed to revert file: ${error.message}`);
         throw error;
       }
     },
