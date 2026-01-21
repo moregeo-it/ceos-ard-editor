@@ -82,7 +82,6 @@ export default {
       const success = authStore.handleAuthCallback(searchParams);
 
       if (success) {
-        notificationsStore.success('Successfully logged in');
         // Redirect to workspaces
         this.$router.push({ name: 'workspaces' });
       } else {
