@@ -16,10 +16,6 @@
       />
     </div>
 
-    <v-alert v-if="filesStore.error" type="error" variant="tonal" class="ma-2">
-      {{ filesStore.error }}
-    </v-alert>
-
     <!-- File Tree -->
     <div class="flex-grow-1 overflow-hidden pa-0 fill-height">
       <v-treeview
