@@ -18,7 +18,9 @@
           @click.middle="close(file.path)"
         >
           <span class="text-none">
-            <span class="file-name"> {{ file.name }} </span
+            <span class="file-name" :class="{ 'file-deleted': isDeleted(file.path) }">{{
+              file.name
+            }}</span
             ><span class="file-changed">
               <template v-if="editorStore.changed[file.path]">*</template>
               <template v-else>&nbsp;</template>
@@ -42,7 +44,7 @@
           class="fill-height"
         >
           <v-container
-            v-if="!editorStore.original[file.path]"
+            v-if="editorStore.original[file.path] === undefined"
             class="fill-height d-flex align-center justify-center"
           >
             <v-progress-circular indeterminate color="primary" size="64" />
@@ -91,6 +93,7 @@
 
 <script>
 import { useEditorStore } from '@/stores/editor';
+import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { defineAsyncComponent } from 'vue';
@@ -139,6 +142,9 @@ export default {
     editorStore() {
       return useEditorStore();
     },
+    filesStore() {
+      return useFilesStore();
+    },
     notificationsStore() {
       return useNotificationsStore();
     },
@@ -173,6 +179,10 @@ export default {
     },
   },
   methods: {
+    isDeleted(path) {
+      const file = this.filesStore.all[path];
+      return !file || file.status === 'deleted';
+    },
     async save(path) {
       const result = await this.editorStore.save(path);
       if (result instanceof Error) {
@@ -213,6 +223,9 @@ export default {
   width: 0.75rem;
   display: inline-block;
   text-align: left;
+}
+.file-deleted {
+  text-decoration: line-through;
 }
 .editor-tabs {
   min-height: var(--v-tabs-height);

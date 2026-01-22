@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 
 import { useFilesStore } from './files';
+import { useNotificationsStore } from './notifications';
 import { usePreviewStore } from './preview';
 
 const getDefaults = () => ({
@@ -29,7 +30,7 @@ export const useEditorStore = defineStore('editor', {
         this.opened.push(file);
       }
       this.active = file;
-      if (!this.original[path]) {
+      if (this.original[path] === undefined) {
         const data = await files.load(path);
         this.original[path] = data;
         this.data[path] = data;
@@ -45,14 +46,10 @@ export const useEditorStore = defineStore('editor', {
       if (!this.changed[path]) {
         return false;
       }
-      const files = useFilesStore();
-      const file = files.all[path];
-      if (!file) {
-        return false;
-      }
       this.saving[path] = true;
       try {
         const data = this.data[path];
+        const files = useFilesStore();
         await files.save(path, data);
         if (regenerate) {
           // Trigger preview regeneration, but don't await it to avoid UI delays
@@ -99,8 +96,144 @@ export const useEditorStore = defineStore('editor', {
         }
       }
     },
+
+    async onFileCreated(fileData) {
+      // Show newly created files (not directories)
+      if (fileData && !fileData.is_directory) {
+        await this.show(fileData.path);
+      }
+    },
+
+    /**
+     * Handle file deletion from files store.
+     * If file has no unsaved changes, close it.
+     * Otherwise keep it open and mark it specifically.
+     */
+    async onFileDeleted(filePath) {
+      if (!this.changed[filePath]) {
+        await this.close(filePath);
+      }
+    },
+
+    /**
+     * Handle file rename from files store.
+     * Updates all editor state from old path to new path.
+     */
+    async onFileRenamed(oldPath, newFile) {
+      const index = this.opened.findIndex((f) => f.path === oldPath);
+      if (index === -1) {
+        return; // File not open in editor
+      }
+
+      const newPath = newFile.path;
+
+      // Update opened files array
+      this.opened[index] = newFile;
+
+      // Migrate state from old path to new path
+      if (this.original[oldPath] !== undefined) {
+        this.original[newPath] = this.original[oldPath];
+        delete this.original[oldPath];
+      }
+      if (this.data[oldPath] !== undefined) {
+        this.data[newPath] = this.data[oldPath];
+        delete this.data[oldPath];
+      }
+      if (this.changed[oldPath] !== undefined) {
+        this.changed[newPath] = this.changed[oldPath];
+        delete this.changed[oldPath];
+      }
+      if (this.saving[oldPath] !== undefined) {
+        this.saving[newPath] = this.saving[oldPath];
+        delete this.saving[oldPath];
+      }
+
+      // Update active file reference if needed
+      if (this.active && this.active.path === oldPath) {
+        this.active = newFile;
+      }
+    },
+
+    /**
+     * Handle file revert from files store.
+     * Reverts can restore deleted files, undo content changes, and undo renames.
+     */
+    async onFileReverted(oldPath, revertedFile) {
+      const index = this.opened.findIndex((f) => f.path === oldPath);
+      if (index === -1) {
+        return; // File not open in editor
+      }
+
+      // The revert was a rename - update editor state accordingly
+      const path = revertedFile.path;
+      if (revertedFile.path !== oldPath) {
+        await this.onFileRenamed(oldPath, revertedFile);
+      } else {
+        this.opened[index] = revertedFile;
+        // Update active file reference if needed
+        if (this.active && this.active.path === path) {
+          this.active = revertedFile;
+        }
+      }
+
+      if (this.changed[path]) {
+        return; // File has changes, don't reload content from server
+      }
+
+      // Reload the file content from server if the opened file has no unsaved changes
+      const files = useFilesStore();
+      const data = await files.load(path);
+      this.original[path] = data;
+      this.data[path] = data;
+    },
+
     reset() {
       Object.assign(this, getDefaults());
     },
   },
 });
+
+export function filesEditorSyncPlugin({ store }) {
+  if (store.$id !== 'files') {
+    return;
+  }
+
+  store.$onAction(({ name, args, after }) => {
+    const editor = useEditorStore();
+    after(async (result) => {
+      try {
+        switch (name) {
+          case 'createFile': {
+            await editor.onFileCreated(result);
+            break;
+          }
+
+          case 'deleteFile': {
+            const [filePath] = args;
+            await editor.onFileDeleted(filePath);
+            break;
+          }
+
+          case 'renameFile': {
+            const [oldPath] = args;
+            if (result && result.path) {
+              await editor.onFileRenamed(oldPath, result);
+            }
+            break;
+          }
+
+          case 'revertFile': {
+            const [filePath] = args;
+            if (result && result.path) {
+              await editor.onFileReverted(filePath, result);
+            }
+            break;
+          }
+        }
+      } catch (error) {
+        const notifications = useNotificationsStore();
+        notifications.error('Updating editor after file operation failed: ' + error.message);
+      }
+    });
+  });
+}
