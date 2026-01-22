@@ -22,6 +22,7 @@ const getDefaults = () => ({
   searchResults: null, // Search results
   isSearchLoading: false,
   isPathLoading: [],
+  isFolderComplete: {},
 });
 
 const getParentPath = (filePath) => {
@@ -92,13 +93,14 @@ export const useFilesStore = defineStore('files', {
      * Load files from server and build tree structure
      */
     async loadFiles(path = '/', force = false) {
-      if (Array.isArray(this.folders[path]) && !force) {
+      if (this.isFolderComplete[path] && !force) {
         return; // Already loaded
       }
       this.isPathLoading.push(path);
       try {
         const files = await fileService.fetchFileTree(getWorkspaceId(), path);
         files.forEach((file) => (this.all[file.path] = file));
+        this.isFolderComplete[path] = true;
       } finally {
         this.resetPathLoading(path);
       }
