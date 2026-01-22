@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import router from '@/router';
 import authService from '@/services/auth.service';
 import tokenService from '@/services/token.service';
 
@@ -145,6 +146,7 @@ export const useAuthStore = defineStore('auth', {
         this.error = error.message;
       } finally {
         this.clearAuth();
+        router.push({ name: 'landing' });
       }
     },
 
