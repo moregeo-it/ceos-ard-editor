@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 
 import { useFilesStore } from './files';
+import { useNotificationsStore } from './notifications';
 import { usePreviewStore } from './preview';
 
 const getDefaults = () => ({
@@ -96,10 +97,10 @@ export const useEditorStore = defineStore('editor', {
       }
     },
 
-    onFileCreated(fileData) {
+    async onFileCreated(fileData) {
       // Show newly created files (not directories)
       if (fileData && !fileData.is_directory) {
-        this.show(fileData.path);
+        await this.show(fileData.path);
       }
     },
 
@@ -108,9 +109,9 @@ export const useEditorStore = defineStore('editor', {
      * If file has no unsaved changes, close it.
      * Otherwise keep it open and mark it specifically.
      */
-    onFileDeleted(filePath) {
+    async onFileDeleted(filePath) {
       if (!this.changed[filePath]) {
-        this.close(filePath);
+        await this.close(filePath);
       }
     },
 
@@ -118,7 +119,7 @@ export const useEditorStore = defineStore('editor', {
      * Handle file rename from files store.
      * Updates all editor state from old path to new path.
      */
-    onFileRenamed(oldPath, newFile) {
+    async onFileRenamed(oldPath, newFile) {
       const index = this.opened.findIndex((f) => f.path === oldPath);
       if (index === -1) {
         return; // File not open in editor
@@ -166,11 +167,14 @@ export const useEditorStore = defineStore('editor', {
       // The revert was a rename - update editor state accordingly
       const path = revertedFile.path;
       if (revertedFile.path !== oldPath) {
-        this.onFileRenamed(oldPath, revertedFile);
+        await this.onFileRenamed(oldPath, revertedFile);
+      } else {
+        this.opened[index] = revertedFile;
+        // Update active file reference if needed
+        if (this.active && this.active.path === path) {
+          this.active = revertedFile;
+        }
       }
-
-      // File is open - update its metadata
-      this.opened[index] = revertedFile;
 
       if (this.changed[path]) {
         return; // File has changes, don't reload content from server
@@ -181,11 +185,6 @@ export const useEditorStore = defineStore('editor', {
       const data = await files.load(path);
       this.original[path] = data;
       this.data[path] = data;
-
-      // Update active file reference if needed
-      if (this.active && this.active.path === path) {
-        this.active = revertedFile;
-      }
     },
 
     reset() {
@@ -201,35 +200,39 @@ export function filesEditorSyncPlugin({ store }) {
 
   store.$onAction(({ name, args, after }) => {
     const editor = useEditorStore();
-
-    after((result) => {
-      switch (name) {
-        case 'createFile': {
-          editor.onFileCreated(result);
-          break;
-        }
-
-        case 'deleteFile': {
-          const [filePath] = args;
-          editor.onFileDeleted(filePath);
-          break;
-        }
-
-        case 'renameFile': {
-          const [oldPath] = args;
-          if (result && result.path) {
-            editor.onFileRenamed(oldPath, result);
+    after(async (result) => {
+      try {
+        switch (name) {
+          case 'createFile': {
+            await editor.onFileCreated(result);
+            break;
           }
-          break;
-        }
 
-        case 'revertFile': {
-          const [filePath] = args;
-          if (result && result.path) {
-            editor.onFileReverted(filePath, result);
+          case 'deleteFile': {
+            const [filePath] = args;
+            await editor.onFileDeleted(filePath);
+            break;
           }
-          break;
+
+          case 'renameFile': {
+            const [oldPath] = args;
+            if (result && result.path) {
+              await editor.onFileRenamed(oldPath, result);
+            }
+            break;
+          }
+
+          case 'revertFile': {
+            const [filePath] = args;
+            if (result && result.path) {
+              await editor.onFileReverted(filePath, result);
+            }
+            break;
+          }
         }
+      } catch (error) {
+        const notifications = useNotificationsStore();
+        notifications.error('Updating editor after file operation failed: ' + error.message);
       }
     });
   });
