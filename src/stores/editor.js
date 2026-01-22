@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia';
 
 import { useFilesStore } from './files';
-import { useNotificationsStore } from './notifications';
 import { usePreviewStore } from './preview';
 
 const getDefaults = () => ({
@@ -44,12 +43,12 @@ export const useEditorStore = defineStore('editor', {
     },
     async save(path, regenerate = true) {
       if (!this.changed[path]) {
-        return;
+        return false;
       }
       const files = useFilesStore();
       const file = files.all[path];
       if (!file) {
-        return;
+        return false;
       }
       this.saving[path] = true;
       try {
@@ -63,20 +62,23 @@ export const useEditorStore = defineStore('editor', {
         }
         this.original[path] = data;
         this.changed[path] = false;
+        return true;
       } catch (error) {
-        const notifications = useNotificationsStore();
-        notifications.error(`Failed to save file ${path}: ${error.message}`);
+        return error;
       } finally {
         this.saving[path] = false;
       }
     },
     async saveAll() {
       const savePromises = this.opened.map((file) => this.save(file.path, false));
-      await Promise.all(savePromises);
-      // Trigger preview regeneration, but don't await it to avoid UI delays
-      // and we also don't want to fail on preview errors here
-      const previewStore = usePreviewStore();
-      previewStore.generatePreview();
+      const results = await Promise.all(savePromises);
+      if (results.some((res) => res === true)) {
+        // Trigger preview regeneration if at least one file was saved successfully
+        // Don't await it to avoid UI delays and we also don't want to fail on preview errors here.
+        const previewStore = usePreviewStore();
+        previewStore.generatePreview();
+      }
+      return results;
     },
     close(path) {
       const index = this.opened.findIndex((f) => f.path === path);

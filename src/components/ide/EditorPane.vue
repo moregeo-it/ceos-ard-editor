@@ -52,7 +52,7 @@
             :is="editorType"
             :value="editorStore.original[file.path]"
             @update="(val) => editorStore.sync(file.path, val)"
-            @save="() => editorStore.save(file.path)"
+            @save="save(file.path)"
             :file="file"
             :readOnly="isReadOnly"
             class="fill-height"
@@ -73,13 +73,10 @@
           <v-btn
             :disabled="isActiveSaving || !hasActiveChanges"
             :loading="isActiveSaving"
-            @click="editorStore.save(activeFile.path)"
+            @click="save(activeFile.path)"
             ><v-icon :icon="icons.save" /> Save</v-btn
           >
-          <v-btn
-            :disabled="isAnySaving || !hasAnyChanges"
-            :loading="isAnySaving"
-            @click="editorStore.saveAll()"
+          <v-btn :disabled="isAnySaving || !hasAnyChanges" :loading="isAnySaving" @click="saveAll"
             ><v-icon :icon="icons.saveAll" /> Save All</v-btn
           >
         </template>
@@ -94,6 +91,7 @@
 
 <script>
 import { useEditorStore } from '@/stores/editor';
+import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { defineAsyncComponent } from 'vue';
 import SourceCodeEditor from './editors/SourceCodeEditor.vue';
@@ -141,6 +139,9 @@ export default {
     editorStore() {
       return useEditorStore();
     },
+    notificationsStore() {
+      return useNotificationsStore();
+    },
     workspacesStore() {
       return useWorkspacesStore();
     },
@@ -172,6 +173,22 @@ export default {
     },
   },
   methods: {
+    async save(path) {
+      const result = await this.editorStore.save(path);
+      if (result instanceof Error) {
+        this.notificationsStore.error(`Failed to save file ${path}: ${result.message}`);
+      }
+    },
+    async saveAll() {
+      const results = await this.editorStore.saveAll();
+      const errorCount = results.filter((res) => res instanceof Error).length;
+      const fileCount = results.filter((res) => res).length;
+      if (errorCount > 0) {
+        this.notificationsStore.error(
+          `Failed to save ${errorCount} of${fileCount} file(s). Please try again.`,
+        );
+      }
+    },
     close(path) {
       if (this.editorStore.saving[path]) {
         return;
