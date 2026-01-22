@@ -145,6 +145,7 @@ export const useFilesStore = defineStore('files', {
       const fileData = await fileService.createFile(getWorkspaceId(), path, name, type);
       generatePreview();
       this.updateFile(fileData);
+      return fileData;
     },
 
     /**
@@ -155,6 +156,7 @@ export const useFilesStore = defineStore('files', {
       generatePreview();
       this.deleteFileFromStore(filePath);
       this.updateFile(fileData);
+      return fileData;
     },
 
     /**
@@ -168,6 +170,7 @@ export const useFilesStore = defineStore('files', {
       } else {
         this.deleteFileFromStore(filePath);
       }
+      return fileData;
     },
 
     async load(filePath) {
@@ -191,6 +194,7 @@ export const useFilesStore = defineStore('files', {
       generatePreview();
       this.deleteFileFromStore(filePath);
       this.updateFile(fileData);
+      return fileData;
     },
 
     /**
