@@ -338,7 +338,8 @@ export default {
     },
 
     async search(value) {
-      if (!value || !value.trim()) {
+      value = typeof value === 'string' ? value.trim() : '';
+      if (value === '') {
         this.clearSearch();
         return;
       }
