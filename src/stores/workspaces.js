@@ -4,7 +4,6 @@ import workspaceService from '@/services/workspace.service';
 export const useWorkspacesStore = defineStore('workspaces', {
   state: () => ({
     pfsOptions: [],
-    error: null,
     // List of all workspaces
     workspaces: [],
     isLoading: false,
@@ -31,13 +30,9 @@ export const useWorkspacesStore = defineStore('workspaces', {
   actions: {
     async fetchWorkspaces() {
       this.isLoading = true;
-      this.error = null;
 
       try {
         this.workspaces = await workspaceService.fetchWorkspaces();
-      } catch (error) {
-        this.error = error.message;
-        throw error;
       } finally {
         this.isLoading = false;
       }
@@ -45,15 +40,12 @@ export const useWorkspacesStore = defineStore('workspaces', {
 
     async createWorkspace(workspaceData) {
       this.isCreating = true;
-      this.error = null;
 
       try {
         const newWorkspace = await workspaceService.createWorkspace(workspaceData);
         this.workspaces.unshift(newWorkspace);
+
         return newWorkspace;
-      } catch (error) {
-        this.error = error.message;
-        throw error;
       } finally {
         this.isCreating = false;
       }
@@ -61,7 +53,6 @@ export const useWorkspacesStore = defineStore('workspaces', {
 
     async updateWorkspace(workspaceId, workspaceData) {
       this.isWorkspaceLoading[workspaceId] = true;
-      this.error = null;
 
       try {
         const updatedWorkspace = await workspaceService.updateWorkspace(workspaceId, workspaceData);
@@ -78,9 +69,6 @@ export const useWorkspacesStore = defineStore('workspaces', {
         }
 
         return updatedWorkspace;
-      } catch (error) {
-        this.error = error.message;
-        throw error;
       } finally {
         this.isWorkspaceLoading[workspaceId] = false;
       }
@@ -88,7 +76,6 @@ export const useWorkspacesStore = defineStore('workspaces', {
 
     async toggleWorkspaceStatus(workspaceId) {
       this.isWorkspaceLoading[workspaceId] = true;
-      this.error = null;
 
       try {
         const workspace = this.workspaces.find((w) => w.id === workspaceId);
@@ -114,9 +101,6 @@ export const useWorkspacesStore = defineStore('workspaces', {
         }
 
         return updatedWorkspace;
-      } catch (error) {
-        this.error = error.message;
-        throw error;
       } finally {
         this.isWorkspaceLoading[workspaceId] = false;
       }
@@ -124,7 +108,6 @@ export const useWorkspacesStore = defineStore('workspaces', {
 
     async deleteWorkspace(workspaceId) {
       this.isWorkspaceLoading[workspaceId] = true;
-      this.error = null;
 
       try {
         await workspaceService.deleteWorkspace(workspaceId);
@@ -136,34 +119,21 @@ export const useWorkspacesStore = defineStore('workspaces', {
         if (this.currentWorkspace?.id === workspaceId) {
           this.currentWorkspace = null;
         }
-      } catch (error) {
-        this.error = error.message;
-        throw error;
       } finally {
         this.isWorkspaceLoading[workspaceId] = false;
       }
     },
 
     async fetchPfs() {
-      try {
-        this.pfsOptions = await workspaceService.fetchPfs();
-      } catch (error) {
-        console.error('Failed to fetch PFS options:', error);
-        this.error = error.message;
-        throw error;
-      }
+      this.pfsOptions = await workspaceService.fetchPfs();
     },
 
     async getWorkspace(workspaceId) {
       this.isWorkspaceLoading[workspaceId] = true;
-      this.error = null;
 
       try {
         this.currentWorkspace = await workspaceService.getWorkspace(workspaceId);
         return this.currentWorkspace;
-      } catch (error) {
-        this.error = error.message;
-        throw error;
       } finally {
         this.isWorkspaceLoading[workspaceId] = false;
       }

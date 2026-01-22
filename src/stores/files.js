@@ -1,19 +1,27 @@
 import { defineStore } from 'pinia';
 
 import { usePreviewStore } from './preview';
-const previewStore = usePreviewStore();
-
 import { useWorkspacesStore } from './workspaces';
-const workspaces = useWorkspacesStore();
 
 import fileService from '@/services/file.service';
+
+const getWorkspaceId = () => {
+  const workspaces = useWorkspacesStore();
+  return workspaces.currentWorkspace?.id;
+};
+
+const generatePreview = () => {
+  const previewStore = usePreviewStore();
+  // Trigger preview regeneration, but don't await it to avoid UI delays
+  // and we also don't want to fail on preview errors here
+  previewStore.generatePreview();
+};
 
 const getDefaults = () => ({
   all: {},
   searchResults: null, // Search results
   isSearchLoading: false,
   isPathLoading: [],
-  error: null,
 });
 
 const getParentPath = (filePath) => {
@@ -71,14 +79,11 @@ export const useFilesStore = defineStore('files', {
       if (Array.isArray(this.all[path]) && typeof this.all[path].usage !== 'undefined' && !force) {
         return this.all[path]; // Already loaded
       }
+      this.isPathLoading.push(path);
       try {
-        this.isPathLoading.push(path);
-        const context = await fileService.loadFileContext(workspaces.currentWorkspace.id, path);
+        const context = await fileService.loadFileContext(getWorkspaceId(), path);
         this.all[path] = context;
         return context;
-      } catch (error) {
-        this.error = error.message;
-        throw error;
       } finally {
         this.resetPathLoading(path);
       }
@@ -90,15 +95,10 @@ export const useFilesStore = defineStore('files', {
       if (Array.isArray(this.folders[path]) && !force) {
         return; // Already loaded
       }
-      const workspaceId = workspaces.currentWorkspace.id;
       this.isPathLoading.push(path);
-      this.error = null;
       try {
-        const files = await fileService.fetchFileTree(workspaceId, path);
+        const files = await fileService.fetchFileTree(getWorkspaceId(), path);
         files.forEach((file) => (this.all[file.path] = file));
-      } catch (error) {
-        this.error = error.message;
-        throw error;
       } finally {
         this.resetPathLoading(path);
       }
@@ -115,7 +115,6 @@ export const useFilesStore = defineStore('files', {
      * Search files and folders
      */
     async searchFiles(query) {
-      const workspaceId = workspaces.currentWorkspace.id;
       if (!query.trim()) {
         // If query is empty, reload full tree
         await this.loadFiles();
@@ -123,13 +122,9 @@ export const useFilesStore = defineStore('files', {
       }
 
       this.isSearchLoading = true;
-      this.error = null;
       try {
-        const files = await fileService.searchFiles(workspaceId, query);
+        const files = await fileService.searchFiles(getWorkspaceId(), query);
         this.searchResults = files.map(toFileTreeObject);
-      } catch (error) {
-        this.error = error.message;
-        throw error;
       } finally {
         this.isSearchLoading = false;
       }
@@ -139,92 +134,52 @@ export const useFilesStore = defineStore('files', {
       this.all[file.path] = file;
     },
 
-    async refresh(filePath) {
-      // force reload the parent directory to reflect the rename
-      await this.loadFiles(getParentPath(filePath), true);
+    deleteFileFromStore(filePath) {
+      delete this.all[filePath];
     },
 
     /**
      * Create new file or folder
      */
     async createFile(path, name, type) {
-      const workspaceId = workspaces.currentWorkspace.id;
-      try {
-        await fileService.createFile(workspaceId, path, name, type);
-        // Trigger preview regeneration, but don't await it to avoid UI delays
-        // and we also don't want to fail on preview errors here
-        previewStore.generatePreview();
-        await this.refresh(path);
-      } catch (error) {
-        this.error = error.message;
-        throw error;
-      }
+      const fileData = await fileService.createFile(getWorkspaceId(), path, name, type);
+      generatePreview();
+      this.updateFile(fileData);
     },
 
     /**
      * Rename file or folder
      */
     async renameFile(filePath, newName) {
-      const workspaceId = workspaces.currentWorkspace.id;
-      try {
-        await fileService.renameFile(workspaceId, filePath, newName);
-        // Trigger preview regeneration, but don't await it to avoid UI delays
-        // and we also don't want to fail on preview errors here
-        previewStore.generatePreview();
-        await this.refresh(filePath);
-      } catch (error) {
-        this.error = error.message;
-        throw error;
-      }
+      const fileData = await fileService.renameFile(getWorkspaceId(), filePath, newName);
+      generatePreview();
+      this.deleteFileFromStore(filePath);
+      this.updateFile(fileData);
     },
 
     /**
      * Delete file or folder
      */
     async deleteFile(filePath) {
-      const workspaceId = workspaces.currentWorkspace.id;
-      try {
-        await fileService.deleteFile(workspaceId, filePath);
-        // Trigger preview regeneration, but don't await it to avoid UI delays
-        // and we also don't want to fail on preview errors here
-        previewStore.generatePreview();
-        await this.refresh(filePath);
-      } catch (error) {
-        this.error = error.message;
-        throw error;
-      }
-    },
-
-    async loadContext(filePath) {
-      try {
-        return await fileService.loadFile(workspaces.currentWorkspace.id, filePath);
-      } catch (error) {
-        this.error = error.message;
-        throw error;
+      const fileData = await fileService.deleteFile(getWorkspaceId(), filePath);
+      generatePreview();
+      if (fileData && fileData.path) {
+        this.updateFile(fileData);
+      } else {
+        this.deleteFileFromStore(filePath);
       }
     },
 
     async load(filePath) {
-      try {
-        return await fileService.loadFile(workspaces.currentWorkspace.id, filePath);
-      } catch (error) {
-        this.error = error.message;
-        throw error;
-      }
+      return await fileService.loadFile(getWorkspaceId(), filePath);
     },
 
     /**
      * Save file content
      */
     async save(filePath, content) {
-      const fileData = await fileService.saveFile(
-        workspaces.currentWorkspace.id,
-        filePath,
-        content,
-      );
-      // Trigger preview regeneration, but don't await it to avoid UI delays
-      // and we also don't want to fail on preview errors here
-      previewStore.generatePreview();
+      const fileData = await fileService.saveFile(getWorkspaceId(), filePath, content);
+      generatePreview();
       this.updateFile(fileData);
     },
 
@@ -232,17 +187,10 @@ export const useFilesStore = defineStore('files', {
      * Revert file to last saved state
      */
     async revertFile(filePath) {
-      const workspaceId = workspaces.currentWorkspace.id;
-      try {
-        await fileService.revertFile(workspaceId, filePath);
-        // Trigger preview regeneration, but don't await it to avoid UI delays
-        // and we also don't want to fail on preview errors here
-        previewStore.generatePreview();
-        await this.refresh(filePath);
-      } catch (error) {
-        this.error = error.message;
-        throw error;
-      }
+      const fileData = await fileService.revertFile(getWorkspaceId(), filePath);
+      generatePreview();
+      this.deleteFileFromStore(filePath);
+      this.updateFile(fileData);
     },
 
     /**

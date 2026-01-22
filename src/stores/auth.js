@@ -13,7 +13,6 @@ export const useAuthStore = defineStore('auth', {
     expiresAt: null,
     isAuthenticated: false,
     isLoading: false,
-    error: null,
   }),
 
   getters: {
@@ -67,30 +66,20 @@ export const useAuthStore = defineStore('auth', {
      * Handle OAuth callback after successful authentication
      */
     handleAuthCallback(searchParams) {
-      try {
-        this.error = null;
+      // Parse authentication data from URL
+      const authData = authService.parseAuthCallback(searchParams);
 
-        // Parse authentication data from URL
-        const authData = authService.parseAuthCallback(searchParams);
+      // Save to localStorage
+      tokenService.saveAuth(authData);
 
-        // Save to localStorage
-        tokenService.saveAuth(authData);
-
-        // Update store state
-        this.accessToken = authData.accessToken;
-        this.tokenType = authData.tokenType;
-        this.userId = authData.userId;
-        this.username = authData.username;
-        this.provider = authData.provider;
-        this.expiresAt = Date.now() + authData.expiresIn * 1000;
-        this.isAuthenticated = true;
-
-        return true;
-      } catch (error) {
-        this.error = error.message;
-        console.error('Auth callback error:', error);
-        return false;
-      }
+      // Update store state
+      this.accessToken = authData.accessToken;
+      this.tokenType = authData.tokenType;
+      this.userId = authData.userId;
+      this.username = authData.username;
+      this.provider = authData.provider;
+      this.expiresAt = Date.now() + authData.expiresIn * 1000;
+      this.isAuthenticated = true;
     },
 
     /**
@@ -123,8 +112,8 @@ export const useAuthStore = defineStore('auth', {
         this.isAuthenticated = true;
 
         return true;
+        // eslint-disable-next-line no-unused-vars
       } catch (error) {
-        this.error = error.message;
         this.clearAuth();
         return false;
       } finally {
@@ -140,10 +129,6 @@ export const useAuthStore = defineStore('auth', {
         if (this.accessToken) {
           await authService.logout(this.accessToken);
         }
-      } catch (error) {
-        console.error('Logout error:', error);
-        // Store error but don't throw - still clear local auth
-        this.error = error.message;
       } finally {
         this.clearAuth();
         router.push({ name: 'landing' });
@@ -161,7 +146,6 @@ export const useAuthStore = defineStore('auth', {
       this.provider = null;
       this.expiresAt = null;
       this.isAuthenticated = false;
-      this.error = null;
       tokenService.clearAuth();
     },
   },

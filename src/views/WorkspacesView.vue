@@ -223,7 +223,6 @@ export default {
           this.workspacesStore.fetchPfs(),
         ]);
       } catch (error) {
-        console.error('Failed to load data:', error);
         this.notificationsStore.error(`Failed to load data: ${error.message}`);
       }
     },
@@ -250,7 +249,6 @@ export default {
         this.showWorkspaceDialog = false;
         this.workspaceToEdit = null;
       } catch (error) {
-        console.error('Failed to save workspace:', error);
         const action = this.workspaceDialogMode === 'create' ? 'create' : 'update';
         this.notificationsStore.error(`Failed to ${action} workspace: ${error.message}`);
       }
@@ -285,7 +283,6 @@ export default {
           await this.workspacesStore.toggleWorkspaceStatus(workspaceId);
           this.notificationsStore.success('Workspace activated successfully');
         } catch (error) {
-          console.error('Failed to reactivate workspace:', error);
           this.notificationsStore.error(`Failed to activate workspace: ${error.message}`);
         }
       }
@@ -298,7 +295,6 @@ export default {
         this.showArchiveDialog = false;
         this.workspaceToArchive = null;
       } catch (error) {
-        console.error('Failed to archive workspace:', error);
         this.notificationsStore.error(`Failed to archive workspace: ${error.message}`);
         // Keep dialog open so user can try again
       }
@@ -316,7 +312,6 @@ export default {
         this.showDeleteDialog = false;
         this.workspaceToDelete = null;
       } catch (error) {
-        console.error('Failed to delete workspace:', error);
         this.notificationsStore.error(`Failed to delete workspace: ${error.message}`);
         // Keep dialog open so user can try again
       }
