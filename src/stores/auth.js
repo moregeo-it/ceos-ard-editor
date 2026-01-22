@@ -66,27 +66,20 @@ export const useAuthStore = defineStore('auth', {
      * Handle OAuth callback after successful authentication
      */
     handleAuthCallback(searchParams) {
-      try {
-        // Parse authentication data from URL
-        const authData = authService.parseAuthCallback(searchParams);
+      // Parse authentication data from URL
+      const authData = authService.parseAuthCallback(searchParams);
 
-        // Save to localStorage
-        tokenService.saveAuth(authData);
+      // Save to localStorage
+      tokenService.saveAuth(authData);
 
-        // Update store state
-        this.accessToken = authData.accessToken;
-        this.tokenType = authData.tokenType;
-        this.userId = authData.userId;
-        this.username = authData.username;
-        this.provider = authData.provider;
-        this.expiresAt = Date.now() + authData.expiresIn * 1000;
-        this.isAuthenticated = true;
-
-        return true;
-        // eslint-disable-next-line no-unused-vars
-      } catch (error) {
-        return false;
-      }
+      // Update store state
+      this.accessToken = authData.accessToken;
+      this.tokenType = authData.tokenType;
+      this.userId = authData.userId;
+      this.username = authData.username;
+      this.provider = authData.provider;
+      this.expiresAt = Date.now() + authData.expiresIn * 1000;
+      this.isAuthenticated = true;
     },
 
     /**

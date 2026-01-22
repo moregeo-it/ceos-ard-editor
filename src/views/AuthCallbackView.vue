@@ -39,6 +39,8 @@
 <script>
 import { useAuthStore } from '@/stores/auth';
 
+import { useNotificationsStore } from '@/stores/notifications';
+
 export default {
   name: 'AuthCallbackView',
 
@@ -73,23 +75,12 @@ export default {
       }
 
       try {
-        // Parse and store tokens
-        const success = authStore.handleAuthCallback(searchParams);
-
-        if (success) {
-          this.$router.push({ name: 'workspaces' });
-        } else {
-          this.error = 'Authentication failed. Please try again.';
-          setTimeout(() => {
-            this.$router.push({ name: 'landing' });
-          }, 3000);
-        }
+        authStore.handleAuthCallback(searchParams);
+        this.$router.push({ name: 'workspaces' });
       } catch (error) {
-        this.error = `Authentication error: ${error.message}`;
-        setTimeout(() => {
-          this.$router.push({ name: 'landing' });
-        }, 3000);
-        return;
+        const notifications = useNotificationsStore();
+        notifications.error(`Authentication failed. Please try again. Error: ${error.message}`);
+        this.$router.push({ name: 'landing' });
       }
     },
   },
