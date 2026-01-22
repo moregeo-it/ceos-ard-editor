@@ -11,7 +11,7 @@
         hide-details
         clearable
         :loading="filesStore.isSearchLoading"
-        @update:model-value="search"
+        @update:model-value="debouncedSearch"
         @click:clear="clearSearch"
       />
     </div>
@@ -158,6 +158,7 @@
 </template>
 
 <script>
+import { useDebounceFn } from '@vueuse/core';
 import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
@@ -201,10 +202,10 @@ export default {
       },
       openFolders: [],
       searchQuery: '',
-      searchDebounce: null,
       createInitialPath: null,
       itemToRename: null,
       itemToDelete: null,
+      debouncedSearch: null,
     };
   },
 
@@ -257,13 +258,8 @@ export default {
   },
 
   async created() {
+    this.debouncedSearch = useDebounceFn(this.search, 300);
     await this.loadFiles();
-  },
-
-  beforeUnmount() {
-    if (this.searchDebounce) {
-      clearTimeout(this.searchDebounce);
-    }
   },
 
   methods: {
@@ -288,25 +284,17 @@ export default {
       this.editorStore.show(path);
     },
 
-    search(value) {
-      // Clear existing timeout
-      if (this.searchDebounce) {
-        clearTimeout(this.searchDebounce);
+    async search(value) {
+      if (!value || !value.trim()) {
+        this.clearSearch();
+        return;
       }
 
-      // Debounce search to avoid too many requests
-      this.searchDebounce = setTimeout(async () => {
-        if (!value || !value.trim()) {
-          this.clearSearch();
-          return;
-        }
-
-        try {
-          await this.filesStore.searchFiles(value);
-        } catch (error) {
-          this.notificationsStore.error(`Search failed: ${error.message}`);
-        }
-      }, 300);
+      try {
+        await this.filesStore.searchFiles(value);
+      } catch (error) {
+        this.notificationsStore.error(`Search failed: ${error.message}`);
+      }
     },
 
     async clearSearch() {

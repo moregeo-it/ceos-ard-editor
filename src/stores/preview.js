@@ -18,7 +18,6 @@ export const usePreviewStore = defineStore('preview', {
   getters: {
     hasPreview: (state) => !!state.previewHtml,
     hasSelectedPfs: (state) => Array.isArray(state.selectedPfs) && state.selectedPfs.length > 0,
-    hasSelectionChanged: (state) => state.oldSelectedPfs !== state.selectedPfs,
   },
 
   actions: {
@@ -54,6 +53,7 @@ export const usePreviewStore = defineStore('preview', {
      */
     async generatePreview() {
       if (!this.hasSelectedPfs) {
+        this.previewHtml = '';
         return;
       }
 
