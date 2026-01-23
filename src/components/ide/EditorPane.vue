@@ -67,9 +67,11 @@
         <template v-slot:prepend>
           <v-btn :icon="icons.menu"></v-btn>
         </template>
-
-        <v-toolbar-title> Used in: ... </v-toolbar-title>
         -->
+
+        <v-toolbar-title v-if="usage" class="text-body-2" :title="usage">
+          {{ usage }}
+        </v-toolbar-title>
 
         <template v-slot:append>
           <v-btn
@@ -130,6 +132,12 @@ export default {
             'bg-color': 'grey-lighten-3',
             color: 'primary',
           };
+    },
+    usage() {
+      if (!this.activeFile?.usage) {
+        return null;
+      }
+      return 'Used in: ' + this.activeFile.usage.join(', ');
     },
     model: {
       get() {
