@@ -269,6 +269,9 @@ export default {
         this.expandToPath(newFile.path);
       }
     },
+    async activatedItems() {
+      setTimeout(() => this.scrollToActivatedItem(), 250);
+    },
   },
 
   async created() {
@@ -326,6 +329,25 @@ export default {
 
       // Activate (select) the file
       this.activatedItems = [filePath];
+    },
+
+    /**
+     * Scroll the currently activated item in the treeview into view
+     */
+    async scrollToActivatedItem() {
+      const treeview = this.$refs.treeview;
+      if (!treeview?.$el) {
+        return;
+      }
+
+      const activatedElement = treeview.$el.querySelector(
+        '.v-treeview-item--activated, .v-list-item--active',
+      );
+      if (activatedElement) {
+        activatedElement.scrollIntoView({
+          behavior: 'smooth',
+        });
+      }
     },
 
     openFile(activated) {
