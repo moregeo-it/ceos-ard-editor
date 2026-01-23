@@ -35,9 +35,9 @@
         color="primary"
         class="ml-2"
         :disabled="!previewHtml"
-        @click="downloadPreview('word')"
+        @click="downloadPreview('docx')"
         title="Download Word Document"
-        :loading="isDownloading['word']"
+        :loading="isDownloading['docx']"
       >
         <v-icon>{{ icons.download }}</v-icon>
         Word
@@ -88,7 +88,7 @@ export default {
     return {
       isDownloading: {
         pdf: false,
-        word: false,
+        docx: false,
       },
       icons: {
         download: mdiDownload,
@@ -288,7 +288,7 @@ export default {
 
         const blob = new Blob([response], { type: response.type });
 
-        const filename = `preview.${documentType === 'word' ? 'docx' : 'pdf'}`;
+        const filename = `preview.${documentType}`;
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -298,7 +298,6 @@ export default {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
       } catch (error) {
-        console.error('Error downloading preview file:', error);
         const notification = useNotificationsStore();
         notification.error('Failed to download preview file: ' + error.message);
       } finally {
