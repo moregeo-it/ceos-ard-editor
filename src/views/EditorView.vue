@@ -1,40 +1,30 @@
 <template>
   <v-app v-if="workspace" id="editor">
-    <!-- Top Navigation Bar -->
-    <v-app-bar color="primary" elevation="2">
-      <!-- Workspace Name -->
-      <v-app-bar-title>
-        {{ workspace.title }}
-      </v-app-bar-title>
+    <HeaderBar :title="workspace.title" :icon="icons.title">
+      <template #central-actions>
+        <v-btn
+          v-if="!isArchived"
+          variant="flat"
+          color="success"
+          class="mr-2"
+          :prepend-icon="icons.propose"
+          @click="handlePropose"
+          :disabled="loading"
+        >
+          Propose
+        </v-btn>
 
-      <!-- Action Buttons -->
-      <v-btn
-        v-if="!isArchived"
-        variant="flat"
-        color="success"
-        class="mr-2"
-        :prepend-icon="icons.propose"
-        @click="handlePropose"
-        :disabled="loading"
-      >
-        Propose
-      </v-btn>
-
-      <v-btn
-        variant="flat"
-        color="error"
-        class="mr-4"
-        :prepend-icon="icons.close"
-        @click="closeWorkspace"
-      >
-        Close
-      </v-btn>
-
-      <v-spacer />
-
-      <!-- User Menu -->
-      <UserMenu />
-    </v-app-bar>
+        <v-btn
+          variant="flat"
+          color="error"
+          class="mr-4"
+          :prepend-icon="icons.close"
+          @click="closeWorkspace"
+        >
+          Close
+        </v-btn>
+      </template>
+    </HeaderBar>
 
     <!-- Main Content Area -->
     <v-main>
@@ -68,11 +58,11 @@ import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
 import { usePreviewStore } from '@/stores/preview';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import { mdiCheckCircle, mdiMenuDown, mdiClose } from '@mdi/js';
+import { mdiCheckCircle, mdiMenuDown, mdiClose, mdiNotebookEdit } from '@mdi/js';
 import EditorPane from '@/components/ide/EditorPane.vue';
 import FilesPane from '@/components/ide/FilesPane.vue';
+import HeaderBar from '@/components/HeaderBar.vue';
 import PreviewPane from '@/components/ide/PreviewPane.vue';
-import UserMenu from '@/components/workspace/UserMenu.vue';
 import ArchivedDialog from '@/components/ide/dialogs/ArchivedDialog.vue';
 import { Splitpanes, Pane } from 'splitpanes';
 
@@ -82,12 +72,11 @@ export default {
     ArchivedDialog,
     EditorPane,
     FilesPane,
+    HeaderBar,
     Pane,
     PreviewPane,
     Splitpanes,
-    UserMenu,
   },
-
   data() {
     const panelSizeDefaults = {
       files: 15,
@@ -99,6 +88,7 @@ export default {
         propose: mdiCheckCircle,
         menuDown: mdiMenuDown,
         close: mdiClose,
+        title: mdiNotebookEdit,
       },
       panelSizeDefaults: panelSizeDefaults,
       panelSizes: {
