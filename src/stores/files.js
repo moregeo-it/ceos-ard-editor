@@ -22,6 +22,7 @@ const getDefaults = () => ({
   searchResults: null, // Search results
   isSearchLoading: false,
   isPathLoading: [],
+  isFolderComplete: {},
 });
 
 const getParentPath = (filePath) => {
@@ -54,6 +55,15 @@ export const useFilesStore = defineStore('files', {
           folders[parent] = [];
         }
         folders[parent].push(toFileTreeObject(file));
+      }
+      for (const path in folders) {
+        folders[path].sort((a, b) => {
+          // Folders first, then files, both alphabetically
+          if (a.type === b.type) {
+            return a.name.localeCompare(b.name, 'en', { sensitivity: 'base' });
+          }
+          return a.type === 'folder' ? -1 : 1;
+        });
       }
       return folders;
     },
@@ -92,13 +102,14 @@ export const useFilesStore = defineStore('files', {
      * Load files from server and build tree structure
      */
     async loadFiles(path = '/', force = false) {
-      if (Array.isArray(this.folders[path]) && !force) {
+      if (this.isFolderComplete[path] && !force) {
         return; // Already loaded
       }
       this.isPathLoading.push(path);
       try {
         const files = await fileService.fetchFileTree(getWorkspaceId(), path);
         files.forEach((file) => (this.all[file.path] = file));
+        this.isFolderComplete[path] = true;
       } finally {
         this.resetPathLoading(path);
       }
@@ -115,7 +126,8 @@ export const useFilesStore = defineStore('files', {
      * Search files and folders
      */
     async searchFiles(query) {
-      if (!query.trim()) {
+      query = typeof query === 'string' ? query.trim() : '';
+      if (query.length < 3) {
         // If query is empty, reload full tree
         await this.loadFiles();
         return;

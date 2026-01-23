@@ -19,14 +19,16 @@
     <!-- File Tree -->
     <div class="flex-grow-1 overflow-hidden pa-0 fill-height">
       <v-treeview
+        ref="treeview"
         v-if="treeItems.length > 0"
+        v-model:opened="openedFolders"
+        v-model:activated="activatedItems"
         class="fill-height"
         activatable
         :items="treeItems"
         :indent-lines="true"
         :separate-roots="true"
         density="compact"
-        :load-children="loadFolder"
         open-on-click
         item-title="name"
         item-value="path"
@@ -43,7 +45,7 @@
             :icon="props.toggleIcon"
             :loading="filesStore.isPathLoading.includes(item.path)"
             variant="text"
-            @click="props.onClick"
+            @click="expandFolder($event, props, item)"
           >
             <template v-slot:loader>
               <VProgressCircular indeterminate="disable-shrink" size="20" width="2" />
@@ -200,7 +202,8 @@ export default {
         delete: mdiDeleteOutline,
         revert: mdiUndoVariant,
       },
-      openFolders: [],
+      openedFolders: [],
+      activatedItems: [],
       searchQuery: '',
       createInitialPath: null,
       itemToRename: null,
@@ -255,6 +258,20 @@ export default {
     treeItems() {
       return this.filesStore.searchResults ?? this.filesStore.fileTree;
     },
+    activeFile() {
+      return this.editorStore.active;
+    },
+  },
+
+  watch: {
+    activeFile(newFile) {
+      if (newFile) {
+        this.expandToPath(newFile.path);
+      }
+    },
+    async activatedItems() {
+      setTimeout(() => this.scrollToActivatedItem(), 250);
+    },
   },
 
   async created() {
@@ -263,15 +280,73 @@ export default {
   },
 
   methods: {
-    async loadFolder(item) {
-      await this.loadFiles(item.path);
+    async expandFolder(event, props, item) {
+      const isExpanding = !this.openedFolders.includes(item.path);
+      props.onClick(event);
+      if (isExpanding && item.type === 'folder') {
+        await this.loadFiles(item.path, true);
+      }
     },
 
-    async loadFiles(path = '/') {
+    async loadFiles(path = '/', force = false) {
       try {
-        await this.filesStore.loadFiles(path);
+        await this.filesStore.loadFiles(path, force);
       } catch (error) {
         this.notificationsStore.error(`Failed to load files: ${error.message}`);
+      }
+    },
+
+    /**
+     * Expand the treeview to reveal a specific file path
+     * @param {string} filePath - The full path to expand to (e.g., '/folder/subfolder/file.txt')
+     */
+    async expandToPath(filePath) {
+      if (!filePath || filePath === '/') {
+        return;
+      }
+
+      // Build array of all parent folder paths
+      const pathParts = filePath.split('/').filter(Boolean);
+      const foldersToOpen = [];
+      let currentPath = '';
+
+      // Don't include the last part if it's a file (not a folder)
+      const partsToProcess = pathParts.slice(0, -1);
+
+      for (const part of partsToProcess) {
+        currentPath = currentPath + '/' + part;
+        foldersToOpen.push(currentPath);
+      }
+
+      // Load each folder level and expand it
+      for (const folderPath of foldersToOpen) {
+        await this.loadFiles(folderPath);
+      }
+
+      // Update opened folders to include all parent paths
+      const newOpened = [...new Set([...this.openedFolders, ...foldersToOpen])];
+      this.openedFolders = newOpened;
+
+      // Activate (select) the file
+      this.activatedItems = [filePath];
+    },
+
+    /**
+     * Scroll the currently activated item in the treeview into view
+     */
+    async scrollToActivatedItem() {
+      const treeview = this.$refs.treeview;
+      if (!treeview?.$el) {
+        return;
+      }
+
+      const activatedElement = treeview.$el.querySelector(
+        '.v-treeview-item--activated, .v-list-item--active',
+      );
+      if (activatedElement) {
+        activatedElement.scrollIntoView({
+          behavior: 'smooth',
+        });
       }
     },
 
@@ -285,7 +360,8 @@ export default {
     },
 
     async search(value) {
-      if (!value || !value.trim()) {
+      value = typeof value === 'string' ? value.trim() : '';
+      if (value === '') {
         this.clearSearch();
         return;
       }
@@ -304,7 +380,7 @@ export default {
 
     getFileIcon(item) {
       if (item.type === 'folder') {
-        return this.openFolders.includes(item.id) ? this.icons.folderOpen : this.icons.folder;
+        return this.openedFolders.includes(item.path) ? this.icons.folderOpen : this.icons.folder;
       }
       return this.icons.file;
     },
