@@ -88,7 +88,6 @@ export const useFilesStore = defineStore('files', {
     async loadFileContext(path, force = false) {
       // File context endpoint adds an additional usage property, which means if it's already
       // there, we have already loaded the context
-      console.log(this.all[path]);
       if (Array.isArray(this.all[path]) && typeof this.all[path].usage !== 'undefined' && !force) {
         return this.all[path]; // Already loaded
       }

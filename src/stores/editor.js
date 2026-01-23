@@ -19,9 +19,7 @@ export const useEditorStore = defineStore('editor', {
   actions: {
     async show(path) {
       const files = useFilesStore();
-      console.log(path);
       let file = await files.loadFileContext(path);
-      console.log(file);
       if (!file || file.is_directory || file.status === 'deleted') {
         return;
       }
