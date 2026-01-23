@@ -16,6 +16,12 @@ const getDefaults = () => ({
 export const useEditorStore = defineStore('editor', {
   state: () => getDefaults(),
 
+  getters: {
+    hasUnsavedChanges: (state) => {
+      return state.opened.some((file) => state.changed[file.path]);
+    },
+  },
+
   actions: {
     async show(path) {
       const files = useFilesStore();

@@ -180,7 +180,7 @@ export default {
       return this.activeFile && this.editorStore.saving[this.activeFile.path];
     },
     hasAnyChanges() {
-      return this.openedFiles.some((file) => this.editorStore.changed[file.path]);
+      return this.editorStore.hasUnsavedChanges;
     },
     isAnySaving() {
       return Object.values(this.editorStore.saving).some((isSaving) => isSaving);
