@@ -79,6 +79,7 @@ import previewService from '@/services/preview.service';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { mdiFileDocumentOutline, mdiDownload } from '@mdi/js';
 import { useNotificationsStore } from '@/stores/notifications';
+import { downloadBlob } from '@/utils/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -280,23 +281,18 @@ export default {
     async downloadPreview(documentType) {
       this.isDownloading[documentType] = true;
 
-      if (!this.selectedPfs || this.selectedPfs.length === 0) return;
-      const pfs = this.selectedPfs;
-      const workspaceId = this.workspaceId;
+      if (!this.selectedPfs || this.selectedPfs.length === 0) {
+        return;
+      }
       try {
-        const response = await previewService.downloadPreviewFile(workspaceId, pfs, documentType);
-
+        const response = await previewService.downloadPreviewFile(
+          this.workspaceId,
+          this.selectedPfs,
+          documentType,
+        );
         const blob = new Blob([response], { type: response.type });
-
-        const filename = `preview.${documentType}`;
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+        const filename = `CEOS-ARD-${this.selectedPfs.join('-')}.${documentType}`;
+        downloadBlob(blob, filename);
       } catch (error) {
         const notification = useNotificationsStore();
         notification.error('Failed to download preview file: ' + error.message);

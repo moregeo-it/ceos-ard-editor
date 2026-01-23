@@ -6,12 +6,9 @@ export default {
    */
   async generatePreview(workspaceId, pfs = null) {
     let url = `/workspaces/${workspaceId}/previews`;
-    if (pfs && pfs.length > 0) {
-      // Build query string for multiple pfs
-      const params = pfs.map((p) => `pfs=${encodeURIComponent(p)}`).join('&');
-      url += `?${params}`;
-    }
-    return api.get(url);
+    const query = new URLSearchParams();
+    pfs.forEach((p) => query.append('pfs', p));
+    return api.get(`${url}?${query}`);
   },
 
   async getPreviewStaticFile(workspaceId, filePath) {
@@ -20,9 +17,9 @@ export default {
   },
 
   async downloadPreviewFile(workspaceId, pfs, documentType) {
-    // Build query string for multiple pfs
-    const params = pfs.map((p) => `pfs=${encodeURIComponent(p)}`).join('&');
-    let url = `/workspaces/${workspaceId}/download?format=${encodeURIComponent(documentType)}&${params}`;
-    return api.getBlob(url);
+    const query = new URLSearchParams();
+    query.append('format', documentType);
+    pfs.forEach((p) => query.append('pfs', p));
+    return api.getBlob(`/workspaces/${workspaceId}/download?${query}`);
   },
 };
