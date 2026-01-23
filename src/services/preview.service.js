@@ -18,4 +18,11 @@ export default {
     const url = `/workspaces/${workspaceId}/previews/${encodeURIComponent(filePath)}`;
     return api.get(url);
   },
+
+  async downloadPreviewFile(workspaceId, pfs, documentType) {
+    // Build query string for multiple pfs
+    const params = pfs.map((p) => `pfs=${encodeURIComponent(p)}`).join('&');
+    let url = `/workspaces/${workspaceId}/download?documentType=${encodeURIComponent(documentType)}&${params}`;
+    return api.getBlob(url);
+  },
 };

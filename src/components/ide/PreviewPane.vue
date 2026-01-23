@@ -20,6 +20,28 @@
           </v-chip>
         </template>
       </v-select>
+      <v-btn
+        color="primary"
+        class="ml-2"
+        :disabled="!previewHtml"
+        @click="downloadPreview('pdf')"
+        title="Download PDF"
+        :loading="isDownloading['pdf']"
+      >
+        <v-icon>{{ icons.download }}</v-icon>
+        PDF
+      </v-btn>
+      <v-btn
+        color="primary"
+        class="ml-2"
+        :disabled="!previewHtml"
+        @click="downloadPreview('word')"
+        title="Download Word Document"
+        :loading="isDownloading['word']"
+      >
+        <v-icon>{{ icons.download }}</v-icon>
+        Word
+      </v-btn>
     </div>
 
     <div class="flex-grow-1 pa-4">
@@ -53,8 +75,10 @@
 import { useAuthStore } from '@/stores/auth';
 import { useEditorStore } from '@/stores/editor';
 import { usePreviewStore } from '@/stores/preview';
+import previewService from '@/services/preview.service';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import { mdiFileDocumentOutline } from '@mdi/js';
+import { mdiFileDocumentOutline, mdiDownload } from '@mdi/js';
+import { useNotificationsStore } from '@/stores/notifications';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -62,7 +86,12 @@ export default {
   name: 'PreviewPane',
   data() {
     return {
+      isDownloading: {
+        pdf: false,
+        word: false,
+      },
       icons: {
+        download: mdiDownload,
         product: mdiFileDocumentOutline,
       },
     };
@@ -246,6 +275,35 @@ export default {
       }
       await this.previewStore.generatePreview();
       this.previewStore.clearOldSelection();
+    },
+
+    async downloadPreview(documentType) {
+      this.isDownloading[documentType] = true;
+
+      if (!this.selectedPfs || this.selectedPfs.length === 0) return;
+      const pfs = this.selectedPfs;
+      const workspaceId = this.workspaceId;
+      try {
+        const response = await previewService.downloadPreviewFile(workspaceId, pfs, documentType);
+
+        const blob = new Blob([response], { type: response.type });
+
+        const filename = `preview.${documentType === 'word' ? 'docx' : 'pdf'}`;
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('Error downloading preview file:', error);
+        const notification = useNotificationsStore();
+        notification.error('Failed to download preview file: ' + error.message);
+      } finally {
+        this.isDownloading[documentType] = false;
+      }
     },
   },
 };

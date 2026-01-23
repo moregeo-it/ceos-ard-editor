@@ -94,6 +94,11 @@ export const api = {
     return response.text();
   },
 
+  async getBlob(endpoint, options = {}) {
+    const response = await fetchWithAuth(endpoint, { ...options, method: 'GET' });
+    return response.blob();
+  },
+
   async get(endpoint, options = {}) {
     const response = await fetchWithAuth(endpoint, { ...options, method: 'GET' });
     const contentType = response.headers.get('content-type') || '';
