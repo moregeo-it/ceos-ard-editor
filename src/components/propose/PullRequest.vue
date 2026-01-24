@@ -40,11 +40,7 @@ export default {
   },
   methods: {
     submitPullRequest() {
-      // Logic to submit the pull request to GitHub
-      console.log('Pull Request:', {
-        title: this.title,
-        description: this.description,
-      });
+      alert('Not implemented yet!');
     },
   },
 };
