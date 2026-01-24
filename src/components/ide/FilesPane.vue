@@ -54,7 +54,10 @@
         </template>
 
         <template v-slot:title="{ item }">
-          <div class="file-item d-flex align-center justify-space-between">
+          <div
+            class="file-item d-flex align-center justify-space-between"
+            @click="item.type === 'folder' && loadFolderOnClick(item)"
+          >
             <span class="file-name">{{ item.name }}</span>
             <FileStatusBadge v-if="item.status" :status="item.status" class="ml-2" />
           </div>
@@ -306,13 +309,22 @@ export default {
       const isExpanding = !this.openedFolders.includes(item.path);
       props.onClick(event);
       if (isExpanding && item.type === 'folder') {
-        await this.loadFiles(item.path, true);
+        await this.loadFiles(item.path);
       }
     },
 
-    async loadFiles(path = '/', force = false) {
+    async loadFolderOnClick(item) {
+      // Load folder contents when clicking on the folder title (text)
+      // The open-on-click prop handles toggling, we just need to load the files
+      const isExpanding = !this.openedFolders.includes(item.path);
+      if (isExpanding) {
+        await this.loadFiles(item.path);
+      }
+    },
+
+    async loadFiles(path = '/') {
       try {
-        await this.filesStore.loadFiles(path, force);
+        await this.filesStore.loadFiles(path);
       } catch (error) {
         this.notificationsStore.error(`Failed to load files: ${error.message}`);
       }
