@@ -1,5 +1,5 @@
 <template>
-  <v-btn-toggle mandatory v-model="switchStore.view" color="primary" :disabled="loading">
+  <v-btn-toggle mandatory v-model="view" color="primary">
     <v-btn
       v-if="!isArchived"
       value="editor"
@@ -29,7 +29,6 @@ import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
 import { usePreviewStore } from '@/stores/preview';
-import { useSwitchStore } from '@/stores/switch';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { mdiCheckCircle, mdiClose, mdiNotebookEdit } from '@mdi/js';
 
@@ -46,7 +45,9 @@ export default {
   },
   computed: {
     loading() {
-      return this.workspacesStore.isWorkspaceLoading[this.workspaceId];
+      const workspaceId = this.workspacesStore.currentWorkspace?.id;
+      if (!workspaceId) return false;
+      return this.workspacesStore.isWorkspaceLoading[workspaceId];
     },
     isArchived() {
       return this.workspacesStore.currentWorkspace?.status === 'archived';
@@ -63,11 +64,11 @@ export default {
     previewStore() {
       return usePreviewStore();
     },
-    switchStore() {
-      return useSwitchStore();
-    },
     workspacesStore() {
       return useWorkspacesStore();
+    },
+    view() {
+      return this.$route.name;
     },
   },
   methods: {
@@ -91,7 +92,6 @@ export default {
       this.filesStore.reset();
       this.notificationsStore.reset();
       this.previewStore.reset();
-      this.switchStore.reset();
       this.$router.push({ name: 'workspaces' });
     },
   },

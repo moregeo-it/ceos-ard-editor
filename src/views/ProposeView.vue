@@ -9,8 +9,12 @@
     <!-- Main Content Area -->
     <v-main>
       <splitpanes @resized="storePaneSizes" :dbl-click-splitter="false">
-        <pane class="diff" min-size="20" :size="panelSizes.diff"> Diff </pane>
-        <pane class="pr" min-size="20" :size="panelSizes.pr"> PR </pane>
+        <pane class="diff" min-size="20" :size="panelSizes.diff">
+          <DiffList />
+        </pane>
+        <pane class="pr" min-size="20" :size="panelSizes.pr">
+          <PullRequest />
+        </pane>
       </splitpanes>
     </v-main>
   </v-app>
@@ -23,16 +27,20 @@
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { mdiCheckCircle } from '@mdi/js';
+import { Splitpanes, Pane } from 'splitpanes';
 import HeaderBar from '@/components/HeaderBar.vue';
 import HeaderSwitch from '@/components/HeaderSwitch.vue';
-import { Splitpanes, Pane } from 'splitpanes';
+import DiffList from '@/components/propose/DiffList.vue';
+import PullRequest from '@/components/propose/PullRequest.vue';
 
 export default {
   name: 'ProposeView',
   components: {
+    DiffList,
     HeaderBar,
     HeaderSwitch,
     Pane,
+    PullRequest,
     Splitpanes,
   },
   data() {

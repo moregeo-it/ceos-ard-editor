@@ -56,15 +56,7 @@
         <template v-slot:title="{ item }">
           <div class="file-item d-flex align-center justify-space-between">
             <span class="file-name">{{ item.name }}</span>
-            <v-chip
-              v-if="item.status"
-              size="x-small"
-              :color="getStatusColor(item.status)"
-              variant="flat"
-              class="ml-2"
-            >
-              {{ item.status }}
-            </v-chip>
+            <FileStatusBadge v-if="item.status" :status="item.status" class="ml-2" />
           </div>
           <div class="text-caption text-pre-wrap text-subtle">
             {{ item.excerpt }}
@@ -168,6 +160,7 @@ import { useWorkspacesStore } from '@/stores/workspaces';
 import CreateFileDialog from './dialogs/CreateFileDialog.vue';
 import RenameDialog from './dialogs/RenameDialog.vue';
 import DeleteConfirmDialog from './dialogs/DeleteConfirmDialog.vue';
+import FileStatusBadge from '../FileStatusBadge.vue';
 import {
   mdiFileDocumentOutline,
   mdiFolderOutline,
@@ -187,6 +180,7 @@ export default {
     CreateFileDialog,
     RenameDialog,
     DeleteConfirmDialog,
+    FileStatusBadge,
   },
 
   data() {
@@ -391,21 +385,6 @@ export default {
       if (item.status === 'renamed') return 'info';
       if (item.status === 'deleted') return 'error';
       return undefined;
-    },
-
-    getStatusColor(status) {
-      switch (status) {
-        case 'added':
-          return 'success';
-        case 'modified':
-          return 'warning';
-        case 'renamed':
-          return 'info';
-        case 'deleted':
-          return 'error';
-        default:
-          return 'default';
-      }
     },
 
     handleCreateInFolder(item) {
