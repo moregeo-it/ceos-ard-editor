@@ -102,6 +102,14 @@
                   </template>
                   <v-list-item-title>Show Changes</v-list-item-title>
                 </v-list-item>
+
+                <v-list-item v-if="item.status !== 'deleted'" @click="handleDownload(item)">
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.download" size="small" />
+                  </template>
+                  <v-list-item-title>Download</v-list-item-title>
+                </v-list-item>
+
                 <v-list-item
                   v-if="item.status && item.status !== 'added'"
                   @click="handleRevert(item)"
@@ -111,12 +119,14 @@
                   </template>
                   <v-list-item-title>Revert</v-list-item-title>
                 </v-list-item>
+
                 <v-list-item v-if="item.status !== 'deleted'" @click="handleRename(item)">
                   <template v-slot:prepend>
                     <v-icon :icon="icons.rename" size="small" />
                   </template>
                   <v-list-item-title>Rename</v-list-item-title>
                 </v-list-item>
+
                 <v-list-item v-if="item.status !== 'deleted'" @click="handleDelete(item)">
                   <template v-slot:prepend>
                     <v-icon :icon="icons.delete" size="small" color="error" />
@@ -183,7 +193,9 @@ import {
   mdiPencilOutline,
   mdiDeleteOutline,
   mdiUndoVariant,
+  mdiDownload,
 } from '@mdi/js';
+import { downloadBlob } from '@/utils/api';
 
 export default {
   name: 'FilesPane',
@@ -209,6 +221,7 @@ export default {
         rename: mdiPencilOutline,
         delete: mdiDeleteOutline,
         revert: mdiUndoVariant,
+        download: mdiDownload,
       },
       openedFolders: [],
       activatedItems: [],
@@ -459,6 +472,15 @@ export default {
         this.notificationsStore.success('File reverted successfully');
       } catch (error) {
         this.notificationsStore.error(`Failed to revert: ${error.message}`);
+      }
+    },
+
+    async handleDownload(item) {
+      try {
+        const data = await this.filesStore.load(item.path);
+        downloadBlob(data, item.name);
+      } catch (error) {
+        this.notificationsStore.error(`Failed to start download: ${error.message}`);
       }
     },
   },

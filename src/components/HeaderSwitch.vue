@@ -1,26 +1,12 @@
 <template>
   <v-btn-toggle mandatory v-model="view" color="primary">
-    <v-btn
-      v-if="!isArchived"
-      value="editor"
-      :prepend-icon="icons.edit"
-      :ripple="false"
-      @click="edit"
-    >
+    <v-btn v-if="!isArchived" value="editor" :prepend-icon="icons.edit" :ripple="false">
       Editor
     </v-btn>
-    <v-btn
-      v-if="!isArchived"
-      value="propose"
-      :prepend-icon="icons.propose"
-      :ripple="false"
-      @click="proposeChanges"
-    >
+    <v-btn v-if="!isArchived" value="propose" :prepend-icon="icons.propose" :ripple="false">
       Propose
     </v-btn>
-    <v-btn value="close" :prepend-icon="icons.close" :ripple="false" @click="closeWorkspace">
-      Close
-    </v-btn>
+    <v-btn value="workspaces" :prepend-icon="icons.close" :ripple="false"> Close </v-btn>
   </v-btn-toggle>
 </template>
 
@@ -67,14 +53,20 @@ export default {
     workspacesStore() {
       return useWorkspacesStore();
     },
-    view() {
-      return this.$route.name;
+    view: {
+      get() {
+        return this.$route.name;
+      },
+      set(name) {
+        if (name === 'workspaces') {
+          this.closeWorkspace();
+          return;
+        }
+        this.$router.push({ name });
+      },
     },
   },
   methods: {
-    edit() {
-      this.$router.push({ name: 'editor' });
-    },
     proposeChanges() {
       this.$router.push({ name: 'propose' });
     },
