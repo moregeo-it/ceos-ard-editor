@@ -31,8 +31,8 @@
 import diffService from '@/services/diff.service';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import FileStatusBadge from '../FileStatusBadge.vue';
-import FileDiff from './FileDiff.vue';
+import FileStatusBadge from '@/components/FileStatusBadge.vue';
+import FileDiff from '@/components/ide/dialogs/FileDiff.vue';
 
 export default {
   name: 'DiffList',

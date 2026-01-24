@@ -94,6 +94,15 @@
               <!-- File Actions -->
               <template v-else>
                 <v-list-item
+                  v-if="item.status && !['added', 'deleted'].includes(item.status)"
+                  @click="itemToDiff = item"
+                >
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.diff" size="small" />
+                  </template>
+                  <v-list-item-title>Show Changes</v-list-item-title>
+                </v-list-item>
+                <v-list-item
                   v-if="item.status && item.status !== 'added'"
                   @click="handleRevert(item)"
                 >
@@ -148,10 +157,12 @@
       :item-type="itemToDelete?.type"
       @confirm="handleDeleteConfirm"
     />
+    <DiffDialog v-if="itemToDiff" :item="itemToDiff" @close="itemToDiff = null" />
   </div>
 </template>
 
 <script>
+import { defineAsyncComponent } from 'vue';
 import { useDebounceFn } from '@vueuse/core';
 import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
@@ -162,6 +173,7 @@ import RenameDialog from './dialogs/RenameDialog.vue';
 import DeleteConfirmDialog from './dialogs/DeleteConfirmDialog.vue';
 import FileStatusBadge from '../FileStatusBadge.vue';
 import {
+  mdiFileCompare,
   mdiFileDocumentOutline,
   mdiFolderOutline,
   mdiFolderOpenOutline,
@@ -178,6 +190,7 @@ export default {
 
   components: {
     CreateFileDialog,
+    DiffDialog: defineAsyncComponent(() => import('./dialogs/DiffDialog.vue')),
     RenameDialog,
     DeleteConfirmDialog,
     FileStatusBadge,
@@ -186,6 +199,7 @@ export default {
   data() {
     return {
       icons: {
+        diff: mdiFileCompare,
         file: mdiFileDocumentOutline,
         folder: mdiFolderOutline,
         folderOpen: mdiFolderOpenOutline,
@@ -202,6 +216,7 @@ export default {
       createInitialPath: null,
       itemToRename: null,
       itemToDelete: null,
+      itemToDiff: null,
       debouncedSearch: null,
     };
   },
