@@ -8,4 +8,10 @@ export default {
   async loadDiff(workspaceId, filePath) {
     return api.getText(`/workspaces/${workspaceId}/diffs/${encodeURIComponent(filePath)}`);
   },
+  async createPullRequest(workspaceId, title, description) {
+    return api.post(`/workspaces/${workspaceId}/propose`, {
+      title,
+      description,
+    });
+  },
 };

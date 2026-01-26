@@ -12,6 +12,8 @@
         label="Title"
         placeholder="Short title for the pull request"
         variant="outlined"
+        :disabled="isSubmitting"
+        :loading="isSubmitting"
       ></v-text-field>
 
       <v-textarea
@@ -22,25 +24,66 @@
         hint="You can use Markdown to format your description."
         variant="outlined"
         rows="10"
+        :disabled="isSubmitting"
+        :loading="isSubmitting"
       ></v-textarea>
 
-      <v-btn type="submit" color="primary" class="mt-2 w-100">Submit</v-btn>
+      <v-btn
+        type="submit"
+        color="primary"
+        class="mt-2 w-100"
+        :disabled="isSubmitting"
+        :loading="isSubmitting"
+        >Submit</v-btn
+      >
     </form>
   </div>
 </template>
 
 <script>
+import diffService from '@/services/diff.service';
+import { useWorkspacesStore } from '@/stores/workspaces';
+import { useNotificationsStore } from '@/stores/notifications';
+
 export default {
   name: 'PullRequest',
   data() {
     return {
       title: '',
       description: '',
+      isSubmitting: false,
     };
   },
+  computed: {
+    workspacesStore() {
+      return useWorkspacesStore();
+    },
+    notificationsStore() {
+      return useNotificationsStore();
+    },
+  },
   methods: {
-    submitPullRequest() {
-      alert('Not implemented yet!');
+    async submitPullRequest() {
+      this.isSubmitting = true;
+      try {
+        const pr_response = await diffService.createPullRequest(
+          this.workspacesStore.currentWorkspace.id,
+          this.title,
+          this.description,
+        );
+
+        if (pr_response) {
+          this.notificationsStore.success('Pull Request created successfully.');
+          this.$router.push({
+            name: 'WorkspaceView',
+            params: { id: this.workspacesStore.currentWorkspace.id },
+          });
+        }
+      } catch (error) {
+        this.notificationsStore.error('Failed to create Pull Request:' + error.message);
+      } finally {
+        this.isSubmitting = false;
+      }
     },
   },
 };
