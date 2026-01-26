@@ -1,5 +1,5 @@
 <template>
-  <v-app v-if="workspace" id="editor">
+  <v-app v-if="workspace" id="propose">
     <HeaderBar :title="workspace.title" :icon="icons.title">
       <template #central-actions>
         <HeaderSwitch />
@@ -8,22 +8,14 @@
 
     <!-- Main Content Area -->
     <v-main>
-      <v-container v-if="loading" class="fill-height d-flex align-center justify-center">
-        <v-progress-circular indeterminate color="primary" size="64" />
-      </v-container>
-      <splitpanes v-else @resized="storePaneSizes" :dbl-click-splitter="false">
-        <pane class="files" min-size="10" :size="panelSizes.files">
-          <FilesPane />
+      <splitpanes @resized="storePaneSizes" :dbl-click-splitter="false">
+        <pane class="diff" min-size="20" :size="panelSizes.diff">
+          <DiffList />
         </pane>
-        <pane class="editor" min-size="30" :size="panelSizes.editor">
-          <EditorPane />
-        </pane>
-        <pane class="preview" min-size="0" :size="panelSizes.preview">
-          <PreviewPane />
+        <pane class="pr" min-size="20" :size="panelSizes.pr">
+          <PullRequest />
         </pane>
       </splitpanes>
-
-      <ArchivedDialog v-if="isArchived" :workspace="workspace" @activate="handleToggleStatus" />
     </v-main>
   </v-app>
   <v-container v-else class="fill-height d-flex align-center justify-center">
@@ -34,44 +26,36 @@
 <script>
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import { mdiCheckCircle, mdiMenuDown, mdiNotebookEdit } from '@mdi/js';
+import { mdiCheckCircle } from '@mdi/js';
+import { Splitpanes, Pane } from 'splitpanes';
 import HeaderBar from '@/components/HeaderBar.vue';
 import HeaderSwitch from '@/components/HeaderSwitch.vue';
-import EditorPane from '@/components/ide/EditorPane.vue';
-import FilesPane from '@/components/ide/FilesPane.vue';
-import PreviewPane from '@/components/ide/PreviewPane.vue';
-import ArchivedDialog from '@/components/ide/dialogs/ArchivedDialog.vue';
-import { Splitpanes, Pane } from 'splitpanes';
+import DiffList from '@/components/propose/DiffList.vue';
+import PullRequest from '@/components/propose/PullRequest.vue';
 
 export default {
-  name: 'EditorView',
+  name: 'ProposeView',
   components: {
-    ArchivedDialog,
-    EditorPane,
-    FilesPane,
+    DiffList,
     HeaderBar,
     HeaderSwitch,
     Pane,
-    PreviewPane,
+    PullRequest,
     Splitpanes,
   },
   data() {
     const panelSizeDefaults = {
-      files: 15,
-      editor: 50,
-      preview: 35,
+      diff: 60,
+      pr: 40,
     };
     return {
       icons: {
-        propose: mdiCheckCircle,
-        menuDown: mdiMenuDown,
-        title: mdiNotebookEdit,
+        title: mdiCheckCircle,
       },
       panelSizeDefaults: panelSizeDefaults,
       panelSizes: {
-        files: localStorage.filesPanelSize ?? panelSizeDefaults.files,
-        editor: localStorage.editorPanelSize ?? panelSizeDefaults.editor,
-        preview: localStorage.previewPanelSize ?? panelSizeDefaults.preview,
+        diff: localStorage.diffPanelSize ?? panelSizeDefaults.diff,
+        pr: localStorage.prPanelSize ?? panelSizeDefaults.pr,
       },
     };
   },
@@ -103,10 +87,9 @@ export default {
 
   methods: {
     storePaneSizes: ({ panes }) => {
-      if (panes.length === 3) {
-        localStorage.filesPanelSize = panes[0].size;
-        localStorage.editorPanelSize = panes[1].size;
-        localStorage.previewPanelSize = panes[2].size;
+      if (panes.length === 2) {
+        localStorage.diffPanelSize = panes[0].size;
+        localStorage.prPanelSize = panes[1].size;
       }
     },
 
@@ -118,15 +101,6 @@ export default {
         this.$router.push({ name: 'workspaces' });
       }
     },
-
-    async handleToggleStatus() {
-      try {
-        await this.workspacesStore.toggleWorkspaceStatus(this.workspaceId);
-        this.notificationsStore.success('Workspace activated successfully');
-      } catch (error) {
-        this.notificationsStore.error(`Failed to activate workspace: ${error.message}`);
-      }
-    },
   },
 };
 </script>
@@ -135,19 +109,18 @@ export default {
 @import '../../node_modules/splitpanes/dist/splitpanes.css';
 @import './split.css';
 
-#editor,
-#editor > * {
+#propose,
+#propose > * {
   height: 100vh !important;
 }
-#editor .v-main {
+#propose .v-main {
   height: calc(100vh - var(--v-layout-top)) !important;
 }
 </style>
 
 <style scoped>
-.files,
-.editor,
-.preview {
+.diff,
+.pr {
   max-height: 100%;
   overflow: hidden;
 }

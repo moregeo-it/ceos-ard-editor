@@ -51,7 +51,7 @@
           </v-container>
           <component
             v-else
-            :is="editorType"
+            :is="getEditorType(editorStore.original[file.path])"
             :value="editorStore.original[file.path]"
             @update="(val) => editorStore.sync(file.path, val)"
             @save="save(file.path)"
@@ -99,14 +99,20 @@ import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { defineAsyncComponent } from 'vue';
+import ImageViewer from './editors/ImageViewer.vue';
 import SourceCodeEditor from './editors/SourceCodeEditor.vue';
+import UnsupportedViewer from './editors/UnsupportedViewer.vue';
 import { mdiClose, mdiContentSave, mdiContentSaveAll, mdiMenu } from '@mdi/js';
+
+const supportedImageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 
 export default {
   name: 'EditorPane',
 
   components: {
+    ImageViewer,
     SourceCodeEditor,
+    UnsupportedViewer,
     PfsDocumentEditor: defineAsyncComponent(() => import('./editors/PfsDocumentEditor.vue')),
   },
 
@@ -165,9 +171,6 @@ export default {
     openedFiles() {
       return this.editorStore.opened;
     },
-    editorType() {
-      return 'SourceCodeEditor';
-    },
     isReadOnly() {
       // Determine if the current workspace is read-only (archived)
       const workspace = this.workspacesStore.current;
@@ -180,13 +183,24 @@ export default {
       return this.activeFile && this.editorStore.saving[this.activeFile.path];
     },
     hasAnyChanges() {
-      return this.openedFiles.some((file) => this.editorStore.changed[file.path]);
+      return this.editorStore.hasUnsavedChanges;
     },
     isAnySaving() {
       return Object.values(this.editorStore.saving).some((isSaving) => isSaving);
     },
   },
   methods: {
+    getEditorType(value) {
+      if (value instanceof Blob) {
+        if (supportedImageTypes.includes(value.type)) {
+          return 'ImageViewer';
+        } else {
+          return 'UnsupportedViewer';
+        }
+      } else {
+        return 'SourceCodeEditor';
+      }
+    },
     isDeleted(path) {
       const file = this.filesStore.all[path];
       return !file || file.status === 'deleted';

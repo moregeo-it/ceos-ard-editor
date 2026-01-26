@@ -16,6 +16,12 @@ const getDefaults = () => ({
 export const useEditorStore = defineStore('editor', {
   state: () => getDefaults(),
 
+  getters: {
+    hasUnsavedChanges: (state) => {
+      return state.opened.some((file) => state.changed[file.path]);
+    },
+  },
+
   actions: {
     async show(path) {
       const files = useFilesStore();
@@ -29,8 +35,13 @@ export const useEditorStore = defineStore('editor', {
       this.active = file;
       if (this.original[path] === undefined) {
         const data = await files.load(path);
-        this.original[path] = data;
-        this.data[path] = data;
+        if (data.type.startsWith('image/')) {
+          this.original[path] = data;
+          this.data[path] = data;
+        } else {
+          this.original[path] = await data.text();
+          this.data[path] = await data.text();
+        }
         this.changed[path] = false;
         this.saving[path] = false;
       }

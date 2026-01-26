@@ -1,17 +1,6 @@
 <template>
   <v-app>
-    <!-- App Bar -->
-    <v-app-bar color="primary" elevation="2">
-      <v-app-bar-title>
-        <v-icon :icon="icons.folderMultiple" start></v-icon>
-        My PFS Workspaces
-      </v-app-bar-title>
-
-      <v-spacer></v-spacer>
-
-      <!-- User Menu -->
-      <UserMenu />
-    </v-app-bar>
+    <HeaderBar title="My PFS Workspaces" :icon="icons.folderMultiple" />
 
     <!-- Main Content -->
     <v-main>
@@ -144,22 +133,22 @@
 import { useAuthStore } from '@/stores/auth';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
+import HeaderBar from '@/components/HeaderBar.vue';
 import WorkspaceCard from '@/components/workspace/WorkspaceCard.vue';
 import WorkspaceDialog from '@/components/workspace/dialogs/WorkspaceDialog.vue';
 import ArchiveConfirmDialog from '@/components/workspace/dialogs/ArchiveConfirmDialog.vue';
 import DeleteConfirmDialog from '@/components/workspace/dialogs/DeleteConfirmDialog.vue';
-import UserMenu from '@/components/workspace/UserMenu.vue';
 import { mdiFolderMultiple, mdiPlus, mdiFolderOff } from '@mdi/js';
 
 export default {
   name: 'WorkspacesView',
 
   components: {
+    HeaderBar,
     WorkspaceCard,
     WorkspaceDialog,
     ArchiveConfirmDialog,
     DeleteConfirmDialog,
-    UserMenu,
   },
 
   data() {

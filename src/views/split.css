@@ -1,0 +1,10 @@
+.splitpanes .splitpanes__splitter {
+  background-color: rgba(var(--v-border-color), var(--v-border-opacity));
+  min-width: 4px;
+}
+
+.splitpanes .splitpanes__splitter:hover,
+.splitpanes .splitpanes__splitter:active,
+.splitpanes .splitpanes__splitter:focus {
+  background-color: rgba(var(--v-border-color), calc(var(--v-border-opacity) * 2));
+}

@@ -28,6 +28,12 @@ const router = createRouter({
       component: () => import('@/views/EditorView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/workspaces/:id/propose',
+      name: 'propose',
+      component: () => import('@/views/ProposeView.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 });
 

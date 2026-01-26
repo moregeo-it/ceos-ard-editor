@@ -54,17 +54,12 @@
         </template>
 
         <template v-slot:title="{ item }">
-          <div class="file-item d-flex align-center justify-space-between">
+          <div
+            class="file-item d-flex align-center justify-space-between"
+            @click="item.type === 'folder' && loadFolderOnClick(item)"
+          >
             <span class="file-name">{{ item.name }}</span>
-            <v-chip
-              v-if="item.status"
-              size="x-small"
-              :color="getStatusColor(item.status)"
-              variant="flat"
-              class="ml-2"
-            >
-              {{ item.status }}
-            </v-chip>
+            <FileStatusBadge v-if="item.status" :status="item.status" class="ml-2" />
           </div>
           <div class="text-caption text-pre-wrap text-subtle">
             {{ item.excerpt }}
@@ -102,6 +97,23 @@
               <!-- File Actions -->
               <template v-else>
                 <v-list-item
+                  v-if="item.status && !['added', 'deleted'].includes(item.status)"
+                  @click="itemToDiff = item"
+                >
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.diff" size="small" />
+                  </template>
+                  <v-list-item-title>Show Changes</v-list-item-title>
+                </v-list-item>
+
+                <v-list-item v-if="item.status !== 'deleted'" @click="handleDownload(item)">
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.download" size="small" />
+                  </template>
+                  <v-list-item-title>Download</v-list-item-title>
+                </v-list-item>
+
+                <v-list-item
                   v-if="item.status && item.status !== 'added'"
                   @click="handleRevert(item)"
                 >
@@ -110,12 +122,14 @@
                   </template>
                   <v-list-item-title>Revert</v-list-item-title>
                 </v-list-item>
+
                 <v-list-item v-if="item.status !== 'deleted'" @click="handleRename(item)">
                   <template v-slot:prepend>
                     <v-icon :icon="icons.rename" size="small" />
                   </template>
                   <v-list-item-title>Rename</v-list-item-title>
                 </v-list-item>
+
                 <v-list-item v-if="item.status !== 'deleted'" @click="handleDelete(item)">
                   <template v-slot:prepend>
                     <v-icon :icon="icons.delete" size="small" color="error" />
@@ -156,10 +170,12 @@
       :item-type="itemToDelete?.type"
       @confirm="handleDeleteConfirm"
     />
+    <DiffDialog v-if="itemToDiff" :item="itemToDiff" @close="itemToDiff = null" />
   </div>
 </template>
 
 <script>
+import { defineAsyncComponent } from 'vue';
 import { useDebounceFn } from '@vueuse/core';
 import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
@@ -168,7 +184,9 @@ import { useWorkspacesStore } from '@/stores/workspaces';
 import CreateFileDialog from './dialogs/CreateFileDialog.vue';
 import RenameDialog from './dialogs/RenameDialog.vue';
 import DeleteConfirmDialog from './dialogs/DeleteConfirmDialog.vue';
+import FileStatusBadge from '../FileStatusBadge.vue';
 import {
+  mdiFileCompare,
   mdiFileDocumentOutline,
   mdiFolderOutline,
   mdiFolderOpenOutline,
@@ -178,20 +196,25 @@ import {
   mdiPencilOutline,
   mdiDeleteOutline,
   mdiUndoVariant,
+  mdiDownload,
 } from '@mdi/js';
+import { downloadBlob } from '@/utils/api';
 
 export default {
   name: 'FilesPane',
 
   components: {
     CreateFileDialog,
+    DiffDialog: defineAsyncComponent(() => import('./dialogs/DiffDialog.vue')),
     RenameDialog,
     DeleteConfirmDialog,
+    FileStatusBadge,
   },
 
   data() {
     return {
       icons: {
+        diff: mdiFileCompare,
         file: mdiFileDocumentOutline,
         folder: mdiFolderOutline,
         folderOpen: mdiFolderOpenOutline,
@@ -201,6 +224,7 @@ export default {
         rename: mdiPencilOutline,
         delete: mdiDeleteOutline,
         revert: mdiUndoVariant,
+        download: mdiDownload,
       },
       openedFolders: [],
       activatedItems: [],
@@ -208,6 +232,7 @@ export default {
       createInitialPath: null,
       itemToRename: null,
       itemToDelete: null,
+      itemToDiff: null,
       debouncedSearch: null,
     };
   },
@@ -284,13 +309,22 @@ export default {
       const isExpanding = !this.openedFolders.includes(item.path);
       props.onClick(event);
       if (isExpanding && item.type === 'folder') {
-        await this.loadFiles(item.path, true);
+        await this.loadFiles(item.path);
       }
     },
 
-    async loadFiles(path = '/', force = false) {
+    async loadFolderOnClick(item) {
+      // Load folder contents when clicking on the folder title (text)
+      // The open-on-click prop handles toggling, we just need to load the files
+      const isExpanding = !this.openedFolders.includes(item.path);
+      if (isExpanding) {
+        await this.loadFiles(item.path);
+      }
+    },
+
+    async loadFiles(path = '/') {
       try {
-        await this.filesStore.loadFiles(path, force);
+        await this.filesStore.loadFiles(path);
       } catch (error) {
         this.notificationsStore.error(`Failed to load files: ${error.message}`);
       }
@@ -393,21 +427,6 @@ export default {
       return undefined;
     },
 
-    getStatusColor(status) {
-      switch (status) {
-        case 'added':
-          return 'success';
-        case 'modified':
-          return 'warning';
-        case 'renamed':
-          return 'info';
-        case 'deleted':
-          return 'error';
-        default:
-          return 'default';
-      }
-    },
-
     handleCreateInFolder(item) {
       this.createInitialPath = item.path;
     },
@@ -465,6 +484,15 @@ export default {
         this.notificationsStore.success('File reverted successfully');
       } catch (error) {
         this.notificationsStore.error(`Failed to revert: ${error.message}`);
+      }
+    },
+
+    async handleDownload(item) {
+      try {
+        const data = await this.filesStore.load(item.path);
+        downloadBlob(data, item.name);
+      } catch (error) {
+        this.notificationsStore.error(`Failed to start download: ${error.message}`);
       }
     },
   },
