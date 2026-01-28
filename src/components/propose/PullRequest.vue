@@ -154,10 +154,6 @@ export default {
 
         if (pr_response) {
           this.notificationsStore.success('Pull Request created successfully.');
-          this.$router.push({
-            name: 'WorkspaceView',
-            params: { id: this.workspacesStore.currentWorkspace.id },
-          });
         }
       } catch (error) {
         this.notificationsStore.error('Failed to create Pull Request:' + error.message);
