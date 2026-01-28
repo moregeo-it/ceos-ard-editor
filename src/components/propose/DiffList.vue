@@ -1,26 +1,16 @@
 <template>
   <div class="diff-list pa-4 fill-height overflow-auto">
-    <template v-if="commits.length > 0">
-      <h2>List of Commits</h2>
-
-      <p>
-        This is a list of previous changes that have been persisted as commits on GitHub in a Pull
-        Request.
-      </p>
-
-      <ul>
-        <li v-for="file in commits" :key="file.path">...</li>
-      </ul>
-    </template>
-
     <h2 class="mb-4">List of Changes</h2>
 
-    <p>Lists all changes that have been made recently and still need to be committed to GitHub.</p>
+    <p class="mb-4">
+      Below you can see a list of changes that you have currently stored in your personal workspace,
+      but have <strong>not</strong> been sent to the CEOS-ARD GitHub repository yet. You should
+      review the changes here before sending them.
+    </p>
 
-    <div v-if="diffs === null" class="text-center">
+    <div v-if="proposalStore.isLoading" class="text-center">
       <v-progress-circular indeterminate color="primary" />
     </div>
-
     <div v-else-if="diffs.length > 0">
       <v-expansion-panels multiple>
         <v-expansion-panel v-for="file in diffs" :key="file.path">
@@ -35,7 +25,6 @@
         </v-expansion-panel>
       </v-expansion-panels>
     </div>
-
     <div v-else class="empty-state text-center">
       <p class="text-subtle mt-2">No changes found</p>
     </div>

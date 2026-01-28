@@ -7,7 +7,6 @@ const getDefaults = () => ({
   diffList: [],
   proposal: null,
   isLoading: false,
-  hasUnpersistedChanges: false,
 });
 
 export const useProposalStore = defineStore('proposal', {
@@ -20,7 +19,13 @@ export const useProposalStore = defineStore('proposal', {
         const workspacesStore = useWorkspacesStore();
         await workspacesStore.getWorkspace(workspaceId);
 
-        this.proposal = await proposalService.fetchProposal(workspaceId);
+        const proposal = await proposalService.fetchProposal(workspaceId);
+        console.log(proposal);
+        if (proposal && Object.keys(proposal).length > 0) {
+          this.proposal = proposal;
+        } else {
+          this.proposal = null;
+        }
       } finally {
         this.isLoading = false;
       }
@@ -30,9 +35,6 @@ export const useProposalStore = defineStore('proposal', {
       this.isLoading = true;
       try {
         const diffs = await proposalService.loadDiffList(workspaceId);
-        console.log('Diffs loaded:', diffs);
-        this.hasUnpersistedChanges = diffs.length > 0;
-
         this.diffList = diffs.sort((a, b) =>
           a.path.localeCompare(b.path, 'en', { sensitivity: 'base' }),
         );

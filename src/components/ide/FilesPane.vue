@@ -1,11 +1,11 @@
 <template>
   <div class="d-flex flex-column fill-height">
     <!-- Search Input -->
-    <div class="px-2 pt-2">
+    <div class="px-2 pt-3">
       <v-text-field
         v-model="searchQuery"
         :prepend-inner-icon="icons.search"
-        placeholder="Search files and folders..."
+        label="Search files and folders..."
         density="compact"
         variant="outlined"
         hide-details
