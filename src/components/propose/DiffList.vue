@@ -1,6 +1,21 @@
 <template>
   <div class="diff-list pa-4 fill-height overflow-auto">
+    <template v-if="commits.length > 0">
+      <h2>List of Commits</h2>
+
+      <p>
+        This is a list of previous changes that have been persisted as commits on GitHub in a Pull
+        Request.
+      </p>
+
+      <ul>
+        <li v-for="file in commits" :key="file.path">...</li>
+      </ul>
+    </template>
+
     <h2 class="mb-4">List of Changes</h2>
+
+    <p>Lists all changes that have been made recently and still need to be committed to GitHub.</p>
 
     <div v-if="diffs === null" class="text-center">
       <v-progress-circular indeterminate color="primary" />
@@ -45,6 +60,7 @@ export default {
   data() {
     return {
       diffs: null,
+      commits: [],
     };
   },
 

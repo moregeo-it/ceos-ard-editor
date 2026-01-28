@@ -6,6 +6,19 @@
       changes.
     </p>
     <form @submit.prevent="submitPullRequest">
+      <h3>Summary for the current changes</h3>
+
+      <!-- Hide field if there are no changes -->
+      <v-text-field
+        v-model="commitMessage"
+        required
+        label="Summary for this group of unpersisted changes"
+        placeholder="Short summary of the changes"
+        variant="outlined"
+      ></v-text-field>
+
+      <h3>Proposal</h3>
+
       <v-text-field
         v-model="title"
         required
@@ -28,13 +41,35 @@
         :loading="isSubmitting"
       ></v-textarea>
 
+      <v-checkbox v-model="ready" label="Ready for Review" class="mt-2" hide-details />
+
+      <!-- add conditions to buttons -->
       <v-btn
+        v-if="serverStatus.state !== 'closed'"
         type="submit"
         color="primary"
         class="mt-2 w-100"
         :disabled="isSubmitting"
         :loading="isSubmitting"
-        >Submit</v-btn
+        >Submit Changes</v-btn
+      >
+      <v-btn
+        v-if="serverStatus.state === 'open'"
+        type="button"
+        color="error"
+        class="mt-2 w-100"
+        :disabled="isSubmitting"
+        :loading="isSubmitting"
+        >Withdraw Proposal</v-btn
+      >
+      <v-btn
+        v-else-if="serverStatus.state === 'closed'"
+        type="button"
+        color="info"
+        class="mt-2 w-100"
+        :disabled="isSubmitting"
+        :loading="isSubmitting"
+        >Reopen Proposal</v-btn
       >
     </form>
   </div>
@@ -49,9 +84,15 @@ export default {
   name: 'PullRequest',
   data() {
     return {
+      serverStatus: {
+        state: 'closed',
+      },
       title: '',
       description: '',
       isSubmitting: false,
+      commitMessage: '',
+      ready: false,
+      state: 'open',
     };
   },
   computed: {
