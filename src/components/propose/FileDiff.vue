@@ -14,7 +14,7 @@
 </template>
 
 <script>
-import diffService from '@/services/diff.service';
+import diffService from '@/services/proposal.service';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { html, parse } from 'diff2html';

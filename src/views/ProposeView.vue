@@ -26,6 +26,8 @@
 <script>
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
+import { useProposalStore } from '@/stores/proposal';
+
 import { mdiCheckCircle } from '@mdi/js';
 import { Splitpanes, Pane } from 'splitpanes';
 import HeaderBar from '@/components/HeaderBar.vue';
@@ -79,10 +81,13 @@ export default {
     notificationsStore() {
       return useNotificationsStore();
     },
+    proposalStore() {
+      return useProposalStore();
+    },
   },
 
   async created() {
-    await this.loadWorkspace();
+    await this.loadProposal();
   },
 
   methods: {
@@ -93,12 +98,12 @@ export default {
       }
     },
 
-    async loadWorkspace() {
+    async loadProposal() {
       try {
-        await this.workspacesStore.getWorkspace(this.workspaceId);
+        await this.proposalStore.fetchProposal(this.workspaceId);
       } catch (error) {
-        this.notificationsStore.error(`Failed to load workspace: ${error.message}`);
-        this.$router.push({ name: 'workspaces' });
+        this.notificationsStore.error(`Failed to load workspace proposal: ${error.message}`);
+        this.$router.push({ name: 'workspaces', params: { id: this.workspaceId } });
       }
     },
   },

@@ -43,9 +43,9 @@
 </template>
 
 <script>
-import diffService from '@/services/diff.service';
-import { useNotificationsStore } from '@/stores/notifications';
+import { useProposalStore } from '@/stores/proposal';
 import { useWorkspacesStore } from '@/stores/workspaces';
+import { useNotificationsStore } from '@/stores/notifications';
 import FileStatusBadge from '@/components/FileStatusBadge.vue';
 import FileDiff from '@/components/propose/FileDiff.vue';
 
@@ -59,7 +59,6 @@ export default {
 
   data() {
     return {
-      diffs: null,
       commits: [],
     };
   },
@@ -71,16 +70,18 @@ export default {
     notificationsStore() {
       return useNotificationsStore();
     },
+    proposalStore() {
+      return useProposalStore();
+    },
+    diffs() {
+      return this.proposalStore.diffList;
+    },
   },
 
   async created() {
     try {
-      const diffs = await diffService.loadDiffList(this.workspacesStore.currentWorkspace.id);
-      this.diffs = diffs.sort((a, b) =>
-        a.path.localeCompare(b.path, 'en', { sensitivity: 'base' }),
-      );
+      await this.proposalStore.loadDiffList(this.workspacesStore.currentWorkspace.id);
     } catch (error) {
-      this.diffs = [];
       this.notificationsStore.error('Error loading diffs: ' + error.message);
     }
   },

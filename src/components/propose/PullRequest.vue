@@ -6,10 +6,10 @@
       changes.
     </p>
     <form @submit.prevent="submitPullRequest">
-      <h3>Summary for the current changes</h3>
+      <h3 v-if="hasUnpersistedChanges">Summary for the current changes</h3>
 
-      <!-- Hide field if there are no changes -->
       <v-text-field
+        v-if="hasUnpersistedChanges"
         v-model="commitMessage"
         required
         label="Summary for this group of unpersisted changes"
@@ -45,7 +45,7 @@
 
       <!-- add conditions to buttons -->
       <v-btn
-        v-if="serverStatus.state !== 'closed'"
+        v-if="state !== 'closed'"
         type="submit"
         color="primary"
         class="mt-2 w-100"
@@ -54,7 +54,7 @@
         >Submit Changes</v-btn
       >
       <v-btn
-        v-if="serverStatus.state === 'open'"
+        v-if="state === 'open'"
         type="button"
         color="error"
         class="mt-2 w-100"
@@ -63,7 +63,7 @@
         >Withdraw Proposal</v-btn
       >
       <v-btn
-        v-else-if="serverStatus.state === 'closed'"
+        v-else-if="state === 'closed'"
         type="button"
         color="info"
         class="mt-2 w-100"
@@ -76,7 +76,8 @@
 </template>
 
 <script>
-import diffService from '@/services/diff.service';
+import { useProposalStore } from '@/stores/proposal';
+import diffService from '@/services/proposal.service';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
 
@@ -84,9 +85,6 @@ export default {
   name: 'PullRequest',
   data() {
     return {
-      serverStatus: {
-        state: 'closed',
-      },
       title: '',
       description: '',
       isSubmitting: false,
@@ -102,15 +100,47 @@ export default {
     notificationsStore() {
       return useNotificationsStore();
     },
+    proposalStore() {
+      return useProposalStore();
+    },
+    proposal() {
+      return this.proposalStore.proposal;
+    },
+    hasUnpersistedChanges() {
+      return this.proposalStore.hasUnpersistedChanges;
+    },
+  },
+  watch: {
+    proposal: {
+      immediate: true,
+      handler(newProposal) {
+        if (newProposal) {
+          this.title = newProposal.title || '';
+          this.ready = newProposal.ready || false;
+          this.state = newProposal.state || 'open';
+          this.description = newProposal.description || '';
+        }
+      },
+    },
   },
   methods: {
     async submitPullRequest() {
       this.isSubmitting = true;
       try {
+        const proposalInput = {
+          draft: this.ready,
+          title: this.title,
+          state: this.state,
+          description: this.description,
+        };
+
+        if (this.hasUnpersistedChanges) {
+          proposalInput.commitMessage = this.commitMessage;
+        }
+
         const pr_response = await diffService.createPullRequest(
           this.workspacesStore.currentWorkspace.id,
-          this.title,
-          this.description,
+          proposalInput,
         );
 
         if (pr_response) {
