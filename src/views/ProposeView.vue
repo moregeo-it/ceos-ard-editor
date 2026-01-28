@@ -64,7 +64,9 @@ export default {
 
   computed: {
     loading() {
-      return this.workspacesStore.isWorkspaceLoading[this.workspaceId];
+      return (
+        this.workspacesStore.isWorkspaceLoading[this.workspaceId] || this.proposalStore.isLoading
+      );
     },
     workspace() {
       return this.workspacesStore.currentWorkspace;

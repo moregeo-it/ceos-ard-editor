@@ -15,6 +15,8 @@
         label="Summary for this group of unpersisted changes"
         placeholder="Short summary of the changes"
         variant="outlined"
+        :disabled="loading"
+        :loading="loading"
       ></v-text-field>
 
       <h3>Proposal</h3>
@@ -25,8 +27,8 @@
         label="Title"
         placeholder="Short title for the pull request"
         variant="outlined"
-        :disabled="isSubmitting"
-        :loading="isSubmitting"
+        :disabled="loading"
+        :loading="loading"
       ></v-text-field>
 
       <v-textarea
@@ -37,8 +39,8 @@
         hint="You can use Markdown to format your description."
         variant="outlined"
         rows="10"
-        :disabled="isSubmitting"
-        :loading="isSubmitting"
+        :disabled="loading"
+        :loading="loading"
       ></v-textarea>
 
       <v-checkbox v-model="ready" label="Ready for Review" class="mt-2" hide-details />
@@ -49,8 +51,8 @@
         type="submit"
         color="primary"
         class="mt-2 w-100"
-        :disabled="isSubmitting"
-        :loading="isSubmitting"
+        :disabled="loading"
+        :loading="loading"
         >Submit Changes</v-btn
       >
       <v-btn
@@ -58,8 +60,8 @@
         type="button"
         color="error"
         class="mt-2 w-100"
-        :disabled="isSubmitting"
-        :loading="isSubmitting"
+        :disabled="loading"
+        :loading="loading"
         >Withdraw Proposal</v-btn
       >
       <v-btn
@@ -67,8 +69,8 @@
         type="button"
         color="info"
         class="mt-2 w-100"
-        :disabled="isSubmitting"
-        :loading="isSubmitting"
+        :disabled="loading"
+        :loading="loading"
         >Reopen Proposal</v-btn
       >
     </form>
@@ -90,10 +92,17 @@ export default {
       isSubmitting: false,
       commitMessage: '',
       ready: false,
-      state: 'open',
+      state: '',
     };
   },
   computed: {
+    loading() {
+      return (
+        this.workspacesStore.isWorkspaceLoading[this.workspaceId] ||
+        this.isSubmitting ||
+        this.proposalStore.isLoading
+      );
+    },
     workspacesStore() {
       return useWorkspacesStore();
     },
