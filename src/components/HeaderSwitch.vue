@@ -16,6 +16,7 @@ import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
 import { usePreviewStore } from '@/stores/preview';
 import { useWorkspacesStore } from '@/stores/workspaces';
+import { useProposalStore } from '@/stores/proposal';
 import { mdiCheckCircle, mdiClose, mdiNotebookEdit } from '@mdi/js';
 
 export default {
@@ -53,6 +54,9 @@ export default {
     workspacesStore() {
       return useWorkspacesStore();
     },
+    proposalStore() {
+      return useProposalStore();
+    },
     view: {
       get() {
         return this.$route.name;
@@ -84,6 +88,7 @@ export default {
       this.filesStore.reset();
       this.notificationsStore.reset();
       this.previewStore.reset();
+      this.proposalStore.reset();
       this.$router.push({ name: 'workspaces' });
     },
   },
