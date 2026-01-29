@@ -18,6 +18,18 @@
         >View Pull Request on GitHub</v-btn
       >
 
+      <template v-if="commits.length > 0">
+        <h2>Previous Changes</h2>
+
+        <p>
+          This is a list of previous changes that have been sent to GitHub as part of this proposal:
+        </p>
+
+        <ul>
+          <li v-for="file in commits" :key="file.path">...</li>
+        </ul>
+      </template>
+
       <form @submit.prevent="submitPullRequest" v-if="proposal.state !== 'merged'">
         <template v-if="diffs.length > 0">
           <v-text-field
