@@ -1,57 +1,58 @@
 <template>
   <div class="pull-request pa-4 fill-height overflow-auto">
-    <h2 class="mb-4">
-      <template v-if="proposal">Update Proposal</template>
-      <template v-else>Create Proposal</template>
-    </h2>
+    <div class="d-flex align-center mb-4">
+      <h2 class="mr-3 mb-0">
+        <template v-if="proposal">Update Proposal</template>
+        <template v-else>Create Proposal</template>
+      </h2>
+      <v-badge
+        v-if="proposal && proposal.draft"
+        color="grey"
+        content="Draft"
+        class="ml-2"
+        bordered
+      />
+    </div>
 
     <div v-if="isLoading" class="text-center">
       <v-progress-circular indeterminate color="primary" />
     </div>
     <template v-else-if="proposal">
-      <p class="mb-2">
-        You already submitted some changes to the CEOS-ARD GitHub repository. The
-        <em>Pull Request</em> can be found here:
-      </p>
-
-      <v-btn :href="proposal.url" target="_blank" color="primary" class="mb-4 w-100"
-        >View Pull Request on GitHub</v-btn
-      >
+      <v-alert type="info" class="mb-4" border="start" color="primary" variant="tonal" dense>
+        You already submitted some changes to the CEOS-ARD GitHub repository.
+      </v-alert>
 
       <form @submit.prevent="submitPullRequest" v-if="proposal.state !== 'merged'">
-        <v-expansion-panels class="mb-4">
-          <v-expansion-panel>
-            <v-expansion-panel-title>
-              (Optional) You can also update the title and description of the overall proposal.
-            </v-expansion-panel-title>
-            <v-expansion-panel-text>
-              <v-text-field
-                v-model="title"
-                required
-                persistent-hint
-                label="Title of the Proposal"
-                hint="You can update the title for your overall proposal."
-                variant="outlined"
-                :counter="maxLengths.title"
-                :disabled="proposal.state === 'closed'"
-                class="mb-6"
-              ></v-text-field>
+        <v-text-field
+          v-model="title"
+          required
+          persistent-hint
+          label="Title of the Proposal"
+          hint="You can update the title for your overall proposal."
+          variant="outlined"
+          :counter="maxLengths.title"
+          :disabled="proposal.state === 'closed'"
+          class="mb-6"
+        ></v-text-field>
 
-              <v-textarea
-                v-model="description"
-                required
-                persistent-hint
-                label="Description of the Proposal"
-                hint="You can update the detailed description of your overall proposal. You can use Markdown to format your description."
-                variant="outlined"
-                rows="8"
-                :counter="maxLengths.description"
-                :disabled="proposal.state === 'closed'"
-                class="mb-4"
-              ></v-textarea>
-            </v-expansion-panel-text>
-          </v-expansion-panel>
-        </v-expansion-panels>
+        <v-textarea
+          v-model="description"
+          required
+          persistent-hint
+          label="Description of the Proposal"
+          hint="You can update the detailed description of your overall proposal. You can use Markdown to format your description."
+          variant="outlined"
+          rows="8"
+          :counter="maxLengths.description"
+          :disabled="proposal.state === 'closed'"
+          class="mb-4"
+        ></v-textarea>
+
+        <v-btn :href="proposal.url" target="_blank" color="primary" class="mb-4 w-100"
+          >View Pull Request on GitHub</v-btn
+        >
+
+        <previous-commits class="mb-6" />
 
         <v-btn
           v-if="!proposal.state || proposal.state === 'open'"
@@ -135,6 +136,7 @@
 </template>
 
 <script>
+import PreviousCommits from './PreviousCommits.vue';
 import { useProposalStore } from '@/stores/proposal';
 import diffService from '@/services/proposal.service';
 import { useWorkspacesStore } from '@/stores/workspaces';
@@ -142,6 +144,9 @@ import { useNotificationsStore } from '@/stores/notifications';
 
 export default {
   name: 'PullRequest',
+  components: {
+    PreviousCommits,
+  },
   data() {
     return {
       title: '',

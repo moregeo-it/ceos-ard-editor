@@ -25,7 +25,7 @@
           class="mb-6"
         ></v-text-field>
         <v-btn type="submit" color="primary" class="mb-8" :loading="isLoading" :disabled="isLoading"
-          >Commit Message</v-btn
+          >Submit Changes</v-btn
         >
       </form>
       <v-expansion-panels multiple>
