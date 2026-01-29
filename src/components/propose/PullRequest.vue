@@ -14,45 +14,11 @@
         <em>Pull Request</em> can be found here:
       </p>
 
-      <v-btn :href="proposal.html_url" target="_blank" color="primary" class="mb-4 w-100"
+      <v-btn :href="proposal.url" target="_blank" color="primary" class="mb-4 w-100"
         >View Pull Request on GitHub</v-btn
       >
 
-      <template v-if="commits.length > 0">
-        <h2>Previous Changes</h2>
-
-        <p>
-          This is a list of previous changes that have been sent to GitHub as part of this proposal:
-        </p>
-
-        <ul>
-          <li v-for="file in commits" :key="file.path">...</li>
-        </ul>
-      </template>
-
       <form @submit.prevent="submitPullRequest" v-if="proposal.state !== 'merged'">
-        <template v-if="diffs.length > 0">
-          <v-text-field
-            v-model="commitMessage"
-            persistent-hint
-            label="Summary for the current changes"
-            hint="Please provide a summary for the changes that you are proposing in this update."
-            variant="outlined"
-            :counter="maxLengths.commitMessage"
-            :disabled="proposal.state === 'closed'"
-            class="mb-6"
-          ></v-text-field>
-        </template>
-
-        <v-checkbox
-          v-model="ready"
-          persistent-hint
-          label="Ready for Review"
-          :hint="readyHint"
-          :disabled="proposal.state === 'closed'"
-          class="mb-9"
-        />
-
         <v-expansion-panels class="mb-4">
           <v-expansion-panel>
             <v-expansion-panel-title>
@@ -149,26 +115,6 @@
           class="mb-4"
         ></v-textarea>
 
-        <v-checkbox
-          v-model="ready"
-          persistent-hint
-          label="Ready for Review"
-          :hint="readyHint"
-          class="mb-9"
-        />
-
-        <template v-if="diffs.length > 0">
-          <v-text-field
-            v-model="commitMessage"
-            persistent-hint
-            label="Summary for the current changes"
-            hint="(Optional) Please provide a summary for the current changes that you are proposing. If not provided, the title of the proposal will be used."
-            variant="outlined"
-            :counter="maxLengths.commitMessage"
-            class="mb-6"
-          ></v-text-field>
-        </template>
-
         <v-btn
           type="submit"
           color="primary"
@@ -201,15 +147,10 @@ export default {
       title: '',
       description: '',
       isSubmitting: false,
-      commitMessage: '',
-      ready: false,
       maxLengths: {
         title: 200,
         description: 10000,
-        commitMessage: 500,
       },
-      readyHint:
-        'Please indicate whether this proposal is ready for review. In this case member of CEOS-ARD will be notified to review your changes. Otherwise, it will be created as a draft proposal and you can continue to add more changes later.',
     };
   },
   computed: {
@@ -258,7 +199,6 @@ export default {
       handler(newProposal) {
         if (newProposal) {
           this.title = newProposal.title || '';
-          this.ready = newProposal.ready || false;
           this.description = newProposal.description || '';
         }
       },
@@ -269,12 +209,11 @@ export default {
       this.isSubmitting = true;
       try {
         const proposalInput = {
-          draft: this.ready,
           title: this.title,
           description: this.description,
         };
 
-        if (this.diffs && this.diffs.length > 0) {
+        if (this.diffs && this.diffs.length > 0 && this.commitMessage !== '') {
           proposalInput.commitMessage = this.commitMessage;
         }
 

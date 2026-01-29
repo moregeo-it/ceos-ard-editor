@@ -20,7 +20,7 @@ export const useProposalStore = defineStore('proposal', {
         await workspacesStore.getWorkspace(workspaceId);
 
         const proposal = await proposalService.fetchProposal(workspaceId);
-        console.log(proposal);
+
         if (proposal && Object.keys(proposal).length > 0) {
           this.proposal = proposal;
         } else {
@@ -38,6 +38,18 @@ export const useProposalStore = defineStore('proposal', {
         this.diffList = diffs.sort((a, b) =>
           a.path.localeCompare(b.path, 'en', { sensitivity: 'base' }),
         );
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
+    async commitChanges(workspaceId, commitMessage) {
+      this.isLoading = true;
+      try {
+        const commit = await proposalService.commitChanges(workspaceId, commitMessage);
+
+        this.proposal.commits.push(commit);
+        return commit;
       } finally {
         this.isLoading = false;
       }

@@ -8,10 +8,26 @@
       review the changes here before sending them.
     </p>
 
-    <div v-if="proposalStore.isLoading" class="text-center">
+    <div v-if="isLoading" class="text-center">
       <v-progress-circular indeterminate color="primary" />
     </div>
     <div v-else-if="diffs.length > 0">
+      <form @submit.prevent="onCommitMessageSubmit" :loading="isLoading">
+        <v-text-field
+          v-model="commitMessage"
+          persistent-hint
+          label="Summary for the current changes"
+          hint="(Optional) Please provide a summary for the current changes that you are proposing. If not provided, the title of the proposal will be used."
+          variant="outlined"
+          :loading="isLoading"
+          :counter="maxLengths.commitMessage"
+          :disabled="proposalStore.proposal?.state === 'closed' || isLoading"
+          class="mb-6"
+        ></v-text-field>
+        <v-btn type="submit" color="primary" class="mb-8" :loading="isLoading" :disabled="isLoading"
+          >Commit Message</v-btn
+        >
+      </form>
       <v-expansion-panels multiple>
         <v-expansion-panel v-for="file in diffs" :key="file.path">
           <v-expansion-panel-title>
@@ -49,10 +65,17 @@ export default {
   data() {
     return {
       commits: [],
+      commitMessage: '',
+      maxLengths: {
+        commitMessage: 500,
+      },
     };
   },
 
   computed: {
+    isLoading() {
+      return this.proposalStore.isLoading;
+    },
     workspacesStore() {
       return useWorkspacesStore();
     },
@@ -73,6 +96,18 @@ export default {
     } catch (error) {
       this.notificationsStore.error('Error loading diffs: ' + error.message);
     }
+  },
+
+  methods: {
+    async onCommitMessageSubmit() {
+      try {
+        const workspaceId = this.workspacesStore.currentWorkspace.id;
+        await this.proposalStore.commitChanges(workspaceId, this.commitMessage);
+        this.notificationsStore.success('Commit message updated successfully.');
+      } catch (error) {
+        this.notificationsStore.error('Error updating commit message: ' + error.message);
+      }
+    },
   },
 };
 </script>
