@@ -15,7 +15,7 @@ export default {
     return api.get(`/workspaces/${workspaceId}/proposal`);
   },
   async commitChanges(workspaceId, commitMessage) {
-    return api.put(`/workspaces/${workspaceId}/commits`, {
+    return api.put(`/workspaces/${workspaceId}/diffs`, {
       message: commitMessage,
     });
   },
