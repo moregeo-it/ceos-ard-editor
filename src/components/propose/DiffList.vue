@@ -103,9 +103,9 @@ export default {
       try {
         const workspaceId = this.workspacesStore.currentWorkspace.id;
         await this.proposalStore.commitChanges(workspaceId, this.commitMessage);
-        this.notificationsStore.success('Commit message updated successfully.');
+        this.notificationsStore.success('Commit updated successfully.');
       } catch (error) {
-        this.notificationsStore.error('Error updating commit message: ' + error.message);
+        this.notificationsStore.error('Error updating commit: ' + error.message);
       }
     },
   },
