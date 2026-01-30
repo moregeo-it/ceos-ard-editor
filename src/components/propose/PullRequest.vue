@@ -14,7 +14,7 @@
       />
     </div>
 
-    <div v-if="isLoading" class="text-center">
+    <div v-if="proposalStore.isProposalLoading" class="text-center">
       <v-progress-circular indeterminate color="primary" />
     </div>
     <template v-else-if="proposal">
@@ -27,6 +27,7 @@
           v-model="title"
           required
           persistent-hint
+          persistent-counter
           label="Title of the Proposal"
           hint="You can update the title for your overall proposal."
           variant="outlined"
@@ -39,6 +40,7 @@
           v-model="description"
           required
           persistent-hint
+          persistent-counter
           label="Description of the Proposal"
           hint="You can update the detailed description of your overall proposal. You can use Markdown to format your description."
           variant="outlined"
@@ -85,7 +87,7 @@
       </form>
     </template>
 
-    <template v-else-if="diffs.length > 0">
+    <template v-else-if="diffs.length > 0 || commits.length > 0">
       <p class="mb-4">
         You can propose your changes to CEOS-ARD now. This will create a new
         <em>Pull Request</em> on the CEOS-ARD GitHub repository. You can add more changes to the
@@ -97,6 +99,7 @@
           v-model="title"
           required
           persistent-hint
+          persistent-counter
           label="Title of the Proposal"
           hint="Please provide a summarizing title for your overall proposal."
           variant="outlined"
@@ -108,6 +111,7 @@
           v-model="description"
           required
           persistent-hint
+          persistent-counter
           label="Description of the Proposal"
           hint="Please provide a detailed description of your overall proposal. You can use Markdown to format your description."
           variant="outlined"
@@ -128,10 +132,12 @@
       </form>
     </template>
 
-    <p v-else>
-      You currently have no changes to propose. Please make some changes in your personal workspace
-      first.
-    </p>
+    <div v-else class="empty-state">
+      <p class="text-subtle mt-4">
+        You currently have no changes to propose.<br />
+        Please make some changes in your personal workspace first.
+      </p>
+    </div>
   </div>
 </template>
 
@@ -159,10 +165,6 @@ export default {
     };
   },
   computed: {
-    isLoading() {
-      const workspaceId = this.workspacesStore.currentWorkspace?.id;
-      return this.workspacesStore.isWorkspaceLoading[workspaceId] || this.proposalStore.isLoading;
-    },
     workspace() {
       return this.workspacesStore.currentWorkspace;
     },
@@ -180,6 +182,9 @@ export default {
     },
     diffs() {
       return this.proposalStore.diffList;
+    },
+    commits() {
+      return this.proposalStore.commits;
     },
   },
   watch: {

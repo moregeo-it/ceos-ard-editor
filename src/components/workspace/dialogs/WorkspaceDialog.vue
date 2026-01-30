@@ -39,6 +39,7 @@
 
           <v-textarea
             v-model="formData.description"
+            persistent-counter
             label="Description (Optional)"
             placeholder="Describe the purpose of this workspace..."
             variant="outlined"

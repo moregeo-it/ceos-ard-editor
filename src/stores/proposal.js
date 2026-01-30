@@ -6,7 +6,11 @@ import { useWorkspacesStore } from './workspaces';
 const getDefaults = () => ({
   diffList: [],
   proposal: null,
-  isLoading: false,
+  commits: [],
+  isProposalLoading: false,
+  isDiffLoading: false,
+  isCommitsLoading: false,
+  isCommitting: false,
 });
 
 export const useProposalStore = defineStore('proposal', {
@@ -14,7 +18,7 @@ export const useProposalStore = defineStore('proposal', {
 
   actions: {
     async fetchProposal(workspaceId) {
-      this.isLoading = true;
+      this.isProposalLoading = true;
       try {
         const workspacesStore = useWorkspacesStore();
         await workspacesStore.getWorkspace(workspaceId);
@@ -27,31 +31,47 @@ export const useProposalStore = defineStore('proposal', {
           this.proposal = null;
         }
       } finally {
-        this.isLoading = false;
+        this.isProposalLoading = false;
+      }
+    },
+    async fetchCommits(workspaceId) {
+      this.isCommitsLoading = true;
+      try {
+        const workspacesStore = useWorkspacesStore();
+        await workspacesStore.getWorkspace(workspaceId);
+
+        const commits = await proposalService.fetchCommits(workspaceId);
+        if (Array.isArray(commits)) {
+          this.commits = commits;
+        } else {
+          this.commits = [];
+        }
+      } finally {
+        this.isCommitsLoading = false;
       }
     },
 
-    async loadDiffList(workspaceId) {
-      this.isLoading = true;
+    async fetchDiffList(workspaceId) {
+      this.isDiffLoading = true;
       try {
-        const diffs = await proposalService.loadDiffList(workspaceId);
+        const diffs = await proposalService.fetchDiffList(workspaceId);
         this.diffList = diffs.sort((a, b) =>
           a.path.localeCompare(b.path, 'en', { sensitivity: 'base' }),
         );
       } finally {
-        this.isLoading = false;
+        this.isDiffLoading = false;
       }
     },
 
     async commitChanges(workspaceId, commitMessage) {
-      this.isLoading = true;
+      this.isCommitting = true;
       try {
         const commit = await proposalService.commitChanges(workspaceId, commitMessage);
-
-        this.proposal.commits.push(commit);
+        this.commits.unshift(commit);
+        this.diffList = [];
         return commit;
       } finally {
-        this.isLoading = false;
+        this.isCommitting = false;
       }
     },
 

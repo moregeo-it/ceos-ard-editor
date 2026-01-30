@@ -1,47 +1,44 @@
 <template>
-  <div v-if="proposalStore.proposal" class="pa-4">
-    <h3 class="mb-4">Previous Commits</h3>
-    <div v-if="isLoading">
+  <div class="previous-commits">
+    <div v-if="proposalStore.isCommitsLoading">
       <v-skeleton-loader
         type="list-item-three-line"
-        :loading="isLoading"
+        :loading="proposalStore.isCommitsLoading"
         class="mb-2"
         v-for="n in 3"
         :key="n"
       ></v-skeleton-loader>
     </div>
-    <div v-else>
-      <v-list v-if="commits.length > 0">
-        <v-list-item
-          v-for="commit in commits"
-          :key="commit.sha"
-          :href="commit.url"
-          target="_blank"
-          rel="noopener"
-        >
-          <v-list-item-title class="font-weight-medium">
-            {{ commit.message }}
-          </v-list-item-title>
-        </v-list-item>
-      </v-list>
-      <p v-else class="text-subtle">No previous commits found.</p>
-    </div>
+    <v-timeline v-if="proposalStore.commits.length > 0" side="end" class="justify-start">
+      <v-timeline-item
+        v-for="commit in proposalStore.commits"
+        :key="commit.sha"
+        size="small"
+        width="100%"
+      >
+        <template #opposite>
+          <span class="text-subtle">{{ new Date(commit.timestamp).toLocaleString() }}</span>
+        </template>
+        <template #default>
+          <div class="d-flex justify-space-between">
+            <div class="flex-grow-1">{{ commit.message }}</div>
+            <div class="text-subtle ml-8">{{ commit.author }}</div>
+          </div>
+        </template>
+      </v-timeline-item>
+    </v-timeline>
+    <p v-else class="text-subtle">No previous commits available.</p>
   </div>
 </template>
 
 <script>
 import { useProposalStore } from '@/stores/proposal';
+
 export default {
   name: 'PreviousCommits',
   computed: {
     proposalStore() {
       return useProposalStore();
-    },
-    isLoading() {
-      return this.proposalStore.isLoading;
-    },
-    commits() {
-      return this.proposalStore.proposal?.commits || [];
     },
   },
 };

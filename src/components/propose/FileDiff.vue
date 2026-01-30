@@ -65,7 +65,7 @@ export default {
     }
     try {
       this.loading = true;
-      this.diff = await diffService.loadDiff(
+      this.diff = await diffService.fetchDiff(
         this.workspacesStore.currentWorkspace.id,
         this.file.path,
       );
