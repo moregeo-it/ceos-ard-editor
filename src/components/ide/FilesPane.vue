@@ -420,10 +420,10 @@ export default {
     },
 
     getIconColor(item) {
-      if (item.status === 'added') return 'success';
-      if (item.status === 'modified') return 'warning';
-      if (item.status === 'renamed') return 'info';
-      if (item.status === 'deleted') return 'error';
+      if (item.status === 'added') return 'green';
+      else if (item.status === 'modified') return 'warning';
+      else if (item.status === 'renamed') return 'blue';
+      else if (item.status === 'deleted') return 'red';
       return undefined;
     },
 
