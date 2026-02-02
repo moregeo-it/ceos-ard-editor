@@ -19,7 +19,7 @@
     <div v-if="proposalStore.isProposalLoading" class="text-center">
       <v-progress-circular indeterminate color="primary" />
     </div>
-    <template v-else-if="commits && commits.length > 0">
+    <template v-else-if="commits.length > 0">
       <v-alert :type="statusColor" :icon="alertIcon" class="mt-4 mb-6" variant="tonal" dense>
         <template v-if="proposal && proposal.state === 'open'">
           <p class="mb-2 font-weight-bold">
@@ -118,14 +118,11 @@
         You currently have no changes to propose.<br />
         Please make some changes in your workspace and commit them before creating a proposal.
       </p>
-      <h2 class="mt-8 mb-2">Commits</h2>
-      <PreviousCommits />
     </div>
   </div>
 </template>
 
 <script>
-import PreviousCommits from './PreviousCommits.vue';
 import { useProposalStore } from '@/stores/proposal';
 import diffService from '@/services/proposal.service';
 import { useWorkspacesStore } from '@/stores/workspaces';
@@ -139,9 +136,6 @@ import {
 
 export default {
   name: 'PullRequest',
-  components: {
-    PreviousCommits,
-  },
   data() {
     return {
       title: '',
@@ -199,7 +193,7 @@ export default {
       return this.proposalStore.diffList;
     },
     commits() {
-      return this.proposalStore.commits;
+      return this.proposalStore.commits || [];
     },
     formDisabled() {
       return (
