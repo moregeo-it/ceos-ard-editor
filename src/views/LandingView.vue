@@ -1,8 +1,16 @@
 <template>
   <v-app>
     <v-main>
-      <v-container fluid class="fill-height">
-        <v-row justify="center">
+      <v-container fluid class="fill-height flex-column">
+        <v-row justify="center" class="flex-grow-0">
+          <v-col>
+            <v-alert type="warning">
+              This is a prototype version of the CEOS-ARD Editor. Functionality may be limited and
+              data may be reset periodically.
+            </v-alert>
+          </v-col>
+        </v-row>
+        <v-row justify="center" align="center" class="flex-grow-1 w-100">
           <v-col cols="12" md="10" lg="8" xl="7">
             <v-card elevation="0" class="pa-8 pa-md-12">
               <v-row align="center">
