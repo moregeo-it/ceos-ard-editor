@@ -65,6 +65,16 @@
             >Reopen Proposal</v-btn
           >
         </template>
+        <template v-else-if="proposal && proposal.state === 'merged'">
+          <p class="mb-2 font-weight-bold">
+            A Pull Request has been created on GitHub and it has been <strong>accepted</strong> by
+            the CEOS-ARD community. Thank you for your contribution!
+          </p>
+
+          <v-btn :href="proposal.url" target="_blank" color="primary" class="ma-2">
+            View Pull Request on GitHub
+          </v-btn>
+        </template>
         <template v-else>
           You can propose your changes to CEOS-ARD now. This will create a new
           <em>Pull Request</em> on the CEOS-ARD GitHub repository. You can add more changes to the
