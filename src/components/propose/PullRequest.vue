@@ -1,38 +1,88 @@
 <template>
   <div class="pull-request pa-4 fill-height overflow-auto">
     <div class="d-flex align-center mb-4">
-      <h2 class="mr-3 mb-0">
-        <template v-if="proposal">Update Proposal</template>
+      <h2 class="ma-0">
+        <template v-if="proposal"
+          >Proposal: <em>{{ proposal.title }}</em></template
+        >
         <template v-else>Create Proposal</template>
       </h2>
-      <v-badge
-        v-if="proposal && proposal.draft"
-        color="grey"
-        content="Draft"
-        class="ml-2"
-        bordered
+      <v-chip v-if="proposal && proposal.draft" text="draft" class="ml-4" />
+      <v-chip
+        v-if="proposal && proposal.state"
+        :text="proposal.state"
+        :color="statusColor"
+        class="ml-1"
       />
     </div>
 
     <div v-if="proposalStore.isProposalLoading" class="text-center">
       <v-progress-circular indeterminate color="primary" />
     </div>
-    <template v-else-if="proposal">
-      <v-alert type="info" class="mb-4" border="start" color="primary" variant="tonal" dense>
-        You already submitted some changes to the CEOS-ARD GitHub repository.
+    <template v-else-if="commits && commits.length > 0">
+      <v-alert :type="statusColor" :icon="alertIcon" class="mt-4 mb-6" variant="tonal" dense>
+        <template v-if="proposal && proposal.state === 'open'">
+          <p class="mb-2 font-weight-bold">
+            A Pull Request has been created on GitHub for your proposed changes.
+          </p>
+          <p class="mb-2">
+            Your Pull Request is in <strong>draft</strong> mode. To mark is as ready for review,
+            please visit the Pull Request on GitHub and change its status there.
+          </p>
+
+          <v-btn :href="proposal.url" target="_blank" color="primary" class="ma-2">
+            View Pull Request on GitHub
+          </v-btn>
+          <v-btn
+            class="ma-2"
+            @click="changeState('closed')"
+            color="error"
+            :disabled="isChangingState"
+            :loading="isChangingState"
+            >Withdraw Proposal</v-btn
+          >
+        </template>
+        <template v-else-if="proposal && proposal.state === 'closed'">
+          <p class="mb-2 font-weight-bold">
+            A Pull Request has been created on GitHub, but it has been withdrawn by you or was
+            rejected by members of the CEOS-ARD community.
+          </p>
+          <p class="mb-2">
+            You can try to reopen the Pull Request, but it might not be possible when rejected by a
+            CEOS-ARD community. Please add a comment on the Pull Request on GitHub to discuss the
+            reasons for rejection.
+          </p>
+
+          <v-btn :href="proposal.url" target="_blank" color="primary" class="ma-2">
+            View Pull Request on GitHub
+          </v-btn>
+          <v-btn
+            class="ma-2"
+            @click="changeState('open')"
+            color="error"
+            :disabled="isChangingState"
+            :loading="isChangingState"
+            >Reopen Proposal</v-btn
+          >
+        </template>
+        <template v-else>
+          You can propose your changes to CEOS-ARD now. This will create a new
+          <em>Pull Request</em> on the CEOS-ARD GitHub repository. You can add more changes to the
+          <em>Pull Request</em> later as well.
+        </template>
       </v-alert>
 
-      <form @submit.prevent="submitPullRequest" v-if="proposal.state !== 'merged'">
+      <v-form @submit.prevent="propose">
         <v-text-field
           v-model="title"
           required
           persistent-hint
           persistent-counter
           label="Title of the Proposal"
-          hint="You can update the title for your overall proposal."
+          hint="Specify a title for your overall proposal."
           variant="outlined"
           :counter="maxLengths.title"
-          :disabled="proposal.state === 'closed'"
+          :disabled="formDisabled"
           class="mb-6"
         ></v-text-field>
 
@@ -42,81 +92,11 @@
           persistent-hint
           persistent-counter
           label="Description of the Proposal"
-          hint="You can update the detailed description of your overall proposal. You can use Markdown to format your description."
+          hint="Specify a detailed description for your overall proposal. You can use Markdown to format your description."
           variant="outlined"
           rows="8"
           :counter="maxLengths.description"
-          :disabled="proposal.state === 'closed'"
-          class="mb-4"
-        ></v-textarea>
-
-        <v-btn :href="proposal.url" target="_blank" color="primary" class="mb-4 w-100"
-          >View Pull Request on GitHub</v-btn
-        >
-
-        <previous-commits class="mb-6" />
-
-        <v-btn
-          v-if="!proposal.state || proposal.state === 'open'"
-          type="submit"
-          color="primary"
-          class="mt-2 w-100"
-          :disabled="isSubmitting"
-          :loading="isSubmitting"
-        >
-          Update Proposal
-        </v-btn>
-        <v-btn
-          v-if="proposal.state === 'open'"
-          type="button"
-          color="error"
-          class="mt-2 w-100"
-          :disabled="isSubmitting"
-          :loading="isSubmitting"
-          >Withdraw Proposal</v-btn
-        >
-        <v-btn
-          v-else-if="proposal.state === 'closed'"
-          type="button"
-          color="info"
-          class="mt-2 w-100"
-          :disabled="isSubmitting"
-          :loading="isSubmitting"
-          >Reopen Proposal</v-btn
-        >
-      </form>
-    </template>
-
-    <template v-else-if="diffs.length > 0 || commits.length > 0">
-      <p class="mb-4">
-        You can propose your changes to CEOS-ARD now. This will create a new
-        <em>Pull Request</em> on the CEOS-ARD GitHub repository. You can add more changes to the
-        <em>Pull Request</em> later as well.
-      </p>
-
-      <form @submit.prevent="submitPullRequest">
-        <v-text-field
-          v-model="title"
-          required
-          persistent-hint
-          persistent-counter
-          label="Title of the Proposal"
-          hint="Please provide a summarizing title for your overall proposal."
-          variant="outlined"
-          :counter="maxLengths.title"
-          class="mb-6"
-        ></v-text-field>
-
-        <v-textarea
-          v-model="description"
-          required
-          persistent-hint
-          persistent-counter
-          label="Description of the Proposal"
-          hint="Please provide a detailed description of your overall proposal. You can use Markdown to format your description."
-          variant="outlined"
-          rows="8"
-          :counter="maxLengths.description"
+          :disabled="formDisabled"
           class="mb-4"
         ></v-textarea>
 
@@ -124,19 +104,22 @@
           type="submit"
           color="primary"
           class="w-100"
+          :disabled="formDisabled"
           :loading="isSubmitting"
-          :disabled="isSubmitting"
         >
-          Create Proposal
+          <template v-if="!proposal">Create</template>
+          <template v-else>Update</template>
+          Proposal
         </v-btn>
-      </form>
+      </v-form>
     </template>
-
     <div v-else class="empty-state">
       <p class="text-subtle mt-4">
         You currently have no changes to propose.<br />
-        Please make some changes in your personal workspace first.
+        Please make some changes in your workspace and commit them before creating a proposal.
       </p>
+      <h2 class="mt-8 mb-2">Commits</h2>
+      <PreviousCommits />
     </div>
   </div>
 </template>
@@ -147,6 +130,12 @@ import { useProposalStore } from '@/stores/proposal';
 import diffService from '@/services/proposal.service';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
+import {
+  mdiInformation,
+  mdiSourceBranch,
+  mdiSourceBranchCheck,
+  mdiSourceBranchRemove,
+} from '@mdi/js';
 
 export default {
   name: 'PullRequest',
@@ -158,13 +147,39 @@ export default {
       title: '',
       description: '',
       isSubmitting: false,
+      isChangingState: false,
       maxLengths: {
         title: 200,
         description: 10000,
       },
+      icons: {
+        opened: mdiSourceBranch,
+        closed: mdiSourceBranchRemove,
+        merged: mdiSourceBranchCheck,
+        info: mdiInformation,
+      },
     };
   },
   computed: {
+    alertIcon() {
+      if (this.proposal?.state) {
+        return this.icons[this.proposal.state];
+      }
+      return mdiInformation;
+    },
+    statusColor() {
+      if (this.proposal) {
+        switch (this.proposal.state) {
+          case 'open':
+            return 'success';
+          case 'closed':
+            return 'danger';
+          case 'merged':
+            return 'purple';
+        }
+      }
+      return 'info';
+    },
     workspace() {
       return this.workspacesStore.currentWorkspace;
     },
@@ -185,6 +200,13 @@ export default {
     },
     commits() {
       return this.proposalStore.commits;
+    },
+    formDisabled() {
+      return (
+        this.isSubmitting ||
+        this.isChangingState ||
+        (this.proposal && this.proposal.state === 'closed')
+      );
     },
   },
   watch: {
@@ -215,28 +237,52 @@ export default {
     },
   },
   methods: {
-    async submitPullRequest() {
+    async changeState(state) {
+      this.isChangingState = true;
+      try {
+        const proposalInput = {
+          title: this.proposal.title,
+          description: this.proposal.description,
+          state: state,
+        };
+        const pr = await diffService.propose(
+          this.workspacesStore.currentWorkspace.id,
+          proposalInput,
+        );
+        if (pr) {
+          this.proposalStore.updateProposal(pr);
+          this.notificationsStore.success('Proposal changed successfully.');
+        }
+        try {
+          await this.workspacesStore.getWorkspace(this.workspace.id);
+        } catch {
+          this.notificationsStore.error('Failed to refresh workspace, please reload the page.');
+        }
+      } catch (error) {
+        this.notificationsStore.error('Failed to change proposal state: ' + error.message);
+      } finally {
+        this.isChangingState = false;
+      }
+    },
+    async propose() {
+      if (this.formDisabled) return;
+      const verb = this.proposal ? 'update' : 'create';
       this.isSubmitting = true;
       try {
         const proposalInput = {
           title: this.title,
           description: this.description,
         };
-
-        if (this.diffs && this.diffs.length > 0 && this.commitMessage !== '') {
-          proposalInput.commitMessage = this.commitMessage;
-        }
-
-        const pr_response = await diffService.createPullRequest(
+        const pr = await diffService.propose(
           this.workspacesStore.currentWorkspace.id,
           proposalInput,
         );
-
-        if (pr_response) {
-          this.notificationsStore.success('Pull Request created successfully.');
+        if (pr) {
+          this.proposalStore.updateProposal(pr);
+          this.notificationsStore.success(`Proposal ${verb}d successfully.`);
         }
       } catch (error) {
-        this.notificationsStore.error('Failed to create Pull Request: ' + error.message);
+        this.notificationsStore.error(`Failed to ${verb} proposal: ` + error.message);
       } finally {
         this.isSubmitting = false;
       }

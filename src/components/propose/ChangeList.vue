@@ -48,9 +48,6 @@
         No changes have been applied to your workspace.<br />There is nothing to send to GitHub.
       </p>
     </div>
-
-    <h2 class="mt-8 mb-2">Previous Commits</h2>
-    <PreviousCommits />
   </div>
 </template>
 
@@ -60,7 +57,6 @@ import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
 import FileStatusBadge from '@/components/FileStatusBadge.vue';
 import FileDiff from './FileDiff.vue';
-import PreviousCommits from './PreviousCommits.vue';
 
 export default {
   name: 'ChangeList',
@@ -68,7 +64,6 @@ export default {
   components: {
     FileStatusBadge,
     FileDiff,
-    PreviousCommits,
   },
 
   data() {

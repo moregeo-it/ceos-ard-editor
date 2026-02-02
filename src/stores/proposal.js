@@ -9,7 +9,7 @@ const getDefaults = () => ({
   commits: [],
   isProposalLoading: false,
   isDiffLoading: false,
-  isCommitsLoading: false,
+  isCommitListLoading: false,
   isCommitting: false,
 });
 
@@ -17,6 +17,9 @@ export const useProposalStore = defineStore('proposal', {
   state: () => getDefaults(),
 
   actions: {
+    updateProposal(proposal) {
+      this.proposal = proposal;
+    },
     async fetchProposal(workspaceId) {
       this.isProposalLoading = true;
       try {
@@ -35,7 +38,7 @@ export const useProposalStore = defineStore('proposal', {
       }
     },
     async fetchCommits(workspaceId) {
-      this.isCommitsLoading = true;
+      this.isCommitListLoading = true;
       try {
         const workspacesStore = useWorkspacesStore();
         await workspacesStore.getWorkspace(workspaceId);
@@ -47,7 +50,7 @@ export const useProposalStore = defineStore('proposal', {
           this.commits = [];
         }
       } finally {
-        this.isCommitsLoading = false;
+        this.isCommitListLoading = false;
       }
     },
 

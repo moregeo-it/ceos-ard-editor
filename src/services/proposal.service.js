@@ -8,7 +8,7 @@ export default {
   async fetchDiff(workspaceId, filePath) {
     return api.getText(`/workspaces/${workspaceId}/diffs/${encodeURIComponent(filePath)}`);
   },
-  async createPullRequest(workspaceId, payload) {
+  async propose(workspaceId, payload) {
     return api.put(`/workspaces/${workspaceId}/proposal`, payload);
   },
   async fetchProposal(workspaceId) {

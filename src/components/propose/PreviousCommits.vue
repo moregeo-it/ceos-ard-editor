@@ -1,21 +1,16 @@
 <template>
   <div class="previous-commits">
-    <div v-if="proposalStore.isCommitsLoading">
+    <div v-if="areCommitsLoading">
       <v-skeleton-loader
         type="list-item-three-line"
-        :loading="proposalStore.isCommitsLoading"
+        :loading="areCommitsLoading"
         class="mb-2"
         v-for="n in 3"
         :key="n"
       ></v-skeleton-loader>
     </div>
-    <v-timeline v-if="proposalStore.commits.length > 0" side="end" class="justify-start">
-      <v-timeline-item
-        v-for="commit in proposalStore.commits"
-        :key="commit.sha"
-        size="small"
-        width="100%"
-      >
+    <v-timeline v-if="commits.length > 0" side="end" class="justify-start">
+      <v-timeline-item v-for="commit in commits" :key="commit.sha" size="small" width="100%">
         <template #opposite>
           <span class="text-subtle">{{ new Date(commit.timestamp).toLocaleString() }}</span>
         </template>
@@ -39,6 +34,12 @@ export default {
   computed: {
     proposalStore() {
       return useProposalStore();
+    },
+    areCommitsLoading() {
+      return this.proposalStore.isCommitListLoading;
+    },
+    commits() {
+      return this.proposalStore.commits;
     },
   },
 };

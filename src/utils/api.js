@@ -52,9 +52,29 @@ export async function fetchWithAuth(endpoint, options = {}) {
  */
 function parseErrorMessage(errorData, status) {
   // Check for message in various formats
-  if (errorData.message) return errorData.message;
-  if (errorData.error) return errorData.error;
-  if (errorData.detail) return errorData.detail;
+  if (typeof errorData.message === 'string') {
+    return errorData.message;
+  }
+  if (typeof errorData.error === 'string') {
+    return errorData.error;
+  }
+  if (typeof errorData.detail === 'string') {
+    return errorData.detail;
+  }
+  if (Array.isArray(errorData.detail)) {
+    return errorData.detail
+      .map((detail) => {
+        if (Array.isArray(detail.loc) && detail.loc.length > 0) {
+          if (detail.loc[0] === 'body') {
+            detail.loc.shift();
+          }
+          return `${detail.loc.join('.')} => ${detail.msg}`;
+        } else {
+          return detail.msg;
+        }
+      })
+      .join('; ');
+  }
 
   // Handle validation errors (422)
   if (status === 422 && errorData.errors) {
