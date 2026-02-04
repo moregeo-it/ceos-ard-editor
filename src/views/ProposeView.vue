@@ -9,8 +9,8 @@
     <!-- Main Content Area -->
     <v-main>
       <splitpanes @resized="storePaneSizes" :dbl-click-splitter="false">
-        <pane class="diff" min-size="20" :size="panelSizes.diff">
-          <DiffList />
+        <pane class="changes" min-size="20" :size="panelSizes.changes">
+          <ChangeList />
         </pane>
         <pane class="pr" min-size="20" :size="panelSizes.pr">
           <PullRequest />
@@ -26,17 +26,19 @@
 <script>
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
+import { useProposalStore } from '@/stores/proposal';
+
 import { mdiCheckCircle } from '@mdi/js';
 import { Splitpanes, Pane } from 'splitpanes';
 import HeaderBar from '@/components/HeaderBar.vue';
 import HeaderSwitch from '@/components/HeaderSwitch.vue';
-import DiffList from '@/components/propose/DiffList.vue';
+import ChangeList from '@/components/propose/ChangeList.vue';
 import PullRequest from '@/components/propose/PullRequest.vue';
 
 export default {
   name: 'ProposeView',
   components: {
-    DiffList,
+    ChangeList,
     HeaderBar,
     HeaderSwitch,
     Pane,
@@ -45,7 +47,7 @@ export default {
   },
   data() {
     const panelSizeDefaults = {
-      diff: 60,
+      changes: 60,
       pr: 40,
     };
     return {
@@ -54,7 +56,7 @@ export default {
       },
       panelSizeDefaults: panelSizeDefaults,
       panelSizes: {
-        diff: localStorage.diffPanelSize ?? panelSizeDefaults.diff,
+        changes: localStorage.changesPanelSize ?? panelSizeDefaults.changes,
         pr: localStorage.prPanelSize ?? panelSizeDefaults.pr,
       },
     };
@@ -62,7 +64,9 @@ export default {
 
   computed: {
     loading() {
-      return this.workspacesStore.isWorkspaceLoading[this.workspaceId];
+      return (
+        this.workspacesStore.isWorkspaceLoading[this.workspaceId] || this.proposalStore.isLoading
+      );
     },
     workspace() {
       return this.workspacesStore.currentWorkspace;
@@ -79,26 +83,35 @@ export default {
     notificationsStore() {
       return useNotificationsStore();
     },
+    proposalStore() {
+      return useProposalStore();
+    },
   },
 
-  async created() {
-    await this.loadWorkspace();
+  created() {
+    this.loadProposal();
+    this.proposalStore.fetchDiffList(this.workspaceId).catch((error) => {
+      this.notificationsStore.error(`Failed to load list of changes: ${error.message}`);
+    });
+    this.proposalStore.fetchCommits(this.workspaceId).catch((error) => {
+      this.notificationsStore.error(`Failed to load commits: ${error.message}`);
+    });
   },
 
   methods: {
     storePaneSizes: ({ panes }) => {
       if (panes.length === 2) {
-        localStorage.diffPanelSize = panes[0].size;
+        localStorage.changesPanelSize = panes[0].size;
         localStorage.prPanelSize = panes[1].size;
       }
     },
 
-    async loadWorkspace() {
+    async loadProposal() {
       try {
-        await this.workspacesStore.getWorkspace(this.workspaceId);
+        await this.proposalStore.fetchProposal(this.workspaceId);
       } catch (error) {
-        this.notificationsStore.error(`Failed to load workspace: ${error.message}`);
-        this.$router.push({ name: 'workspaces' });
+        this.notificationsStore.error(`Failed to load workspace proposal: ${error.message}`);
+        this.$router.push({ name: 'workspaces', params: { id: this.workspaceId } });
       }
     },
   },
@@ -119,7 +132,7 @@ export default {
 </style>
 
 <style scoped>
-.diff,
+.changes,
 .pr {
   max-height: 100%;
   overflow: hidden;

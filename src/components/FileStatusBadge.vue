@@ -34,9 +34,11 @@ export default {
         case 'added':
           return 'green';
         case 'modified':
-          return 'blue';
+          return 'warning';
         case 'deleted':
           return 'red';
+        case 'renamed':
+          return 'blue';
         default:
           return 'grey';
       }

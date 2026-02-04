@@ -10,6 +10,7 @@
 
         <v-text-field
           v-model="path"
+          variant="outlined"
           label="Path (optional)"
           placeholder="e.g., sections/introduction"
           hint="Leave empty to create at root level"
@@ -20,6 +21,7 @@
 
         <v-text-field
           v-model="name"
+          variant="outlined"
           label="Name"
           :placeholder="type === 'file' ? 'example.yaml' : 'folder-name'"
           :hint="type === 'file' ? 'File name must include extension (e.g., .yaml, .json)' : ''"

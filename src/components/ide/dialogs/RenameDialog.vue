@@ -10,6 +10,7 @@
           :hint="hint"
           :error-messages="nameError"
           persistent-hint
+          variant="outlined"
           density="compact"
           autofocus
           @keyup.enter="handleRename"
