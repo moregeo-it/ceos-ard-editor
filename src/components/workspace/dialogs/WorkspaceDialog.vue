@@ -1,5 +1,5 @@
 <template>
-  <v-dialog v-model="showDialog" max-width="600" persistent>
+  <v-dialog v-model="showDialog" max-width="600">
     <v-card>
       <v-card-title class="d-flex align-center">
         <v-icon :icon="dialogIcon" start></v-icon>

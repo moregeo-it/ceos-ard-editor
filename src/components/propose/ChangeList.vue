@@ -23,7 +23,7 @@
           </v-expansion-panel-text>
         </v-expansion-panel>
       </v-expansion-panels>
-      <form @submit.prevent="onCommitMessageSubmit">
+      <v-form @submit.prevent="onCommitMessageSubmit">
         <v-text-field
           v-model="commitMessage"
           persistent-counter
@@ -41,7 +41,7 @@
           class="w-100"
           >Commit Changes</v-btn
         >
-      </form>
+      </v-form>
     </div>
     <div v-else class="empty-state">
       <p class="text-subtle mt-4">
