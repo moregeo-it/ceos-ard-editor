@@ -14,6 +14,10 @@ export const useWorkspacesStore = defineStore('workspaces', {
   }),
 
   getters: {
+    isArchived: (state) => {
+      return state.currentWorkspace?.status === 'archived' || false;
+    },
+
     activeWorkspaces: (state) => {
       return state.workspaces.filter((w) => w.status === 'active');
     },

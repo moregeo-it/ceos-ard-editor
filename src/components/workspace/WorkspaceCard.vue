@@ -109,7 +109,7 @@ export default {
     },
 
     isArchived() {
-      return this.workspace.status === 'archived';
+      return this.workspace.status === 'archived' || false;
     },
 
     toggleStatusLabel() {

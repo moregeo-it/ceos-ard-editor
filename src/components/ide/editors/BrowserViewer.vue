@@ -1,14 +1,12 @@
 <template>
-  <div class="fill-height overflow-auto">
-    <img :src="blob" alt="Image Preview" />
-  </div>
+  <iframe :src="blob" width="100%" height="100%" class="iframe fill-height"></iframe>
 </template>
 
 <script>
 import BaseEditorMixin from './BaseEditorMixin';
 
 export default {
-  name: 'ImageViewer',
+  name: 'BrowserViewer',
 
   mixins: [BaseEditorMixin],
 
@@ -22,3 +20,9 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.iframe {
+  border: none;
+}
+</style>

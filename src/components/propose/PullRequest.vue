@@ -209,7 +209,8 @@ export default {
       return (
         this.isSubmitting ||
         this.isChangingState ||
-        (this.proposal && this.proposal.state === 'closed')
+        (this.proposal && this.proposal.state === 'closed') ||
+        this.workspacesStore.isArchived
       );
     },
   },

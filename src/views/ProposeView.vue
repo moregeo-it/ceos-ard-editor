@@ -74,9 +74,6 @@ export default {
     workspaceId() {
       return this.$route.params.id;
     },
-    isArchived() {
-      return this.workspace?.status === 'archived';
-    },
     workspacesStore() {
       return useWorkspacesStore();
     },

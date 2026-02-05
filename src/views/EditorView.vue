@@ -23,7 +23,11 @@
         </pane>
       </splitpanes>
 
-      <ArchivedDialog v-if="isArchived" :workspace="workspace" @activate="handleToggleStatus" />
+      <ArchivedDialog
+        v-if="workspacesStore.isArchived"
+        :workspace="workspace"
+        @activate="handleToggleStatus"
+      />
     </v-main>
   </v-app>
   <v-container v-else class="fill-height d-flex align-center justify-center">
@@ -85,9 +89,6 @@ export default {
     },
     workspaceId() {
       return this.$route.params.id;
-    },
-    isArchived() {
-      return this.workspace?.status === 'archived';
     },
     workspacesStore() {
       return useWorkspacesStore();

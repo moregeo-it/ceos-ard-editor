@@ -35,7 +35,7 @@ export const useEditorStore = defineStore('editor', {
       this.active = file;
       if (this.original[path] === undefined) {
         const data = await files.load(path);
-        if (data.type.startsWith('image/')) {
+        if (data.type.startsWith('image/') || data.type === 'application/pdf') {
           this.original[path] = data;
           this.data[path] = data;
         } else {

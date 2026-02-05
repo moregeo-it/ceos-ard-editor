@@ -56,7 +56,7 @@
             @update="(val) => editorStore.sync(file.path, val)"
             @save="save(file.path)"
             :file="file"
-            :readOnly="isReadOnly"
+            :readOnly="workspacesStore.isArchived"
             class="fill-height"
           />
         </v-tabs-window-item>
@@ -73,7 +73,7 @@
           {{ usage }}
         </v-toolbar-title>
 
-        <template v-slot:append>
+        <template v-slot:append v-if="!workspacesStore.isArchived">
           <v-btn
             :disabled="isActiveSaving || !hasActiveChanges"
             :loading="isActiveSaving"
@@ -99,18 +99,26 @@ import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { defineAsyncComponent } from 'vue';
-import ImageViewer from './editors/ImageViewer.vue';
+import BrowserViewer from './editors/BrowserViewer.vue';
 import SourceCodeEditor from './editors/SourceCodeEditor.vue';
 import UnsupportedViewer from './editors/UnsupportedViewer.vue';
 import { mdiClose, mdiContentSave, mdiContentSaveAll, mdiMenu } from '@mdi/js';
 
-const supportedImageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+const supportedBrowserTypes = [
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'image/bmp', // Raster images
+  'image/svg+xml', // Vector images
+  'application/pdf', // PDF
+];
 
 export default {
   name: 'EditorPane',
 
   components: {
-    ImageViewer,
+    BrowserViewer,
     SourceCodeEditor,
     UnsupportedViewer,
     PfsDocumentEditor: defineAsyncComponent(() => import('./editors/PfsDocumentEditor.vue')),
@@ -171,11 +179,6 @@ export default {
     openedFiles() {
       return this.editorStore.opened;
     },
-    isReadOnly() {
-      // Determine if the current workspace is read-only (archived)
-      const workspace = this.workspacesStore.current;
-      return workspace ? workspace.isArchived : false;
-    },
     hasActiveChanges() {
       return this.activeFile && this.editorStore.changed[this.activeFile.path];
     },
@@ -192,8 +195,8 @@ export default {
   methods: {
     getEditorType(value) {
       if (value instanceof Blob) {
-        if (supportedImageTypes.includes(value.type)) {
-          return 'ImageViewer';
+        if (supportedBrowserTypes.includes(value.type)) {
+          return 'BrowserViewer';
         } else {
           return 'UnsupportedViewer';
         }

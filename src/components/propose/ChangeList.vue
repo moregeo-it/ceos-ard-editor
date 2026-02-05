@@ -30,14 +30,14 @@
           label="Summary for the changes above"
           variant="outlined"
           :counter="maxLengths.commitMessage"
-          :disabled="proposalStore.proposal?.state === 'closed'"
+          :disabled="formDisabled"
           class="mb-3"
         ></v-text-field>
         <v-btn
           type="submit"
           color="primary"
           :loading="proposalStore.isCommitting"
-          :disabled="proposalStore.isCommitting"
+          :disabled="formDisabled"
           class="w-100"
           >Commit Changes</v-btn
         >
@@ -96,6 +96,13 @@ export default {
     },
     commits() {
       return this.proposalStore.commits || [];
+    },
+    formDisabled() {
+      return (
+        this.proposalStore.isCommitting ||
+        this.proposalStore.proposal?.state === 'closed' ||
+        this.workspacesStore.isArchived
+      );
     },
   },
 
