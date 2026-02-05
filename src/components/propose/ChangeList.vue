@@ -23,7 +23,7 @@
           </v-expansion-panel-text>
         </v-expansion-panel>
       </v-expansion-panels>
-      <v-form ref="commitForm" @submit.prevent="onCommitMessageSubmit">
+      <v-form @submit.prevent="onCommitMessageSubmit">
         <v-text-field
           v-model="commitMessage"
           persistent-counter
