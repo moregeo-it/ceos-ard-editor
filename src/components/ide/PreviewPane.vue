@@ -141,6 +141,10 @@ export default {
   },
   async mounted() {
     await this.previewStore.generatePreview();
+    // Update iframe content if preview already exists (e.g., returning from Propose view)
+    if (this.previewHtml) {
+      this.updateIframeContent();
+    }
   },
   watch: {
     previewHtml() {
