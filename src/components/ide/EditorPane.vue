@@ -44,15 +44,15 @@
           class="fill-height"
         >
           <v-container
-            v-if="editorStore.original[file.path] === undefined"
+            v-if="editorStore.data[file.path] === undefined"
             class="fill-height d-flex align-center justify-center"
           >
             <v-progress-circular indeterminate color="primary" size="64" />
           </v-container>
           <component
             v-else
-            :is="getEditorType(editorStore.original[file.path])"
-            :value="editorStore.original[file.path]"
+            :is="getEditorType(editorStore.data[file.path])"
+            :value="editorStore.data[file.path]"
             @update="(val) => editorStore.sync(file.path, val)"
             @save="save(file.path)"
             :file="file"

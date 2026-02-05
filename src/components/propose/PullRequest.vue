@@ -148,8 +148,6 @@ export default {
   name: 'PullRequest',
   data() {
     return {
-      title: '',
-      description: '',
       isSubmitting: false,
       isChangingState: false,
       maxLengths: {
@@ -213,24 +211,24 @@ export default {
         this.workspacesStore.isArchived
       );
     },
+    title: {
+      get() {
+        return this.proposalStore.prTitle;
+      },
+      set(value) {
+        this.proposalStore.prTitle = value;
+      },
+    },
+    description: {
+      get() {
+        return this.proposalStore.prDescription;
+      },
+      set(value) {
+        this.proposalStore.prDescription = value;
+      },
+    },
   },
   watch: {
-    title: {
-      handler(newTitle, oldTitle) {
-        if (!this.commitMessage || this.commitMessage === oldTitle) {
-          this.commitMessage = newTitle;
-        }
-      },
-    },
-    workspace: {
-      immediate: true,
-      handler(workspace) {
-        if (workspace && !this.proposal) {
-          this.title = workspace.title || '';
-          this.description = workspace.description || '';
-        }
-      },
-    },
     proposal: {
       immediate: true,
       handler(newProposal) {
@@ -240,6 +238,16 @@ export default {
         }
       },
     },
+  },
+  created() {
+    if (!this.proposal) {
+      if (this.title === null) {
+        this.title = this.workspace.title || '';
+      }
+      if (this.description === null) {
+        this.description = this.workspace.description || '';
+      }
+    }
   },
   methods: {
     async changeState(state) {

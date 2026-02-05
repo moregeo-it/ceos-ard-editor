@@ -11,7 +11,7 @@
         workspace, but have <strong>not</strong> been sent to the CEOS-ARD GitHub repository yet.
         Please review the changes and provide a summary message before committing them to GitHub.
       </p>
-      <v-expansion-panels multiple class="mb-6">
+      <v-expansion-panels multiple class="mb-6" v-model="proposalStore.expandedFiles">
         <v-expansion-panel v-for="file in diffs" :key="file.path">
           <v-expansion-panel-title>
             <FileStatusBadge :status="file.status" class="mr-2" width="60px" />
@@ -25,7 +25,7 @@
       </v-expansion-panels>
       <v-form @submit.prevent="onCommitMessageSubmit">
         <v-text-field
-          v-model="commitMessage"
+          v-model="proposalStore.commitMessage"
           persistent-counter
           label="Summary for the changes above"
           variant="outlined"
@@ -74,7 +74,6 @@ export default {
 
   data() {
     return {
-      commitMessage: '',
       maxLengths: {
         commitMessage: 500,
       },
@@ -110,8 +109,8 @@ export default {
     async onCommitMessageSubmit() {
       try {
         const workspaceId = this.workspacesStore.currentWorkspace.id;
-        await this.proposalStore.commitChanges(workspaceId, this.commitMessage);
-        this.commitMessage = '';
+        await this.proposalStore.commitChanges(workspaceId, this.proposalStore.commitMessage);
+        this.proposalStore.commitMessage = '';
         this.notificationsStore.success('Commit updated successfully.');
       } catch (error) {
         this.notificationsStore.error('Error updating commit: ' + error.message);

@@ -135,26 +135,24 @@ export default {
     },
   },
   async created() {
+    if (this.selectedPfs === null) {
+      this.selectedPfs = this.currentWorkspace.pfs || [];
+    }
     if (this.pfsOptions.length === 0) {
       await this.workspacesStore.fetchPfs();
     }
   },
   async mounted() {
-    await this.previewStore.generatePreview();
     // Update iframe content if preview already exists (e.g., returning from Propose view)
     if (this.previewHtml) {
       this.updateIframeContent();
+    } else {
+      await this.previewStore.generatePreview();
     }
   },
   watch: {
     previewHtml() {
       this.updateIframeContent();
-    },
-    currentWorkspace: {
-      handler(newVal) {
-        this.selectedPfs = newVal?.pfs || [];
-      },
-      immediate: true,
     },
   },
   methods: {

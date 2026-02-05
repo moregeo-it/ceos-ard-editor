@@ -23,6 +23,9 @@ const getDefaults = () => ({
   isSearchLoading: false,
   isPathLoading: [],
   isFolderComplete: {},
+  openedFolders: [],
+  activatedItems: [],
+  searchQuery: '',
 });
 
 const getParentPath = (filePath) => {

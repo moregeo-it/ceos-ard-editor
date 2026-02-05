@@ -7,10 +7,16 @@ const getDefaults = () => ({
   diffList: [],
   proposal: null,
   commits: [],
+  expandedFiles: [],
+  // Loading states
   isProposalLoading: false,
   isDiffLoading: false,
   isCommitListLoading: false,
   isCommitting: false,
+  // Form inputs
+  commitMessage: '',
+  prTitle: null,
+  prDescription: null,
 });
 
 export const useProposalStore = defineStore('proposal', {

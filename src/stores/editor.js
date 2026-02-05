@@ -39,8 +39,9 @@ export const useEditorStore = defineStore('editor', {
           this.original[path] = data;
           this.data[path] = data;
         } else {
-          this.original[path] = await data.text();
-          this.data[path] = await data.text();
+          const text = await data.text();
+          this.original[path] = text;
+          this.data[path] = text;
         }
         this.changed[path] = false;
         this.saving[path] = false;
