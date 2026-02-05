@@ -1,5 +1,5 @@
 <template>
-  <v-dialog v-model="showDialog" max-width="500" persistent>
+  <v-dialog v-model="showDialog" max-width="500">
     <v-card>
       <v-card-title class="d-flex align-center">
         Archive Workspace?
