@@ -56,6 +56,7 @@
 </template>
 
 <script>
+import { useFilesStore } from '@/stores/files';
 import { useProposalStore } from '@/stores/proposal';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
@@ -81,6 +82,9 @@ export default {
   },
 
   computed: {
+    filesStore() {
+      return useFilesStore();
+    },
     workspacesStore() {
       return useWorkspacesStore();
     },
@@ -112,6 +116,7 @@ export default {
         await this.proposalStore.commitChanges(workspaceId, this.proposalStore.commitMessage);
         this.proposalStore.commitMessage = '';
         this.notificationsStore.success('Commit updated successfully.');
+        await this.filesStore.updateFilesAfterCommit();
       } catch (error) {
         this.notificationsStore.error('Error updating commit: ' + error.message);
       }

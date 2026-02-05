@@ -120,6 +120,19 @@ export const useFilesStore = defineStore('files', {
       }
     },
 
+    async updateFilesAfterCommit() {
+      const requests = [];
+      // After commit, we need to refresh the file tree to reflect any changes
+      for (const path in this.all) {
+        const data = this.all[path];
+        if (data.status !== null) {
+          // If file has a status, it means it was changed in the commit, so we need to reload its context
+          requests.push(this.loadFileContext(path, true));
+        }
+      }
+      return await Promise.all(requests);
+    },
+
     resetPathLoading(path) {
       const ix = this.isPathLoading.indexOf(path);
       if (ix !== -1) {
