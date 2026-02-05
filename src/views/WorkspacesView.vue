@@ -133,7 +133,7 @@
 import { useAuthStore } from '@/stores/auth';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
-import HeaderBar from '@/components/HeaderBar.vue';
+import HeaderBar from '@/components/common/HeaderBar.vue';
 import WorkspaceCard from '@/components/workspace/WorkspaceCard.vue';
 import WorkspaceDialog from '@/components/workspace/dialogs/WorkspaceDialog.vue';
 import ArchiveConfirmDialog from '@/components/workspace/dialogs/ArchiveConfirmDialog.vue';

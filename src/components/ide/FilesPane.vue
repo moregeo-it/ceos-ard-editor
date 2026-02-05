@@ -184,7 +184,7 @@ import { useWorkspacesStore } from '@/stores/workspaces';
 import CreateFileDialog from './dialogs/CreateFileDialog.vue';
 import RenameDialog from './dialogs/RenameDialog.vue';
 import DeleteConfirmDialog from './dialogs/DeleteConfirmDialog.vue';
-import FileStatusBadge from '../FileStatusBadge.vue';
+import FileStatusBadge from '@/components/common/FileStatusBadge.vue';
 import {
   mdiFileCompare,
   mdiFileDocumentOutline,

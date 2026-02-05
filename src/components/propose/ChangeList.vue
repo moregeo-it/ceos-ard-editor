@@ -59,8 +59,8 @@
 import { useProposalStore } from '@/stores/proposal';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
-import FileStatusBadge from '@/components/FileStatusBadge.vue';
-import FileDiff from './FileDiff.vue';
+import FileStatusBadge from '@/components/common/FileStatusBadge.vue';
+import FileDiff from '@/components/common/FileDiff.vue';
 import PreviousCommits from './PreviousCommits.vue';
 
 export default {

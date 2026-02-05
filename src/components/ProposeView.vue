@@ -1,26 +1,12 @@
 <template>
-  <v-app v-if="workspace" id="propose">
-    <HeaderBar :title="workspace.title" :icon="icons.title">
-      <template #central-actions>
-        <HeaderSwitch />
-      </template>
-    </HeaderBar>
-
-    <!-- Main Content Area -->
-    <v-main>
-      <splitpanes @resized="storePaneSizes" :dbl-click-splitter="false">
-        <pane class="changes" min-size="20" :size="panelSizes.changes">
-          <ChangeList />
-        </pane>
-        <pane class="pr" min-size="20" :size="panelSizes.pr">
-          <PullRequest />
-        </pane>
-      </splitpanes>
-    </v-main>
-  </v-app>
-  <v-container v-else class="fill-height d-flex align-center justify-center">
-    <v-progress-circular indeterminate color="primary" size="64" />
-  </v-container>
+  <splitpanes @resized="storePaneSizes" :dbl-click-splitter="false">
+    <pane class="changes" min-size="20" :size="panelSizes.changes">
+      <ChangeList />
+    </pane>
+    <pane class="pr" min-size="20" :size="panelSizes.pr">
+      <PullRequest />
+    </pane>
+  </splitpanes>
 </template>
 
 <script>
@@ -30,8 +16,6 @@ import { useProposalStore } from '@/stores/proposal';
 
 import { mdiCheckCircle } from '@mdi/js';
 import { Splitpanes, Pane } from 'splitpanes';
-import HeaderBar from '@/components/HeaderBar.vue';
-import HeaderSwitch from '@/components/HeaderSwitch.vue';
 import ChangeList from '@/components/propose/ChangeList.vue';
 import PullRequest from '@/components/propose/PullRequest.vue';
 
@@ -39,8 +23,6 @@ export default {
   name: 'ProposeView',
   components: {
     ChangeList,
-    HeaderBar,
-    HeaderSwitch,
     Pane,
     PullRequest,
     Splitpanes,
@@ -63,11 +45,6 @@ export default {
   },
 
   computed: {
-    loading() {
-      return (
-        this.workspacesStore.isWorkspaceLoading[this.workspaceId] || this.proposalStore.isLoading
-      );
-    },
     workspace() {
       return this.workspacesStore.currentWorkspace;
     },
@@ -108,7 +85,7 @@ export default {
         await this.proposalStore.fetchProposal(this.workspaceId);
       } catch (error) {
         this.notificationsStore.error(`Failed to load workspace proposal: ${error.message}`);
-        this.$router.push({ name: 'workspaces', params: { id: this.workspaceId } });
+        //this.$router.push({ name: 'workspaces', params: { id: this.workspaceId } });
       }
     },
   },

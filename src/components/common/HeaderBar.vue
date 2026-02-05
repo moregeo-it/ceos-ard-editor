@@ -30,5 +30,13 @@ export default {
       default: null,
     },
   },
+  watch: {
+    title: {
+      immediate: true,
+      handler() {
+        document.title = this.title || 'CEOS-ARD Editor';
+      },
+    },
+  },
 };
 </script>

@@ -14,7 +14,7 @@
 </template>
 
 <script>
-import FileDiff from '@/components/propose/FileDiff.vue';
+import FileDiff from '@/components/common/FileDiff.vue';
 
 export default {
   name: 'DiffDialog',

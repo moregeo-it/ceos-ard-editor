@@ -1,5 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { useEditorStore } from '@/stores/editor';
+import { useFilesStore } from '@/stores/files';
+import { useNotificationsStore } from '@/stores/notifications';
+import { usePreviewStore } from '@/stores/preview';
+import { useProposalStore } from '@/stores/proposal';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -25,22 +30,28 @@ const router = createRouter({
     {
       path: '/workspaces/:id',
       name: 'editor',
-      component: () => import('@/views/EditorView.vue'),
-      meta: { requiresAuth: true },
-    },
-    {
-      path: '/workspaces/:id/propose',
-      name: 'propose',
-      component: () => import('@/views/ProposeView.vue'),
+      component: () => import('@/views/PfsEditorView.vue'),
       meta: { requiresAuth: true },
     },
   ],
 });
 
+const resetStore = () => {
+  // Reset relevant stores on route change
+  useEditorStore().reset();
+  useFilesStore().reset();
+  useNotificationsStore().reset();
+  usePreviewStore().reset();
+  useProposalStore().reset();
+};
+
 router.beforeEach(async (to, from, next) => {
-  const authStore = useAuthStore();
+  if (to.name !== from.name) {
+    resetStore();
+  }
 
   // Try to restore session on first load
+  const authStore = useAuthStore();
   if (!authStore.isAuthenticated && !authStore.isLoading) {
     await authStore.restoreSession();
   }
