@@ -3,7 +3,7 @@
     <!-- Search Input -->
     <div class="px-2 pt-3">
       <v-text-field
-        v-model="searchQuery"
+        v-model="filesStore.searchQuery"
         :prepend-inner-icon="icons.search"
         label="Search files and folders..."
         density="compact"
@@ -226,9 +226,6 @@ export default {
         revert: mdiUndoVariant,
         download: mdiDownload,
       },
-      openedFolders: [],
-      activatedItems: [],
-      searchQuery: '',
       createInitialPath: null,
       itemToRename: null,
       itemToDelete: null,
@@ -285,6 +282,22 @@ export default {
     },
     activeFile() {
       return this.editorStore.active;
+    },
+    openedFolders: {
+      get() {
+        return this.filesStore.openedFolders;
+      },
+      set(value) {
+        this.filesStore.openedFolders = value;
+      },
+    },
+    activatedItems: {
+      get() {
+        return this.filesStore.activatedItems;
+      },
+      set(value) {
+        this.filesStore.activatedItems = value;
+      },
     },
   },
 
@@ -408,7 +421,7 @@ export default {
     },
 
     async clearSearch() {
-      this.searchQuery = '';
+      this.filesStore.searchQuery = '';
       this.filesStore.searchResults = null;
     },
 

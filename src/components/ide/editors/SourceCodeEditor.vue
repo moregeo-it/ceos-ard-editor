@@ -22,11 +22,6 @@ export default {
   components: {
     CodeMirror,
   },
-  data() {
-    return {
-      extensions: [],
-    };
-  },
   computed: {
     fileExtension() {
       const path = this.file?.name ?? '';
