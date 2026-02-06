@@ -51,7 +51,7 @@
           </v-container>
           <component
             v-else
-            :is="getEditorType(editorStore.data[file.path])"
+            :is="getEditorType(file, editorStore.data[file.path])"
             :value="editorStore.data[file.path]"
             @update="(val) => editorStore.sync(file.path, val)"
             @save="save(file.path)"
@@ -100,9 +100,9 @@ import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { defineAsyncComponent } from 'vue';
 import BrowserViewer from './editors/BrowserViewer.vue';
-import SourceCodeEditor from './editors/SourceCodeEditor.vue';
 import UnsupportedViewer from './editors/UnsupportedViewer.vue';
 import { mdiClose, mdiContentSave, mdiContentSaveAll, mdiMenu } from '@mdi/js';
+import { supportVisualEditing } from '@/components/ide/editors/utils';
 
 const supportedBrowserTypes = [
   'image/png',
@@ -119,9 +119,9 @@ export default {
 
   components: {
     BrowserViewer,
-    SourceCodeEditor,
+    SourceCodeEditor: defineAsyncComponent(() => import('./editors/SourceCodeEditor.vue')),
     UnsupportedViewer,
-    PfsDocumentEditor: defineAsyncComponent(() => import('./editors/PfsDocumentEditor.vue')),
+    JsonSchemaEditor: defineAsyncComponent(() => import('./editors/JsonSchemaEditor.vue')),
   },
 
   data() {
@@ -193,13 +193,15 @@ export default {
     },
   },
   methods: {
-    getEditorType(value) {
-      if (value instanceof Blob) {
-        if (supportedBrowserTypes.includes(value.type)) {
+    getEditorType(file, data) {
+      if (data instanceof Blob) {
+        if (supportedBrowserTypes.includes(data.type)) {
           return 'BrowserViewer';
         } else {
           return 'UnsupportedViewer';
         }
+      } else if (supportVisualEditing(file, data)) {
+        return 'JsonSchemaEditor';
       } else {
         return 'SourceCodeEditor';
       }
@@ -220,7 +222,7 @@ export default {
       const fileCount = results.filter((res) => res).length;
       if (errorCount > 0) {
         this.notificationsStore.error(
-          `Failed to save ${errorCount} of${fileCount} file(s). Please try again.`,
+          `Failed to save ${errorCount} of ${fileCount} file(s). Please try again.`,
         );
       }
     },
