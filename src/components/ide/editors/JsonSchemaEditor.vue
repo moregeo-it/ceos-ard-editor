@@ -1,21 +1,24 @@
 <template>
-  <JsonForms
-    :data="parsedData"
-    :schema="schema"
-    :uischema="uiSchema"
-    :renderers="renderers"
-    @change="onChange"
-    :readonly="this.readOnly"
-  />
+  <div class="json-schema-editor">
+    <JsonForms
+      :data="parsedData"
+      :schema="schema"
+      :uischema="uiSchema"
+      :renderers="renderers"
+      @change="onChange"
+      :readonly="this.readOnly"
+    />
+  </div>
 </template>
 
 <script>
 import BaseEditorMixin from './BaseEditorMixin';
+import { useNotificationsStore } from '@/stores/notifications';
 import { JsonForms } from '@jsonforms/vue';
 import { extendedVuetifyRenderers } from '@jsonforms/vue-vuetify';
 import { markRaw } from 'vue';
 import { getEditingSchema, getUiSchema } from './utils';
-import { parse, parseDocument } from 'yaml';
+import { load, dump } from '@/utils/enhanced-yaml';
 
 const renderers = markRaw([
   ...extendedVuetifyRenderers,
@@ -34,6 +37,9 @@ export default {
     };
   },
   computed: {
+    notifications() {
+      return useNotificationsStore();
+    },
     schema() {
       return getEditingSchema(this.file, this.data);
     },
@@ -41,17 +47,23 @@ export default {
       return getUiSchema(this.file, this.data);
     },
     parsedData() {
-      // todo: error handling?
-      return parse(this.data);
+      return this.parse();
     },
   },
   methods: {
+    parse() {
+      try {
+        return load(this.data);
+      } catch (error) {
+        this.notifications.error(
+          'The YAML file is invalid, opening in the source code editor. Please fix the issues there.',
+        );
+        this.$emit('error', error);
+        return {};
+      }
+    },
     onChange(event) {
-      // Parse original as a Document to preserve comments and styling,
-      // then update its contents with the new data and re-stringify.
-      const doc = parseDocument(this.data);
-      doc.contents = doc.createNode(event.data);
-      this.data = doc.toString();
+      this.data = dump(event.data, {}, this.data);
     },
   },
 };

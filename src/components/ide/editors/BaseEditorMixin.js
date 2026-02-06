@@ -1,5 +1,5 @@
 export default {
-  emits: ['update', 'save'],
+  emits: ['update', 'save', 'error'],
   data() {
     return {
       data: '',

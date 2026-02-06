@@ -23,13 +23,17 @@ export const useEditorStore = defineStore('editor', {
   },
 
   actions: {
-    async show(path) {
+    async show(path, forceSourceCodeEditor = false) {
       const files = useFilesStore();
       let file = await files.loadFileContext(path);
       if (!file || file.is_directory || file.status === 'deleted') {
         return;
       }
       if (!this.opened.find((f) => f.path === path)) {
+        file = Object.assign({}, file);
+        if (forceSourceCodeEditor) {
+          file.forceSourceCodeEditor = true;
+        }
         this.opened.push(file);
       }
       this.active = file;

@@ -32,7 +32,7 @@
         open-on-click
         item-title="name"
         item-value="path"
-        @update:activated="openFile"
+        @update:activated="openActivatedFile"
       >
         <template v-slot:prepend="{ item }">
           <v-icon :icon="getFileIcon(item)" size="small" :color="getIconColor(item)" />
@@ -73,6 +73,13 @@
             </template>
             <v-list density="compact">
               <template v-if="item.type === 'file'">
+                <v-list-item v-if="item.status !== 'deleted'" @click="openFile(item.path, true)">
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.codeeditor" size="small" />
+                  </template>
+                  <v-list-item-title>Open in Source Code Editor</v-list-item-title>
+                </v-list-item>
+
                 <v-list-item
                   v-if="item.status && !['added', 'deleted'].includes(item.status)"
                   @click="requestDiff(item)"
@@ -160,6 +167,7 @@ import {
   mdiDeleteOutline,
   mdiUndoVariant,
   mdiDownload,
+  mdiCodeJson,
 } from '@mdi/js';
 import { downloadBlob } from '@/utils/api';
 
@@ -184,6 +192,7 @@ export default {
         delete: mdiDeleteOutline,
         revert: mdiUndoVariant,
         download: mdiDownload,
+        codeeditor: mdiCodeJson,
       },
       debouncedSearch: null,
     };
@@ -322,13 +331,16 @@ export default {
       }
     },
 
-    openFile(activated) {
+    openActivatedFile(activated) {
       if (activated.length === 0) {
         return;
       }
 
-      const path = activated[0];
-      this.editorStore.show(path);
+      this.openFile(activated[0]);
+    },
+
+    openFile(path, forceSourceCodeEditor = false) {
+      this.editorStore.show(path, forceSourceCodeEditor);
     },
 
     async search(value) {

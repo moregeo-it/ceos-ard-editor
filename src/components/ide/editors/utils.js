@@ -1,28 +1,4 @@
-const GLOSSARY_SCHEMA = {
-  type: 'object',
-  properties: {
-    term: {
-      type: 'string',
-      minLength: 2,
-    },
-    description: {
-      type: 'string',
-      minLength: 2,
-    },
-  },
-};
-
-const GLOSSARY_UI_SCHEMA = {
-  type: 'VerticalLayout',
-  elements: [
-    { type: 'Control', scope: '#/properties/term' },
-    {
-      type: 'Control',
-      scope: '#/properties/description',
-      options: { multi: true },
-    },
-  ],
-};
+import { GLOSSARY_SCHEMA, GLOSSARY_UI_SCHEMA } from './schemas';
 
 export function isGlossary(file /*, data*/) {
   return file.path.startsWith('/glossary/') && file.path.endsWith('.yaml');

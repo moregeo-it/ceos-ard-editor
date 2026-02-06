@@ -51,10 +51,11 @@
           </v-container>
           <component
             v-else
-            :is="getEditorType(file, editorStore.data[file.path])"
+            :is="getEditorType(file, editorStore.data[file.path], file.forceSourceCodeEditor)"
             :value="editorStore.data[file.path]"
             @update="(val) => editorStore.sync(file.path, val)"
             @save="save(file.path)"
+            @error="error(file.path, $event)"
             :file="file"
             :readOnly="workspacesStore.isArchived"
             class="fill-height"
@@ -193,14 +194,14 @@ export default {
     },
   },
   methods: {
-    getEditorType(file, data) {
+    getEditorType(file, data, forceSourceCodeEditor = false) {
       if (data instanceof Blob) {
         if (supportedBrowserTypes.includes(data.type)) {
           return 'BrowserViewer';
         } else {
           return 'UnsupportedViewer';
         }
-      } else if (supportVisualEditing(file, data)) {
+      } else if (supportVisualEditing(file, data) && !forceSourceCodeEditor) {
         return 'JsonSchemaEditor';
       } else {
         return 'SourceCodeEditor';
@@ -209,6 +210,10 @@ export default {
     isDeleted(path) {
       const file = this.filesStore.all[path];
       return !file || file.status === 'deleted';
+    },
+    error(path, error) {
+      console.error(error);
+      this.close(path);
     },
     async save(path) {
       const result = await this.editorStore.save(path);
