@@ -18,7 +18,7 @@
           Reactivate Workspace
         </v-btn>
         <v-spacer />
-        <v-btn color="primary" :prepend-icon="icons.eye" @click="reject"> View Workspace </v-btn>
+        <v-btn color="primary" :prepend-icon="icons.eye" @click="reject">View Workspace</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
