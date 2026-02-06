@@ -44,12 +44,12 @@
       </v-btn>
     </div>
 
-    <div class="flex-grow-1 pa-4">
-      <div v-if="isGenerating" class="text-center pa-8">
+    <div class="flex-grow-1">
+      <div v-if="isGenerating" class="text-center pa-8 ma-4">
         <v-progress-circular indeterminate color="primary" size="64" />
       </div>
 
-      <v-alert v-else-if="!previewHtml" type="info" variant="tonal">
+      <v-alert v-else-if="!previewHtml" type="info" variant="tonal" class="ma-4">
         <template v-if="!previewStore.hasSelectedPfs">
           Select at least one PFS from the list above to create a preview.
         </template>

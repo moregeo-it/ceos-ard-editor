@@ -229,15 +229,15 @@ export default {
         return;
       }
       if (this.editorStore.changed[path]) {
-        // todo: Replace with a Vuetify dialog
-        const confirmClose = window.confirm(
-          `The file "${path}" has unsaved changes. Are you sure you want to close it? Unsaved changes will be lost.`,
-        );
-        if (!confirmClose) {
-          return;
-        }
+        this.$root.openDialog('ConfirmDialog', {
+          title: 'Unsaved Changes',
+          message: `The file "${path}" has unsaved changes. Are you sure you want to close it? Unsaved changes will be lost.`,
+          confirmButton: 'Discard Changes',
+          onAcceptance: () => this.editorStore.close(path),
+        });
+      } else {
+        this.editorStore.close(path);
       }
-      this.editorStore.close(path);
     },
   },
 };

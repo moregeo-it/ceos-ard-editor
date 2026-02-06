@@ -1,5 +1,5 @@
 <template>
-  <v-app v-if="workspace" id="propose">
+  <template v-if="workspace">
     <HeaderBar :title="workspace.title" :icon="icons.title">
       <template #central-actions>
         <HeaderSwitch />
@@ -7,7 +7,7 @@
     </HeaderBar>
 
     <!-- Main Content Area -->
-    <v-main>
+    <v-main class="main-with-header">
       <splitpanes @resized="storePaneSizes" :dbl-click-splitter="false">
         <pane class="changes" min-size="20" :size="panelSizes.changes">
           <ChangeList />
@@ -17,7 +17,7 @@
         </pane>
       </splitpanes>
     </v-main>
-  </v-app>
+  </template>
   <v-container v-else class="fill-height d-flex align-center justify-center">
     <v-progress-circular indeterminate color="primary" size="64" />
   </v-container>
@@ -118,14 +118,6 @@ export default {
 <style>
 @import '../../node_modules/splitpanes/dist/splitpanes.css';
 @import './split.css';
-
-#propose,
-#propose > * {
-  height: 100vh !important;
-}
-#propose .v-main {
-  height: calc(100vh - var(--v-layout-top)) !important;
-}
 </style>
 
 <style scoped>
