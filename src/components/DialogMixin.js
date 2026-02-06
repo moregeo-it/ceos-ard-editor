@@ -26,7 +26,7 @@ export default {
   },
   watch: {
     show(newVal) {
-      if (!newVal) {
+      if (!newVal && !this.accepting) {
         this.$emit('reject');
       }
     },
@@ -46,8 +46,8 @@ export default {
       } else {
         this.$emit('accept', value);
       }
-      this.accepting = false;
       this.show = false;
+      this.accepting = false;
     },
     reject() {
       this.show = false;

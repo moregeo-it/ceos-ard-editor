@@ -50,10 +50,14 @@ export default {
   methods: {
     // Returns a callback to close the dialog
     openDialog(component, props = {}, events = {}) {
-      return this.$refs.dialogs.open(component, props, events);
+      if (this.$refs.dialogs) {
+        return this.$refs.dialogs.open(component, props, events);
+      }
     },
     closeDialog(component) {
-      this.$refs.dialogs.close(component);
+      if (this.$refs.dialogs) {
+        this.$refs.dialogs.close(component);
+      }
     },
   },
 };

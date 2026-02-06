@@ -118,10 +118,6 @@ export default {
 <style>
 @import '../../node_modules/splitpanes/dist/splitpanes.css';
 @import './split.css';
-
-#propose .v-main {
-  height: calc(100vh - var(--v-layout-top)) !important;
-}
 </style>
 
 <style scoped>

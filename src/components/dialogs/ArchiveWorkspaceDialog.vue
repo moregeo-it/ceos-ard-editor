@@ -31,7 +31,7 @@
 import DialogMixin from '@/components/DialogMixin';
 
 export default {
-  name: 'ArchiveConfirmDialog',
+  name: 'ArchiveWorkspaceDialog',
   mixins: [DialogMixin],
   props: {
     workspace: {
