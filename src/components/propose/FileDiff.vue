@@ -18,7 +18,7 @@ import diffService from '@/services/proposal.service';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { html, parse } from 'diff2html';
-import 'diff2html/bundles/css/diff2html.min.css';
+import './diff2html.css';
 
 export default {
   name: 'FileDiff',
@@ -52,8 +52,8 @@ export default {
       return html(diffJson, {
         drawFileList: false,
         matching: 'lines',
-        outputFormat: 'side-by-side',
         renderNothingWhenEmpty: false,
+        colorScheme: 'auto',
       });
     },
   },
