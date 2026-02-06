@@ -367,7 +367,7 @@
     border-color: var(--d2h-dark-info-border-color);
   }
 
-  .d2h-dark-color-scheme .d2h-deleted {
+  .d2h-auto-color-scheme .d2h-deleted {
     color: var(--d2h-dark-del-label-color);
   }
 
