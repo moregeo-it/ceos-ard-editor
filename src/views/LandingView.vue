@@ -1,96 +1,94 @@
 <template>
-  <v-app>
-    <v-main>
-      <v-container fluid class="fill-height flex-column">
-        <v-row justify="center" class="flex-grow-0">
-          <v-col>
-            <v-alert type="warning">
-              This is a prototype version of the CEOS-ARD Editor. Functionality may be limited and
-              data may be reset periodically.
-            </v-alert>
-          </v-col>
-        </v-row>
-        <v-row justify="center" align="center" class="flex-grow-1 w-100">
-          <v-col cols="12" md="10" lg="8" xl="7">
-            <v-card elevation="0" class="pa-8 pa-md-12">
-              <v-row align="center">
-                <!-- Left side - Logo and branding -->
-                <v-col cols="12" md="6" class="text-center">
-                  <!-- CEOS Logo -->
-                  <img :src="ceosLogo" alt="CEOS Analysis Ready Data" class="logo" />
+  <v-main>
+    <v-container fluid class="fill-height flex-column">
+      <v-row justify="center" class="flex-grow-0">
+        <v-col>
+          <v-alert type="warning">
+            This is a prototype version of the CEOS-ARD Editor. Functionality may be limited and
+            data may be reset periodically.
+          </v-alert>
+        </v-col>
+      </v-row>
+      <v-row justify="center" align="center" class="flex-grow-1 w-100">
+        <v-col cols="12" md="10" lg="8" xl="7">
+          <v-card elevation="0" class="pa-8 pa-md-12">
+            <v-row align="center">
+              <!-- Left side - Logo and branding -->
+              <v-col cols="12" md="6" class="text-center">
+                <!-- CEOS Logo -->
+                <img :src="ceosLogo" alt="CEOS Analysis Ready Data" class="logo" />
 
-                  <h1 class="text-h4 font-weight-bold mt-6 mb-3">CEOS-ARD Editor</h1>
+                <h1 class="text-h4 font-weight-bold mt-6 mb-3">CEOS-ARD Editor</h1>
 
-                  <p class="text-body-1 text-medium-emphasis">
-                    Collaborative Product Specification Editor for<br class="d-none d-md-inline" />
-                    CEOS Analysis Ready Data
-                  </p>
-                </v-col>
+                <p class="text-body-1 text-medium-emphasis">
+                  Collaborative Product Specification Editor for<br class="d-none d-md-inline" />
+                  CEOS Analysis Ready Data
+                </p>
+              </v-col>
 
-                <!-- Right side - Login buttons -->
-                <v-col cols="12" md="6" class="d-flex flex-column align-center">
-                  <p class="text-h6 mb-6 text-center">Sign in to get started</p>
+              <!-- Right side - Login buttons -->
+              <v-col cols="12" md="6" class="d-flex flex-column align-center">
+                <p class="text-h6 mb-6 text-center">Sign in to get started</p>
 
-                  <LoginButton provider="github" @click="handleGitHubLogin" />
-                </v-col>
-              </v-row>
-            </v-card>
+                <LoginButton provider="github" @click="handleGitHubLogin" />
+              </v-col>
+            </v-row>
+          </v-card>
 
-            <!-- Footer -->
-            <div class="text-center mt-8">
-              <div class="d-flex justify-center align-center flex-wrap gap-2 mb-2">
-                <v-btn
-                  variant="text"
-                  size="small"
-                  :prepend-icon="icons.web"
-                  href="https://ceos.org/ard/"
-                  target="_blank"
-                >
-                  CEOS-ARD Website
-                </v-btn>
+          <!-- Footer -->
+          <div class="text-center mt-8">
+            <div class="d-flex justify-center align-center flex-wrap gap-2 mb-2">
+              <v-btn
+                variant="text"
+                size="small"
+                :prepend-icon="icons.web"
+                href="https://ceos.org/ard/"
+                target="_blank"
+              >
+                CEOS-ARD Website
+              </v-btn>
 
-                <v-divider vertical class="mx-2"></v-divider>
+              <v-divider vertical class="mx-2"></v-divider>
 
-                <v-btn
-                  variant="text"
-                  size="small"
-                  :prepend-icon="icons.github"
-                  href="https://github.com/ceos-org"
-                  target="_blank"
-                >
-                  CEOS GitHub Organization
-                </v-btn>
+              <v-btn
+                variant="text"
+                size="small"
+                :prepend-icon="icons.github"
+                href="https://github.com/ceos-org"
+                target="_blank"
+              >
+                CEOS GitHub Organization
+              </v-btn>
 
-                <v-divider vertical class="mx-2"></v-divider>
+              <v-divider vertical class="mx-2"></v-divider>
 
-                <v-btn
-                  variant="text"
-                  size="small"
-                  :prepend-icon="icons.web"
-                  href="https://moregeo.it"
-                  target="_blank"
-                >
-                  MoreGeo GmbH
-                </v-btn>
+              <v-btn
+                variant="text"
+                size="small"
+                :prepend-icon="icons.web"
+                href="https://moregeo.it"
+                target="_blank"
+              >
+                MoreGeo GmbH
+              </v-btn>
 
-                <v-divider vertical class="mx-2"></v-divider>
+              <v-divider vertical class="mx-2"></v-divider>
 
-                <v-btn
-                  variant="text"
-                  size="small"
-                  :prepend-icon="icons.document"
-                  href="https://moregeo.it/imprint"
-                  target="_blank"
-                >
-                  Imprint
-                </v-btn>
-              </div>
+              <v-btn
+                variant="text"
+                size="small"
+                :prepend-icon="icons.document"
+                href="https://moregeo.it/imprint"
+                target="_blank"
+              >
+                Imprint
+              </v-btn>
             </div>
-          </v-col>
-        </v-row>
-      </v-container>
-    </v-main>
-  </v-app>
+          </div>
+        </v-col>
+      </v-row>
+    </v-container>
+  </v-main>
 </template>
 
 <script>

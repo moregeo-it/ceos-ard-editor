@@ -69,14 +69,17 @@ export default {
     },
     closeWorkspace() {
       if (this.editorStore.hasUnsavedChanges) {
-        // todo: Replace with a Vuetify dialog
-        const confirmClose = confirm(
-          'You have unsaved changes. Are you sure you want to close the workspace?',
-        );
-        if (!confirmClose) {
-          return;
-        }
+        this.$root.openDialog('ConfirmDialog', {
+          title: 'Unsaved Changes',
+          message: 'You have unsaved changes. Are you sure you want to close the workspace?',
+          confirmButton: 'Discard Changes',
+          onAcceptance: this.forceCloseWorkspace,
+        });
+      } else {
+        this.forceCloseWorkspace();
       }
+    },
+    forceCloseWorkspace() {
       this.editorStore.reset();
       this.filesStore.reset();
       this.notificationsStore.reset();

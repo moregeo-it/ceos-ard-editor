@@ -72,33 +72,10 @@
               <v-btn v-bind="props" :icon="icons.menu" size="x-small" variant="text" @click.stop />
             </template>
             <v-list density="compact">
-              <!-- Folder Actions -->
-              <template v-if="item.type === 'folder'">
-                <v-list-item @click="handleCreateInFolder(item)">
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.add" size="small" />
-                  </template>
-                  <v-list-item-title>Create</v-list-item-title>
-                </v-list-item>
-                <v-list-item @click="handleRename(item)">
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.rename" size="small" />
-                  </template>
-                  <v-list-item-title>Rename</v-list-item-title>
-                </v-list-item>
-                <v-list-item @click="handleDelete(item)">
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.delete" size="small" color="error" />
-                  </template>
-                  <v-list-item-title class="text-error">Delete</v-list-item-title>
-                </v-list-item>
-              </template>
-
-              <!-- File Actions -->
-              <template v-else>
+              <template v-if="item.type === 'file'">
                 <v-list-item
                   v-if="item.status && !['added', 'deleted'].includes(item.status)"
-                  @click="itemToDiff = item"
+                  @click="requestDiff(item)"
                 >
                   <template v-slot:prepend>
                     <v-icon :icon="icons.diff" size="small" />
@@ -122,15 +99,25 @@
                   </template>
                   <v-list-item-title>Revert</v-list-item-title>
                 </v-list-item>
+              </template>
+              <template v-else>
+                <v-list-item @click="requestNewFile(item)">
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.add" size="small" />
+                  </template>
+                  <v-list-item-title>Create</v-list-item-title>
+                </v-list-item>
+              </template>
 
-                <v-list-item v-if="item.status !== 'deleted'" @click="handleRename(item)">
+              <template v-if="item.status !== 'deleted'">
+                <v-list-item @click="requestRename(item)">
                   <template v-slot:prepend>
                     <v-icon :icon="icons.rename" size="small" />
                   </template>
                   <v-list-item-title>Rename</v-list-item-title>
                 </v-list-item>
 
-                <v-list-item v-if="item.status !== 'deleted'" @click="handleDelete(item)">
+                <v-list-item @click="requestDelete(item)">
                   <template v-slot:prepend>
                     <v-icon :icon="icons.delete" size="small" color="error" />
                   </template>
@@ -151,39 +138,15 @@
         <p class="text-subtle mt-2">No files found</p>
       </div>
     </div>
-
-    <!-- Dialogs -->
-    <CreateFileDialog
-      v-model:show="showCreateDialog"
-      :initial-path="createInitialPath"
-      @create="handleCreate"
-    />
-    <RenameDialog
-      v-model:show="showRenameDialog"
-      :current-name="itemToRename?.name"
-      :item-type="itemToRename?.type"
-      @rename="handleRenameConfirm"
-    />
-    <DeleteConfirmDialog
-      v-model:show="showDeleteDialog"
-      :item-name="itemToDelete?.name"
-      :item-type="itemToDelete?.type"
-      @confirm="handleDeleteConfirm"
-    />
-    <DiffDialog v-if="itemToDiff" :item="itemToDiff" @close="itemToDiff = null" />
   </div>
 </template>
 
 <script>
-import { defineAsyncComponent } from 'vue';
 import { useDebounceFn } from '@vueuse/core';
 import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import CreateFileDialog from './dialogs/CreateFileDialog.vue';
-import RenameDialog from './dialogs/RenameDialog.vue';
-import DeleteConfirmDialog from './dialogs/DeleteConfirmDialog.vue';
 import FileStatusBadge from '../FileStatusBadge.vue';
 import {
   mdiFileCompare,
@@ -204,10 +167,6 @@ export default {
   name: 'FilesPane',
 
   components: {
-    CreateFileDialog,
-    DiffDialog: defineAsyncComponent(() => import('./dialogs/DiffDialog.vue')),
-    RenameDialog,
-    DeleteConfirmDialog,
     FileStatusBadge,
   },
 
@@ -226,10 +185,6 @@ export default {
         revert: mdiUndoVariant,
         download: mdiDownload,
       },
-      createInitialPath: null,
-      itemToRename: null,
-      itemToDelete: null,
-      itemToDiff: null,
       debouncedSearch: null,
     };
   },
@@ -246,36 +201,6 @@ export default {
     },
     workspacesStore() {
       return useWorkspacesStore();
-    },
-    showCreateDialog: {
-      get() {
-        return this.createInitialPath !== null;
-      },
-      set(value) {
-        if (!value) {
-          this.createInitialPath = null;
-        }
-      },
-    },
-    showRenameDialog: {
-      get() {
-        return !!this.itemToRename;
-      },
-      set(value) {
-        if (!value) {
-          this.itemToRename = null;
-        }
-      },
-    },
-    showDeleteDialog: {
-      get() {
-        return !!this.itemToDelete;
-      },
-      set(value) {
-        if (!value) {
-          this.itemToDelete = null;
-        }
-      },
     },
     treeItems() {
       return this.filesStore.searchResults ?? this.filesStore.fileTree;
@@ -440,55 +365,48 @@ export default {
       return undefined;
     },
 
-    handleCreateInFolder(item) {
-      this.createInitialPath = item.path;
+    requestDiff(item) {
+      this.$root.openDialog('DiffDialog', { item });
+    },
+
+    requestNewFile(item) {
+      this.$root.openDialog('CreateFileDialog', {
+        initialPath: item.path,
+        onAcceptance: this.handleCreate,
+      });
     },
 
     async handleCreate({ type, path, name }) {
-      try {
-        await this.filesStore.createFile(path, name, type);
-        this.notificationsStore.success(
-          `${type === 'folder' ? 'Folder' : 'File'} created successfully`,
-        );
-        this.createInitialPath = null;
-      } catch (error) {
-        this.notificationsStore.error(`Failed to create: ${error.message}`);
-      }
+      await this.filesStore.createFile(path, name, type);
+      this.notificationsStore.success(
+        `${type === 'folder' ? 'Folder' : 'File'} created successfully`,
+      );
     },
 
-    handleRename(item) {
-      this.itemToRename = item;
+    requestRename(source) {
+      this.$root.openDialog('RenameFileDialog', {
+        currentName: source.name,
+        itemType: source.type,
+        onAcceptance: async (target) => this.handleRename(source, target),
+      });
     },
 
-    async handleRenameConfirm(newName) {
-      if (!this.itemToRename) return;
-
-      try {
-        await this.filesStore.renameFile(this.itemToRename.path, newName);
-        this.notificationsStore.success('Renamed successfully');
-      } catch (error) {
-        this.notificationsStore.error(`Failed to rename: ${error.message}`);
-      } finally {
-        this.itemToRename = null;
-      }
+    async handleRename(source, target) {
+      await this.filesStore.renameFile(source.path, target);
+      this.notificationsStore.success('Renamed successfully');
     },
 
-    handleDelete(item) {
-      this.itemToDelete = item;
+    requestDelete(item) {
+      this.$root.openDialog('DeleteFileDialog', {
+        name: item.name,
+        type: item.type,
+        onAcceptance: async () => await this.handleDelete(item),
+      });
     },
 
-    async handleDeleteConfirm() {
-      if (!this.itemToDelete) return;
-
-      try {
-        await this.filesStore.deleteFile(this.itemToDelete.path);
-        this.notificationsStore.success('Deleted successfully');
-        this.itemToDelete = null;
-      } catch (error) {
-        this.notificationsStore.error(`Failed to delete: ${error.message}`);
-      } finally {
-        this.itemToDelete = null;
-      }
+    async handleDelete(item) {
+      await this.filesStore.deleteFile(item.path);
+      this.notificationsStore.success('Deleted successfully');
     },
 
     async handleRevert(item) {

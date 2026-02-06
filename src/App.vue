@@ -1,26 +1,35 @@
 <template>
-  <router-view />
+  <v-app id="app">
+    <router-view />
 
-  <!-- Global Snackbar -->
-  <v-snackbar
-    v-model="notificationsStore.show"
-    :color="snackbarColor"
-    :timeout="notificationsStore.timeout"
-    location="bottom end"
-    multi-line
-  >
-    {{ notificationsStore.message }}
-    <template v-slot:actions>
-      <v-btn color="white" variant="outlined" @click="notificationsStore.hide()"> Close </v-btn>
-    </template>
-  </v-snackbar>
+    <!-- Global Snackbar -->
+    <v-snackbar
+      v-model="notificationsStore.show"
+      :color="snackbarColor"
+      :timeout="notificationsStore.timeout"
+      location="bottom end"
+      multi-line
+    >
+      {{ notificationsStore.message }}
+      <template v-slot:actions>
+        <v-btn color="white" variant="outlined" @click="notificationsStore.hide()"> Close </v-btn>
+      </template>
+    </v-snackbar>
+
+    <DialogControl ref="dialogs" />
+  </v-app>
 </template>
 
 <script>
 import { useNotificationsStore } from '@/stores/notifications';
+import DialogControl from '@/components/DialogControl.vue';
 
 export default {
   name: 'App',
+
+  components: {
+    DialogControl,
+  },
 
   computed: {
     notificationsStore() {
@@ -37,12 +46,29 @@ export default {
       return colors[this.notificationsStore.type] || 'info';
     },
   },
+
+  methods: {
+    // Returns a callback to close the dialog
+    openDialog(component, props = {}, events = {}) {
+      return this.$refs.dialogs.open(component, props, events);
+    },
+    closeDialog(component) {
+      this.$refs.dialogs.close(component);
+    },
+  },
 };
 </script>
 
 <style>
 :root {
   --ceos-primary: #3e5265;
+}
+#app,
+#app > * {
+  height: 100vh !important;
+}
+.main-with-header {
+  height: calc(100vh - var(--v-layout-top)) !important;
 }
 .text-subtle {
   color: rgba(0, 0, 0, 0.6);

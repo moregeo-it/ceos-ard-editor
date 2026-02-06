@@ -1,5 +1,5 @@
 <template>
-  <v-app v-if="workspace" id="editor">
+  <template v-if="workspace">
     <HeaderBar :title="workspace.title" :icon="icons.title">
       <template #central-actions>
         <HeaderSwitch />
@@ -7,7 +7,7 @@
     </HeaderBar>
 
     <!-- Main Content Area -->
-    <v-main>
+    <v-main class="main-with-header">
       <v-container v-if="loading" class="fill-height d-flex align-center justify-center">
         <v-progress-circular indeterminate color="primary" size="64" />
       </v-container>
@@ -22,14 +22,8 @@
           <PreviewPane />
         </pane>
       </splitpanes>
-
-      <ArchivedDialog
-        v-if="workspacesStore.isArchived"
-        :workspace="workspace"
-        @activate="handleToggleStatus"
-      />
     </v-main>
-  </v-app>
+  </template>
   <v-container v-else class="fill-height d-flex align-center justify-center">
     <v-progress-circular indeterminate color="primary" size="64" />
   </v-container>
@@ -44,13 +38,11 @@ import HeaderSwitch from '@/components/HeaderSwitch.vue';
 import EditorPane from '@/components/ide/EditorPane.vue';
 import FilesPane from '@/components/ide/FilesPane.vue';
 import PreviewPane from '@/components/ide/PreviewPane.vue';
-import ArchivedDialog from '@/components/ide/dialogs/ArchivedDialog.vue';
 import { Splitpanes, Pane } from 'splitpanes';
 
 export default {
   name: 'EditorView',
   components: {
-    ArchivedDialog,
     EditorPane,
     FilesPane,
     HeaderBar,
@@ -100,6 +92,13 @@ export default {
 
   async created() {
     await this.loadWorkspace();
+    // Muste be called after the workspace has loaded, otherwise isArchived is always false
+    if (this.workspacesStore.isArchived) {
+      this.$root.openDialog('ArchivedDialog', {
+        workspace: this.workspace,
+        onAcceptance: async () => await this.handleToggleStatus(),
+      });
+    }
   },
 
   methods: {
@@ -121,12 +120,8 @@ export default {
     },
 
     async handleToggleStatus() {
-      try {
-        await this.workspacesStore.toggleWorkspaceStatus(this.workspaceId);
-        this.notificationsStore.success('Workspace activated successfully');
-      } catch (error) {
-        this.notificationsStore.error(`Failed to activate workspace: ${error.message}`);
-      }
+      await this.workspacesStore.toggleWorkspaceStatus(this.workspaceId);
+      this.notificationsStore.success('Workspace activated successfully');
     },
   },
 };
@@ -135,14 +130,6 @@ export default {
 <style>
 @import '../../node_modules/splitpanes/dist/splitpanes.css';
 @import './split.css';
-
-#editor,
-#editor > * {
-  height: 100vh !important;
-}
-#editor .v-main {
-  height: calc(100vh - var(--v-layout-top)) !important;
-}
 </style>
 
 <style scoped>

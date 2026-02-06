@@ -1,5 +1,5 @@
 <template>
-  <v-dialog scrollable v-model="show" width="90%" height="90%">
+  <v-dialog scrollable v-model="show" :width="sizes.large" :height="sizes.large">
     <v-card>
       <v-card-title>Changes</v-card-title>
       <v-card-text>
@@ -7,7 +7,7 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer />
-        <v-btn color="primary" @click="show = false">OK</v-btn>
+        <v-btn color="primary" @click="reject" variant="elevated">OK</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -15,30 +15,14 @@
 
 <script>
 import FileDiff from '@/components/propose/FileDiff.vue';
+import DialogMixin from '@/components/DialogMixin';
 
 export default {
   name: 'DiffDialog',
-
+  mixins: [DialogMixin],
   components: {
     FileDiff,
   },
-
-  emits: ['close'],
-
-  data() {
-    return {
-      show: true,
-    };
-  },
-
-  watch: {
-    show(newVal) {
-      if (!newVal) {
-        this.$emit('close');
-      }
-    },
-  },
-
   props: {
     item: {
       type: Object,

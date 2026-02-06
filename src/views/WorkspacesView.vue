@@ -1,132 +1,96 @@
 <template>
-  <v-app>
-    <HeaderBar title="My PFS Workspaces" :icon="icons.folderMultiple" />
+  <HeaderBar title="My PFS Workspaces" :icon="icons.folderMultiple" />
 
-    <!-- Main Content -->
-    <v-main>
-      <v-container>
-        <!-- Toolbar -->
-        <v-row class="mb-4">
-          <v-col cols="12" md="6">
+  <!-- Main Content -->
+  <v-main>
+    <v-container>
+      <!-- Toolbar -->
+      <v-row class="mb-4">
+        <v-col cols="12" md="6">
+          <v-btn color="primary" size="large" :prepend-icon="icons.plus" @click="openCreateDialog">
+            Create Workspace
+          </v-btn>
+        </v-col>
+
+        <v-col cols="12" md="6" class="d-flex justify-end align-center">
+          <v-btn-toggle v-model="filter" variant="outlined" divided mandatory>
+            <v-btn value="all">
+              All
+              <v-chip size="x-small" class="ml-2">
+                {{ workspacesStore.workspaces.length }}
+              </v-chip>
+            </v-btn>
+            <v-btn value="active">
+              Active
+              <v-chip size="x-small" class="ml-2" color="success">
+                {{ workspacesStore.activeWorkspaces.length }}
+              </v-chip>
+            </v-btn>
+            <v-btn value="archived">
+              Archived
+              <v-chip size="x-small" class="ml-2" color="grey">
+                {{ workspacesStore.archivedWorkspaces.length }}
+              </v-chip>
+            </v-btn>
+          </v-btn-toggle>
+        </v-col>
+      </v-row>
+
+      <!-- Loading State -->
+      <v-row v-if="workspacesStore.isLoading">
+        <v-col v-for="n in 3" :key="n" cols="12" md="4">
+          <v-skeleton-loader type="card"></v-skeleton-loader>
+        </v-col>
+      </v-row>
+
+      <!-- Empty State -->
+      <v-row v-else-if="filteredWorkspaces.length === 0">
+        <v-col cols="12">
+          <v-card class="pa-8 text-center text-subtle" variant="outlined">
+            <v-icon :icon="icons.folderOff" size="64" class="mb-4"></v-icon>
+            <h3 class="text-h6 mb-2">No workspaces found</h3>
+            <p class="text-body-2 text-medium-emphasis mb-4">
+              {{
+                filter === 'all'
+                  ? 'Create your first workspace to get started'
+                  : `No ${filter} workspaces`
+              }}
+            </p>
             <v-btn
+              v-if="filter === 'all'"
               color="primary"
-              size="large"
               :prepend-icon="icons.plus"
               @click="openCreateDialog"
             >
               Create Workspace
             </v-btn>
-          </v-col>
+          </v-card>
+        </v-col>
+      </v-row>
 
-          <v-col cols="12" md="6" class="d-flex justify-end align-center">
-            <v-btn-toggle v-model="filter" variant="outlined" divided mandatory>
-              <v-btn value="all">
-                All
-                <v-chip size="x-small" class="ml-2">
-                  {{ workspacesStore.workspaces.length }}
-                </v-chip>
-              </v-btn>
-              <v-btn value="active">
-                Active
-                <v-chip size="x-small" class="ml-2" color="success">
-                  {{ workspacesStore.activeWorkspaces.length }}
-                </v-chip>
-              </v-btn>
-              <v-btn value="archived">
-                Archived
-                <v-chip size="x-small" class="ml-2" color="grey">
-                  {{ workspacesStore.archivedWorkspaces.length }}
-                </v-chip>
-              </v-btn>
-            </v-btn-toggle>
-          </v-col>
-        </v-row>
-
-        <!-- Loading State -->
-        <v-row v-if="workspacesStore.isLoading">
-          <v-col v-for="n in 3" :key="n" cols="12" md="4">
-            <v-skeleton-loader type="card"></v-skeleton-loader>
-          </v-col>
-        </v-row>
-
-        <!-- Empty State -->
-        <v-row v-else-if="filteredWorkspaces.length === 0">
-          <v-col cols="12">
-            <v-card class="pa-8 text-center text-subtle" variant="outlined">
-              <v-icon :icon="icons.folderOff" size="64" class="mb-4"></v-icon>
-              <h3 class="text-h6 mb-2">No workspaces found</h3>
-              <p class="text-body-2 text-medium-emphasis mb-4">
-                {{
-                  filter === 'all'
-                    ? 'Create your first workspace to get started'
-                    : `No ${filter} workspaces`
-                }}
-              </p>
-              <v-btn
-                v-if="filter === 'all'"
-                color="primary"
-                :prepend-icon="icons.plus"
-                @click="openCreateDialog"
-              >
-                Create Workspace
-              </v-btn>
-            </v-card>
-          </v-col>
-        </v-row>
-
-        <!-- Workspaces Grid -->
-        <v-row v-else>
-          <v-col
-            v-for="workspace in filteredWorkspaces"
-            :key="workspace.id"
-            cols="12"
-            md="6"
-            lg="6"
-            xl="4"
-          >
-            <WorkspaceCard
-              v-if="!workspacesStore.isWorkspaceLoading[workspace.id]"
-              :workspace="workspace"
-              @view="handleViewWorkspace"
-              @edit="handleEditWorkspace"
-              @toggle-status="handleToggleStatus"
-              @delete="confirmDelete"
-            />
-            <v-skeleton-loader v-else type="card"></v-skeleton-loader>
-          </v-col>
-        </v-row>
-      </v-container>
-    </v-main>
-
-    <!-- Workspace Dialog (Create/Update) -->
-    <WorkspaceDialog
-      v-model="showWorkspaceDialog"
-      :mode="workspaceDialogMode"
-      :workspace="workspaceToEdit"
-      :pfs-options="workspacesStore.pfsOptions"
-      :loading="
-        workspaceDialogMode === 'create'
-          ? workspacesStore.isCreating
-          : workspacesStore.isWorkspaceLoading[workspaceToEdit?.id]
-      "
-      @submit="handleWorkspaceSubmit"
-    />
-
-    <!-- Archive Confirmation Dialog -->
-    <ArchiveConfirmDialog
-      v-model="showArchiveDialog"
-      :workspace="workspacesStore.workspaces.find((w) => w.id === workspaceToArchive)"
-      :loading="workspacesStore.isWorkspaceLoading[workspaceToArchive?.id]"
-      @confirm="handleArchiveWorkspace"
-    />
-
-    <!-- Delete Confirmation Dialog -->
-    <DeleteConfirmDialog
-      v-model="showDeleteDialog"
-      :loading="workspacesStore.isWorkspaceLoading[workspaceToDelete?.id]"
-      @confirm="handleDeleteWorkspace"
-    />
-  </v-app>
+      <!-- Workspaces Grid -->
+      <v-row v-else>
+        <v-col
+          v-for="workspace in filteredWorkspaces"
+          :key="workspace.id"
+          cols="12"
+          md="6"
+          lg="6"
+          xl="4"
+        >
+          <WorkspaceCard
+            v-if="!workspacesStore.isWorkspaceLoading[workspace.id]"
+            :workspace="workspace"
+            @view="handleViewWorkspace"
+            @edit="handleEditWorkspace"
+            @toggle-status="handleToggleStatus"
+            @delete="confirmDelete"
+          />
+          <v-skeleton-loader v-else type="card"></v-skeleton-loader>
+        </v-col>
+      </v-row>
+    </v-container>
+  </v-main>
 </template>
 
 <script>
@@ -135,9 +99,6 @@ import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
 import HeaderBar from '@/components/HeaderBar.vue';
 import WorkspaceCard from '@/components/workspace/WorkspaceCard.vue';
-import WorkspaceDialog from '@/components/workspace/dialogs/WorkspaceDialog.vue';
-import ArchiveConfirmDialog from '@/components/workspace/dialogs/ArchiveConfirmDialog.vue';
-import DeleteConfirmDialog from '@/components/workspace/dialogs/DeleteConfirmDialog.vue';
 import { mdiFolderMultiple, mdiPlus, mdiFolderOff } from '@mdi/js';
 
 export default {
@@ -146,9 +107,6 @@ export default {
   components: {
     HeaderBar,
     WorkspaceCard,
-    WorkspaceDialog,
-    ArchiveConfirmDialog,
-    DeleteConfirmDialog,
   },
 
   data() {
@@ -158,13 +116,6 @@ export default {
         plus: mdiPlus,
         folderOff: mdiFolderOff,
       },
-      showWorkspaceDialog: false,
-      workspaceDialogMode: 'create',
-      workspaceToEdit: null,
-      showArchiveDialog: false,
-      workspaceToArchive: null,
-      showDeleteDialog: false,
-      workspaceToDelete: null,
       filter: 'active', // 'all', 'active', 'archived'
     };
   },
@@ -217,29 +168,28 @@ export default {
     },
 
     openCreateDialog() {
-      this.workspaceDialogMode = 'create';
-      this.workspaceToEdit = null;
-      this.showWorkspaceDialog = true;
+      const mode = 'create';
+      this.$root.openDialog('WorkspaceDialog', {
+        mode,
+        onAcceptance: async (data) => await this.handleWorkspaceSubmit(data, mode),
+      });
     },
 
-    async handleWorkspaceSubmit(workspaceData) {
+    async handleWorkspaceSubmit(data, mode) {
       try {
-        if (this.workspaceDialogMode === 'create') {
-          await this.workspacesStore.createWorkspace(workspaceData);
+        if (mode === 'create') {
+          await this.workspacesStore.createWorkspace(data);
           this.notificationsStore.success('Workspace created successfully');
         } else {
-          await this.workspacesStore.updateWorkspace(workspaceData.id, {
-            title: workspaceData.title,
-            pfs: workspaceData.pfs,
-            description: workspaceData.description,
+          await this.workspacesStore.updateWorkspace(data.id, {
+            title: data.title,
+            pfs: data.pfs,
+            description: data.description,
           });
           this.notificationsStore.success('Workspace updated successfully');
         }
-        this.showWorkspaceDialog = false;
-        this.workspaceToEdit = null;
       } catch (error) {
-        const action = this.workspaceDialogMode === 'create' ? 'create' : 'update';
-        this.notificationsStore.error(`Failed to ${action} workspace: ${error.message}`);
+        throw new Error(`Failed to ${mode} workspace: ${error.message}`);
       }
     },
 
@@ -252,10 +202,13 @@ export default {
 
     handleEditWorkspace(workspaceId) {
       const workspace = this.workspacesStore.workspaces.find((w) => w.id === workspaceId);
+      const mode = 'update';
       if (workspace) {
-        this.workspaceDialogMode = 'update';
-        this.workspaceToEdit = workspace;
-        this.showWorkspaceDialog = true;
+        this.$root.openDialog('WorkspaceDialog', {
+          mode,
+          workspace,
+          onAcceptance: async (data) => await this.handleWorkspaceSubmit(data, mode),
+        });
       }
     },
 
@@ -264,8 +217,10 @@ export default {
 
       // If workspace is active, show archive confirmation dialog
       if (workspace?.status === 'active') {
-        this.workspaceToArchive = workspaceId;
-        this.showArchiveDialog = true;
+        this.$root.openDialog('ArchiveWorkspaceDialog', {
+          workspace,
+          onAcceptance: async () => await this.handleArchiveWorkspace(workspaceId),
+        });
       } else {
         // If workspace is archived, reactivate immediately without confirmation
         try {
@@ -277,33 +232,24 @@ export default {
       }
     },
 
-    async handleArchiveWorkspace() {
-      try {
-        await this.workspacesStore.toggleWorkspaceStatus(this.workspaceToArchive);
-        this.notificationsStore.success('Workspace archived successfully');
-        this.showArchiveDialog = false;
-        this.workspaceToArchive = null;
-      } catch (error) {
-        this.notificationsStore.error(`Failed to archive workspace: ${error.message}`);
-        // Keep dialog open so user can try again
-      }
+    async handleArchiveWorkspace(workspaceId) {
+      await this.workspacesStore.toggleWorkspaceStatus(workspaceId);
+      this.notificationsStore.success('Workspace archived successfully');
     },
 
     confirmDelete(workspaceId) {
-      this.workspaceToDelete = workspaceId;
-      this.showDeleteDialog = true;
+      this.$root.openDialog('ConfirmDialog', {
+        title: 'Delete Workspace?',
+        message: 'Are you sure you want to delete this workspace? This action cannot be undone.',
+        confirmButton: 'Delete Permanently',
+        confirmButtonColor: 'error',
+        onAcceptance: async () => await this.handleDeleteWorkspace(workspaceId),
+      });
     },
 
-    async handleDeleteWorkspace() {
-      try {
-        await this.workspacesStore.deleteWorkspace(this.workspaceToDelete);
-        this.notificationsStore.success('Workspace deleted successfully');
-        this.showDeleteDialog = false;
-        this.workspaceToDelete = null;
-      } catch (error) {
-        this.notificationsStore.error(`Failed to delete workspace: ${error.message}`);
-        // Keep dialog open so user can try again
-      }
+    async handleDeleteWorkspace(workspaceId) {
+      await this.workspacesStore.deleteWorkspace(workspaceId);
+      this.notificationsStore.success('Workspace deleted successfully');
     },
   },
 };
