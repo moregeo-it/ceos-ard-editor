@@ -51,10 +51,11 @@
           </v-container>
           <component
             v-else
-            :is="getEditorType(editorStore.data[file.path])"
+            :is="getEditorType(file, editorStore.data[file.path], file.forceSourceCodeEditor)"
             :value="editorStore.data[file.path]"
             @update="(val) => editorStore.sync(file.path, val)"
             @save="save(file.path)"
+            @error="error(file.path, $event)"
             :file="file"
             :readOnly="workspacesStore.isArchived"
             class="fill-height"
@@ -100,9 +101,9 @@ import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { defineAsyncComponent } from 'vue';
 import BrowserViewer from './editors/BrowserViewer.vue';
-import SourceCodeEditor from './editors/SourceCodeEditor.vue';
 import UnsupportedViewer from './editors/UnsupportedViewer.vue';
 import { mdiClose, mdiContentSave, mdiContentSaveAll, mdiMenu } from '@mdi/js';
+import { supportVisualEditing } from '@/components/ide/editors/utils';
 
 const supportedBrowserTypes = [
   'image/png',
@@ -119,9 +120,9 @@ export default {
 
   components: {
     BrowserViewer,
-    SourceCodeEditor,
+    SourceCodeEditor: defineAsyncComponent(() => import('./editors/SourceCodeEditor.vue')),
     UnsupportedViewer,
-    PfsDocumentEditor: defineAsyncComponent(() => import('./editors/PfsDocumentEditor.vue')),
+    JsonSchemaEditor: defineAsyncComponent(() => import('./editors/JsonSchemaEditor.vue')),
   },
 
   data() {
@@ -193,13 +194,15 @@ export default {
     },
   },
   methods: {
-    getEditorType(value) {
-      if (value instanceof Blob) {
-        if (supportedBrowserTypes.includes(value.type)) {
+    getEditorType(file, data, forceSourceCodeEditor = false) {
+      if (data instanceof Blob) {
+        if (supportedBrowserTypes.includes(data.type)) {
           return 'BrowserViewer';
         } else {
           return 'UnsupportedViewer';
         }
+      } else if (supportVisualEditing(file, data) && !forceSourceCodeEditor) {
+        return 'JsonSchemaEditor';
       } else {
         return 'SourceCodeEditor';
       }
@@ -207,6 +210,10 @@ export default {
     isDeleted(path) {
       const file = this.filesStore.all[path];
       return !file || file.status === 'deleted';
+    },
+    error(path, error) {
+      console.error(error);
+      this.close(path);
     },
     async save(path) {
       const result = await this.editorStore.save(path);
@@ -220,7 +227,7 @@ export default {
       const fileCount = results.filter((res) => res).length;
       if (errorCount > 0) {
         this.notificationsStore.error(
-          `Failed to save ${errorCount} of${fileCount} file(s). Please try again.`,
+          `Failed to save ${errorCount} of ${fileCount} file(s). Please try again.`,
         );
       }
     },
