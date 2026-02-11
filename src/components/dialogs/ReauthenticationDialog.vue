@@ -35,6 +35,12 @@
       </v-card-text>
 
       <v-card-actions class="px-6 pb-4">
+        <v-btn color="error" variant="text" :disabled="isAuthenticating" @click="handleCancel">
+          Logout
+        </v-btn>
+
+        <v-spacer />
+
         <v-btn
           color="primary"
           variant="elevated"
@@ -44,12 +50,6 @@
           @click="handleReauthenticate"
         >
           Reauthenticate with GitHub
-        </v-btn>
-
-        <v-spacer />
-
-        <v-btn color="error" variant="text" :disabled="isAuthenticating" @click="handleCancel">
-          Logout
         </v-btn>
       </v-card-actions>
 
