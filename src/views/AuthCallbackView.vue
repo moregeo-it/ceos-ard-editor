@@ -38,6 +38,7 @@
 
 <script>
 import { useAuthStore } from '@/stores/auth';
+import authService from '@/services/auth.service';
 
 import { useNotificationsStore } from '@/stores/notifications';
 
@@ -68,6 +69,16 @@ export default {
           ? decodeURIComponent(errorDescription)
           : 'Authentication failed. Please try again.';
 
+        // If in popup, send error to parent
+        if (this.isPopup()) {
+          this.sendMessageToParent({
+            type: 'auth_error',
+            error: this.error,
+          });
+          setTimeout(() => window.close(), 2000);
+          return;
+        }
+
         setTimeout(() => {
           this.$router.push({ name: 'landing' });
         }, 3000);
@@ -75,13 +86,57 @@ export default {
       }
 
       try {
+        // If opened in popup, send auth data to parent instead of storing locally
+        if (this.isPopup()) {
+          const authData = authService.parseAuthCallback(searchParams);
+          this.sendMessageToParent({
+            type: 'auth_success',
+            data: authData,
+          });
+          // Close popup after short delay
+          setTimeout(() => window.close(), 1000);
+          return;
+        }
+
+        // Normal flow - store auth and navigate
         authStore.handleAuthCallback(searchParams);
         this.$router.push({ name: 'workspaces' });
       } catch (error) {
         const notifications = useNotificationsStore();
         notifications.error(`Authentication failed. Please try again. Error: ${error.message}`);
+
+        // If in popup, send error to parent
+        if (this.isPopup()) {
+          this.sendMessageToParent({
+            type: 'auth_error',
+            error: error.message,
+          });
+          setTimeout(() => window.close(), 2000);
+          return;
+        }
+
         this.$router.push({ name: 'landing' });
       }
+    },
+
+    /**
+     * Check if we're in a popup window
+     */
+    isPopup() {
+      return window.opener && window.opener !== window;
+    },
+
+    /**
+     * Send message to parent window
+     */
+    sendMessageToParent(message) {
+      if (!window.opener) {
+        console.warn('No parent window found');
+        return;
+      }
+
+      // Send to same origin only for security
+      window.opener.postMessage(message, window.location.origin);
     },
   },
 };

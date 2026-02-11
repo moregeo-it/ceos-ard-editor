@@ -23,6 +23,9 @@ const components = {
   CreateFileDialog: defineAsyncComponent(() => import('@/components/dialogs/CreateFileDialog.vue')),
   DeleteFileDialog: defineAsyncComponent(() => import('@/components/dialogs/DeleteFileDialog.vue')),
   DiffDialog: defineAsyncComponent(() => import('@/components/dialogs/DiffDialog.vue')),
+  ReauthenticationDialog: defineAsyncComponent(
+    () => import('@/components/dialogs/ReauthenticationDialog.vue'),
+  ),
   RenameFileDialog: defineAsyncComponent(() => import('@/components/dialogs/RenameFileDialog.vue')),
   WorkspaceDialog: defineAsyncComponent(() => import('@/components/dialogs/WorkspaceDialog.vue')),
 };
