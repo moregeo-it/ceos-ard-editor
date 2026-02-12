@@ -102,12 +102,18 @@ export default {
         if (event.data.type === 'auth_success') {
           window.removeEventListener('message', messageHandler);
           clearInterval(checkClosed);
-          popup.close();
+
+          // Send confirmation back to popup so it can close
+          popup.postMessage({ type: 'popup_can_close' }, window.location.origin);
+
           resolve(event.data.data);
         } else if (event.data.type === 'auth_error') {
           window.removeEventListener('message', messageHandler);
           clearInterval(checkClosed);
-          popup.close();
+
+          // Send confirmation back to popup so it can close
+          popup.postMessage({ type: 'popup_can_close' }, window.location.origin);
+
           reject(new Error(event.data.error || 'Authentication failed'));
         }
       };

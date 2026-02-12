@@ -75,7 +75,7 @@ export default {
             type: 'auth_error',
             error: this.error,
           });
-          setTimeout(() => window.close(), 2000);
+          this.waitForParentConfirmation();
           return;
         }
 
@@ -93,8 +93,8 @@ export default {
             type: 'auth_success',
             data: authData,
           });
-          // Close popup after short delay
-          setTimeout(() => window.close(), 1000);
+          // Wait for parent confirmation before closing
+          this.waitForParentConfirmation();
           return;
         }
 
@@ -111,7 +111,7 @@ export default {
             type: 'auth_error',
             error: error.message,
           });
-          setTimeout(() => window.close(), 2000);
+          this.waitForParentConfirmation();
           return;
         }
 
@@ -137,6 +137,37 @@ export default {
 
       // Send to same origin only for security
       window.opener.postMessage(message, window.location.origin);
+    },
+
+    /**
+     * Wait for confirmation from parent window before closing popup
+     */
+    waitForParentConfirmation() {
+      const closePopup = () => {
+        clearTimeout(timeoutId);
+        window.removeEventListener('message', messageHandler);
+        window.close();
+      };
+
+      const messageHandler = (event) => {
+        // Security: validate origin
+        if (event.origin !== window.location.origin) {
+          return;
+        }
+
+        // Parent confirms popup can close
+        if (event.data.type === 'popup_can_close') {
+          closePopup();
+        }
+      };
+
+      window.addEventListener('message', messageHandler);
+
+      // Fallback: close after 3 seconds if no confirmation received
+      const timeoutId = setTimeout(() => {
+        window.removeEventListener('message', messageHandler);
+        window.close();
+      }, 3000);
     },
   },
 };
