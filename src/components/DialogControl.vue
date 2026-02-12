@@ -50,6 +50,9 @@ export default {
     close(component) {
       delete this.dialogs[component];
     },
+    closeAll() {
+      this.dialogs = {};
+    },
   },
 };
 </script>

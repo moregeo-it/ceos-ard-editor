@@ -62,6 +62,13 @@ export default {
         this.closeDialog('ReauthenticationDialog');
       }
     },
+
+    'authStore.isAuthenticated'(isAuthenticated) {
+      // When user logs out, close all dialogs to prevent them showing on landing page
+      if (!isAuthenticated) {
+        this.closeAllDialogs();
+      }
+    },
   },
 
   methods: {
@@ -74,6 +81,11 @@ export default {
     closeDialog(component) {
       if (this.$refs.dialogs) {
         this.$refs.dialogs.close(component);
+      }
+    },
+    closeAllDialogs() {
+      if (this.$refs.dialogs) {
+        this.$refs.dialogs.closeAll();
       }
     },
   },
