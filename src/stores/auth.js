@@ -13,6 +13,7 @@ export const useAuthStore = defineStore('auth', {
     expiresAt: null,
     isAuthenticated: false,
     isLoading: false,
+    isPendingReauth: false,
   }),
 
   getters: {
@@ -146,7 +147,32 @@ export const useAuthStore = defineStore('auth', {
       this.provider = null;
       this.expiresAt = null;
       this.isAuthenticated = false;
+      this.isPendingReauth = false;
       tokenService.clearAuth();
+    },
+
+    /**
+     * Set pending reauthentication state
+     */
+    setPendingReauth() {
+      this.isPendingReauth = true;
+    },
+
+    /**
+     * Update authentication after successful reauthentication
+     */
+    updateAuthAfterReauth(authData) {
+      this.accessToken = authData.accessToken;
+      this.tokenType = authData.tokenType;
+      this.userId = authData.userId;
+      this.username = authData.username;
+      this.provider = authData.provider;
+      this.expiresAt = Date.now() + authData.expiresIn * 1000;
+      this.isAuthenticated = true;
+      this.isPendingReauth = false;
+
+      // Save to localStorage
+      tokenService.saveAuth(authData);
     },
   },
 });

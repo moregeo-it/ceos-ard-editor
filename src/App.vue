@@ -22,6 +22,7 @@
 
 <script>
 import { useNotificationsStore } from '@/stores/notifications';
+import { useAuthStore } from '@/stores/auth';
 import DialogControl from '@/components/DialogControl.vue';
 
 export default {
@@ -36,6 +37,10 @@ export default {
       return useNotificationsStore();
     },
 
+    authStore() {
+      return useAuthStore();
+    },
+
     snackbarColor() {
       const colors = {
         success: 'success',
@@ -44,6 +49,25 @@ export default {
         info: 'info',
       };
       return colors[this.notificationsStore.type] || 'info';
+    },
+  },
+
+  watch: {
+    'authStore.isPendingReauth'(needsReauth) {
+      if (needsReauth) {
+        this.openDialog('ReauthenticationDialog', {
+          show: true,
+        });
+      } else {
+        this.closeDialog('ReauthenticationDialog');
+      }
+    },
+
+    'authStore.isAuthenticated'(isAuthenticated) {
+      // When user logs out, close all dialogs to prevent them showing on landing page
+      if (!isAuthenticated) {
+        this.closeAllDialogs();
+      }
     },
   },
 
@@ -57,6 +81,11 @@ export default {
     closeDialog(component) {
       if (this.$refs.dialogs) {
         this.$refs.dialogs.close(component);
+      }
+    },
+    closeAllDialogs() {
+      if (this.$refs.dialogs) {
+        this.$refs.dialogs.closeAll();
       }
     },
   },

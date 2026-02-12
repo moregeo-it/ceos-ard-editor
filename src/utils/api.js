@@ -15,7 +15,7 @@ export async function fetchWithAuth(endpoint, options = {}) {
 
   // Check if token is expired
   if (authStore.isTokenExpired) {
-    authStore.logout();
+    authStore.setPendingReauth();
     throw new Error('Session expired. Please login again.');
   }
 
@@ -31,7 +31,7 @@ export async function fetchWithAuth(endpoint, options = {}) {
 
   // Handle 401 Unauthorized
   if (response.status === 401) {
-    authStore.logout();
+    authStore.setPendingReauth();
     throw new Error('Authentication failed. Please login again.');
   }
 
