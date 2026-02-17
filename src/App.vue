@@ -106,6 +106,28 @@ export default {
 .text-subtle {
   color: rgba(0, 0, 0, 0.6);
 }
+.comma-separated-list {
+  display: inline;
+  list-style: none;
+}
+.comma-separated-list li {
+  display: inline;
+}
+.comma-separated-list li::after {
+  content: ', ';
+}
+.comma-separated-list li:last-child::after {
+  content: '';
+}
+
+a {
+  color: var(--ceos-primary);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--v-theme-on-surface-light);
+  text-decoration: none;
+}
 
 @media (prefers-color-scheme: dark) {
   .text-subtle {

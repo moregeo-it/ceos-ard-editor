@@ -222,7 +222,9 @@ export const useFilesStore = defineStore('files', {
     async revertFile(filePath) {
       const fileData = await fileService.revertFile(getWorkspaceId(), filePath);
       generatePreview();
-      this.deleteFileFromStore(filePath);
+      if (filePath !== fileData.path) {
+        this.deleteFileFromStore(filePath);
+      }
       this.updateFile(fileData);
       return fileData;
     },

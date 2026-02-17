@@ -53,7 +53,7 @@
             v-else
             :is="getEditorType(file, editorStore.data[file.path], file.forceSourceCodeEditor)"
             :value="editorStore.data[file.path]"
-            @update="(val) => editorStore.sync(file.path, val)"
+            @update="(val) => editorStore.applyEdits(file.path, val)"
             @save="save(file.path)"
             @error="error(file.path, $event)"
             :file="file"
@@ -70,8 +70,15 @@
         </template>
         -->
 
-        <v-toolbar-title v-if="usage" class="text-body-2" :title="usage">
-          {{ usage }}
+        <v-toolbar-title v-if="activeFile?.usage" class="text-body-2">
+          Used in:
+          <ul class="comma-separated-list">
+            <li v-for="item in activeFile.usage" :key="item">
+              <a href="#" @click.prevent="editorStore.show(`/pfs/${item}/document.yaml`)">{{
+                item
+              }}</a>
+            </li>
+          </ul>
         </v-toolbar-title>
 
         <template v-slot:append v-if="!workspacesStore.isArchived">

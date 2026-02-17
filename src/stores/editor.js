@@ -25,6 +25,10 @@ export const useEditorStore = defineStore('editor', {
   actions: {
     async show(path, forceSourceCodeEditor = false) {
       const files = useFilesStore();
+      if (!path.startsWith('/')) {
+        console.warn('File path should start with /. Prepending it automatically.');
+        path = '/' + path;
+      }
       let file = await files.loadFileContext(path);
       if (!file || file.is_directory || file.status === 'deleted') {
         return;
@@ -38,20 +42,27 @@ export const useEditorStore = defineStore('editor', {
       }
       this.active = file;
       if (this.original[path] === undefined) {
-        const data = await files.load(path);
-        if (data.type.startsWith('image/') || data.type === 'application/pdf') {
-          this.original[path] = data;
-          this.data[path] = data;
-        } else {
-          const text = await data.text();
-          this.original[path] = text;
-          this.data[path] = text;
-        }
-        this.changed[path] = false;
-        this.saving[path] = false;
+        await this.sync(path);
       }
     },
-    async sync(path, content) {
+    async sync(path) {
+      if (!this.opened.find((f) => f.path === path)) {
+        return;
+      }
+      const files = useFilesStore();
+      const data = await files.load(path);
+      if (data.type.startsWith('image/') || data.type === 'application/pdf') {
+        this.original[path] = data;
+        this.data[path] = data;
+      } else {
+        const text = await data.text();
+        this.original[path] = text;
+        this.data[path] = text;
+      }
+      this.changed[path] = false;
+      this.saving[path] = false;
+    },
+    async applyEdits(path, content) {
       this.data[path] = content;
       this.changed[path] = this.original[path] !== content;
     },

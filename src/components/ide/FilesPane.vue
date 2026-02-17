@@ -424,6 +424,7 @@ export default {
     async handleRevert(item) {
       try {
         await this.filesStore.revertFile(item.path);
+        await this.editorStore.sync(item.path);
         this.notificationsStore.success('File reverted successfully');
       } catch (error) {
         this.notificationsStore.error(`Failed to revert: ${error.message}`);
