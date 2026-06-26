@@ -10,6 +10,7 @@
         density="compact"
         variant="outlined"
         hide-details
+        item-title="id"
         class="preview-select mr-2 flex-grow-1"
         :prepend-inner-icon="icons.product"
         @update:focused="handleSelect"
@@ -117,7 +118,7 @@ export default {
       return this.workspacesStore?.currentWorkspace;
     },
     pfsOptions() {
-      return this.workspacesStore?.pfsOptions || [];
+      return this.workspacesStore?.workspacePfsOptions || [];
     },
     selectedPfs: {
       get() {
@@ -139,7 +140,7 @@ export default {
       this.selectedPfs = this.currentWorkspace.pfs || [];
     }
     if (this.pfsOptions.length === 0) {
-      await this.workspacesStore.fetchPfs();
+      await this.workspacesStore.fetchWorkspacePfs(this.workspaceId);
     }
   },
   async mounted() {

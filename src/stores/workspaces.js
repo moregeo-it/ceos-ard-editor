@@ -4,6 +4,7 @@ import workspaceService from '@/services/workspace.service';
 export const useWorkspacesStore = defineStore('workspaces', {
   state: () => ({
     pfsOptions: [],
+    workspacePfsOptions: [],
     // List of all workspaces
     workspaces: [],
     isLoading: false,
@@ -130,6 +131,10 @@ export const useWorkspacesStore = defineStore('workspaces', {
 
     async fetchPfs() {
       this.pfsOptions = await workspaceService.fetchPfs();
+    },
+
+    async fetchWorkspacePfs(workspaceId) {
+      this.workspacePfsOptions = await workspaceService.fetchWorkspacePfs(workspaceId);
     },
 
     async getWorkspace(workspaceId) {

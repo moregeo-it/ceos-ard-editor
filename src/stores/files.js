@@ -14,7 +14,14 @@ const generatePreview = () => {
   const previewStore = usePreviewStore();
   // Trigger preview regeneration, but don't await it to avoid UI delays
   // and we also don't want to fail on preview errors here
+  refreshPreviewOptions();
   previewStore.generatePreview();
+};
+
+const refreshPreviewOptions = () => {
+  const workspaces = useWorkspacesStore();
+
+  return workspaces.fetchWorkspacePfs(workspaces.currentWorkspace?.id);
 };
 
 const getDefaults = () => ({
@@ -175,6 +182,23 @@ export const useFilesStore = defineStore('files', {
       const fileData = await fileService.createFile(getWorkspaceId(), path, name, type);
       generatePreview();
       this.updateFile(fileData);
+      return fileData;
+    },
+
+    /**
+     * Create a new pfs folder and document with content of source pfs
+     */
+    async createNewPfs(name, sourcePfs) {
+      const templateId = sourcePfs?.id;
+
+      const templatePath = `/pfs/${templateId}/document.yaml`;
+      const templateContent = await this.load(templatePath);
+
+      await this.createFile('/pfs', name, 'folder');
+      await this.createFile(`/pfs/${name}`, 'document.yaml', 'file');
+      const fileData = await this.save(`/pfs/${name}/document.yaml`, templateContent);
+
+      refreshPreviewOptions();
       return fileData;
     },
 

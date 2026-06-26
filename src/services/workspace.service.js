@@ -50,4 +50,11 @@ export default {
     const response = await api.get('/pfs');
     return response.pfsTypes || [];
   },
+
+  /**
+   * Fetch available workspace PFS (Product Format Specifications)
+   */
+  async fetchWorkspacePfs(workspaceId) {
+    return api.get(`/workspaces/${workspaceId}/pfs`);
+  },
 };
