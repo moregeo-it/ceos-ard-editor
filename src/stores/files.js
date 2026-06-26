@@ -21,11 +21,9 @@ const refreshPreviewOptions = () => {
   const workspaces = useWorkspacesStore();
   const workspaceId = workspaces.currentWorkspace?.id;
 
-  if (!workspaceId) {
-    return Promise.resolve();
+  if (workspaceId) {
+    return workspaces.fetchWorkspacePfs(workspaceId);
   }
-
-  return workspaces.fetchWorkspacePfs(workspaceId);
 };
 
 const getDefaults = () => ({
