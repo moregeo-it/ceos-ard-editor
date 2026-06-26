@@ -200,15 +200,14 @@ export default {
     enhanceHtml(doc) {
       const token = this.authStore.accessToken;
 
-      // Fix relative links
+      // Fix relative links and target
       const links = doc.querySelectorAll('a[href]');
       links.forEach((link) => {
         const href = link.getAttribute('href');
-        if (href && !href.startsWith('http') && !href.startsWith('#')) {
-          link.setAttribute(
-            'href',
-            `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${href}?authorization=${token}`,
-          );
+        const url = URL.parse(href);
+        if (url !== null) {
+          // Valid absolute URL (or mailto: link for example)
+          link.setAttribute('target', '_blank');
         }
       });
 
@@ -216,7 +215,7 @@ export default {
       const images = doc.querySelectorAll('img[src]');
       images.forEach((img) => {
         const src = img.getAttribute('src');
-        if (src && !src.startsWith('http')) {
+        if (src && !src.match(/^https?:\/\//i)) {
           img.setAttribute(
             'src',
             `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${src}?authorization=${token}`,
@@ -228,7 +227,7 @@ export default {
       const stylesheets = doc.querySelectorAll('link[rel="stylesheet"]');
       stylesheets.forEach((sheet) => {
         const href = sheet.getAttribute('href');
-        if (href && !href.startsWith('http')) {
+        if (href && !href.match(/^https?:\/\//i)) {
           sheet.setAttribute(
             'href',
             `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${href}?authorization=${token}`,
