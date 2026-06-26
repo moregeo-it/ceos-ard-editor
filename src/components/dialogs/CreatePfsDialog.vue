@@ -8,8 +8,8 @@
             v-model.trim="folderName"
             variant="outlined"
             label="Folder Name"
-            placeholder="e.g., my-new-pfs"
-            hint="Creates /pfs/<folder-name>/document.yaml"
+            placeholder="e.g., SR"
+            hint="Creates a new PFS folder in the workspace with the specified name"
             persistent-hint
             density="compact"
             class="mb-3"
@@ -95,7 +95,7 @@ export default {
   },
   async created() {
     const workspaceId = this.workspacesStore.currentWorkspace?.id;
-    if (this.pfsOptions.length === 0 && workspaceId) {
+    if (workspaceId) {
       this.isLoadingPfs = true;
       try {
         await this.workspacesStore.fetchWorkspacePfs(workspaceId);

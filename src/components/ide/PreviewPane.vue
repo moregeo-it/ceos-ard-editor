@@ -11,6 +11,7 @@
         variant="outlined"
         hide-details
         item-title="id"
+        item-value="id"
         class="preview-select mr-2 flex-grow-1"
         :prepend-inner-icon="icons.product"
         @update:focused="handleSelect"
