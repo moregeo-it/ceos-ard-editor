@@ -14,14 +14,18 @@ const generatePreview = () => {
   const previewStore = usePreviewStore();
   // Trigger preview regeneration, but don't await it to avoid UI delays
   // and we also don't want to fail on preview errors here
-  refreshPreviewOptions();
   previewStore.generatePreview();
 };
 
 const refreshPreviewOptions = () => {
   const workspaces = useWorkspacesStore();
+  const workspaceId = workspaces.currentWorkspace?.id;
 
-  return workspaces.fetchWorkspacePfs(workspaces.currentWorkspace?.id);
+  if (!workspaceId) {
+    return Promise.resolve();
+  }
+
+  return workspaces.fetchWorkspacePfs(workspaceId);
 };
 
 const getDefaults = () => ({
@@ -189,17 +193,30 @@ export const useFilesStore = defineStore('files', {
      * Create a new pfs folder and document with content of source pfs
      */
     async createNewPfs(name, sourcePfs) {
-      const templateId = sourcePfs?.id;
-
-      const templatePath = `/pfs/${templateId}/document.yaml`;
+      const templatePath = `/pfs/${sourcePfs}/document.yaml`;
       const templateContent = await this.load(templatePath);
 
-      await this.createFile('/pfs', name, 'folder');
-      await this.createFile(`/pfs/${name}`, 'document.yaml', 'file');
-      const fileData = await this.save(`/pfs/${name}/document.yaml`, templateContent);
+      const folderData = await fileService.createFile(getWorkspaceId(), '/pfs', name, 'folder');
+      this.updateFile(folderData);
+
+      const fileData = await fileService.createFile(
+        getWorkspaceId(),
+        `/pfs/${name}`,
+        'document.yaml',
+        'file',
+      );
+      this.updateFile(fileData);
+
+      const savedFileData = await fileService.saveFile(
+        getWorkspaceId(),
+        `/pfs/${name}/document.yaml`,
+        templateContent,
+      );
+      this.updateFile(savedFileData);
 
       refreshPreviewOptions();
-      return fileData;
+
+      return savedFileData;
     },
 
     /**

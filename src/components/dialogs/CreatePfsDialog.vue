@@ -90,7 +90,7 @@ export default {
       return [];
     },
     isValid() {
-      return this.folderNameError.length === 0;
+      return this.folderNameError.length === 0 && !!this.selectedPfs;
     },
   },
   async created() {
@@ -103,16 +103,8 @@ export default {
         this.isLoadingPfs = false;
       }
     }
-  },
-  watch: {
-    pfsOptions: {
-      immediate: true,
-      handler(options) {
-        if (!this.selectedPfs && options.length > 0) {
-          this.selectedPfs = options[0];
-        }
-      },
-    },
+
+    this.selectedPfs = this.pfsOptions.length > 0 ? this.pfsOptions[0].id : null;
   },
   methods: {
     handleCreate() {

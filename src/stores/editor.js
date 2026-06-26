@@ -232,6 +232,11 @@ export function filesEditorSyncPlugin({ store }) {
             break;
           }
 
+          case 'createNewPfs': {
+            await editor.onFileCreated(result);
+            break;
+          }
+
           case 'deleteFile': {
             const [filePath] = args;
             await editor.onFileDeleted(filePath);
