@@ -1,27 +1,16 @@
 <template>
   <div class="d-flex flex-column fill-height">
     <div v-if="pfsOptions.length > 0" class="pa-2 pt-3 d-flex align-center border-b-sm">
-      <v-select
+      <PfsSelect
         v-model="selectedPfs"
         :items="pfsOptions"
         label="Select PFS for Preview"
         multiple
         chips
-        density="compact"
-        variant="outlined"
         hide-details
-        item-title="id"
-        item-value="id"
         class="preview-select mr-2 flex-grow-1"
-        :prepend-inner-icon="icons.product"
         @update:focused="handleSelect"
-      >
-        <template v-slot:chip="{ item, props }">
-          <v-chip v-bind="props" size="small">
-            {{ item.title }}
-          </v-chip>
-        </template>
-      </v-select>
+      />
       <v-btn
         color="primary"
         class="ml-2"
@@ -79,14 +68,18 @@ import { useEditorStore } from '@/stores/editor';
 import { usePreviewStore } from '@/stores/preview';
 import previewService from '@/services/preview.service';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import { mdiFileDocumentOutline, mdiDownload } from '@mdi/js';
+import { mdiDownload } from '@mdi/js';
 import { useNotificationsStore } from '@/stores/notifications';
 import { downloadBlob } from '@/utils/api';
+import PfsSelect from '@/components/PfsSelect.vue';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export default {
   name: 'PreviewPane',
+  components: {
+    PfsSelect,
+  },
   data() {
     return {
       isDownloading: {
@@ -95,7 +88,6 @@ export default {
       },
       icons: {
         download: mdiDownload,
-        product: mdiFileDocumentOutline,
       },
     };
   },
@@ -141,7 +133,7 @@ export default {
       this.selectedPfs = this.currentWorkspace.pfs || [];
     }
     if (this.pfsOptions.length === 0 && this.workspaceId) {
-      await this.workspacesStore.fetchWorkspacePfs(this.workspaceId);
+      await this.workspacesStore.fetchPfs(this.workspaceId);
     }
   },
   async mounted() {

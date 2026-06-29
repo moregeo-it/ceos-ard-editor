@@ -22,20 +22,16 @@
             class="mb-3"
           ></v-text-field>
 
-          <v-select
+          <PfsSelect
             v-model="formData.pfs"
             :items="workspacesStore.pfsOptions"
             label="Product Format Specification (Optional)"
-            placeholder="Select one or more PFS types"
-            variant="outlined"
-            :prepend-inner-icon="icons.fileDocument"
-            clearable
             multiple
             chips
             hint="If not selected, backend will assign a default PFS"
             persistent-hint
             class="mb-3"
-          ></v-select>
+          />
 
           <v-textarea
             v-model="formData.description"
@@ -68,10 +64,14 @@
 import DialogMixin from '@/components/DialogMixin';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { mdiFolderPlus, mdiFolderEdit, mdiFolder, mdiFileDocument, mdiText } from '@mdi/js';
+import PfsSelect from '@/components/PfsSelect.vue';
 
 export default {
   name: 'WorkspaceDialog',
   mixins: [DialogMixin],
+  components: {
+    PfsSelect,
+  },
   props: {
     mode: {
       type: String,
@@ -124,13 +124,14 @@ export default {
   },
   created() {
     if (this.workspace) {
+      const pfsIds = Array.isArray(this.workspace.pfs)
+        ? this.workspace.pfs
+        : this.workspace.pfs
+          ? [this.workspace.pfs]
+          : [];
       this.formData = {
         title: this.workspace.title || '',
-        pfs: this.workspace.pfs
-          ? Array.isArray(this.workspace.pfs)
-            ? this.workspace.pfs
-            : [this.workspace.pfs]
-          : [],
+        pfs: pfsIds,
         description: this.workspace.description || '',
       };
     }
@@ -143,7 +144,7 @@ export default {
       const payload = {
         title: this.formData.title,
         description: this.formData.description || null,
-        pfs: this.formData.pfs.length > 0 ? this.formData.pfs : null,
+        pfs: this.formData.pfs && this.formData.pfs.length > 0 ? this.formData.pfs : null,
       };
 
       // Include workspace ID for update mode

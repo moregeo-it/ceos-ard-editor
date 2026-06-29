@@ -129,12 +129,13 @@ export const useWorkspacesStore = defineStore('workspaces', {
       }
     },
 
-    async fetchPfs() {
-      this.pfsOptions = await workspaceService.fetchPfs();
-    },
-
-    async fetchWorkspacePfs(workspaceId) {
-      this.workspacePfsOptions = await workspaceService.fetchWorkspacePfs(workspaceId);
+    async fetchPfs(workspaceId) {
+      const pfs = await workspaceService.fetchPfs(workspaceId);
+      if (workspaceId) {
+        this.workspacePfsOptions = pfs;
+      } else {
+        this.pfsOptions = pfs;
+      }
     },
 
     async getWorkspace(workspaceId) {

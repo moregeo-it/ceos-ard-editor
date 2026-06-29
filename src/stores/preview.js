@@ -105,7 +105,7 @@ export function filesPreviewSyncPlugin({ store }) {
             await preview.generatePreview();
           } catch (error) {
             useNotificationsStore().error(
-              'Updating editor after file operation failed: ' + error.message,
+              'Updating preview after file operation failed: ' + error.message,
             );
           }
           break;
@@ -129,7 +129,7 @@ export function filesPreviewSyncPlugin({ store }) {
             const workspaces = useWorkspacesStore();
             const workspaceId = workspaces.currentWorkspace?.id;
             if (workspaceId) {
-              await workspaces.fetchWorkspacePfs(workspaceId);
+              await workspaces.fetchPfs(workspaceId);
             }
           } catch (error) {
             useNotificationsStore().error(

@@ -44,17 +44,11 @@ export default {
   },
 
   /**
-   * Fetch available PFS (Product Format Specifications)
+   * Fetch available PFS types (Product Format Specifications)
    */
-  async fetchPfs() {
-    const response = await api.get('/pfs');
-    return response.pfsTypes || [];
-  },
-
-  /**
-   * Fetch available workspace PFS (Product Format Specifications)
-   */
-  async fetchWorkspacePfs(workspaceId) {
-    return api.get(`/workspaces/${workspaceId}/pfs`);
+  async fetchPfs(workspaceId) {
+    const endpoint = workspaceId ? `/workspaces/${workspaceId}/pfs` : '/pfs';
+    const response = await api.get(endpoint);
+    return response?.pfsTypes || [];
   },
 };

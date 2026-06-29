@@ -12,10 +12,10 @@
             hint="Creates a new PFS folder in the workspace with the specified name"
             persistent-hint
             density="compact"
-            class="mb-3"
-            @input="id = id.toUpperCase()"
+            class="mb-4"
             :error-messages="idError"
             autofocus
+            @blur="touched.id = true"
           />
 
           <v-text-field
@@ -26,10 +26,12 @@
             hint="The title of the new PFS document"
             persistent-hint
             density="compact"
-            class="mb-3"
+            class="mb-4"
+            :error-messages="titleError"
+            @blur="touched.title = true"
           />
 
-          <v-text-field
+          <v-textarea
             v-model.trim="applies_to"
             variant="outlined"
             label="Applies To"
@@ -37,26 +39,19 @@
             hint="The description of the new PFS document"
             persistent-hint
             density="compact"
-            class="mb-3"
+            class="mb-4"
           />
 
-          <v-select
+          <PfsSelect
             v-model="selectedPfs"
             :items="pfsOptions"
-            item-title="name"
-            item-value="id"
-            variant="outlined"
             label="Base PFS"
             hint="The selected PFS document will be used as the base for the new folder"
             persistent-hint
-            density="compact"
-            class="mb-3"
+            :clearable="true"
             :loading="isLoadingPfs"
-          >
-            <template v-slot:selection="{ item }">
-              {{ item.raw.name }}
-            </template>
-          </v-select>
+            class="mb-4"
+          />
 
           <v-alert v-if="pfsOptions.length === 0" type="info" variant="tonal" density="compact">
             No workspace PFS options are available yet.
@@ -82,10 +77,14 @@
 <script>
 import DialogMixin from '@/components/DialogMixin';
 import { useWorkspacesStore } from '@/stores/workspaces';
+import PfsSelect from '@/components/PfsSelect.vue';
 
 export default {
   name: 'CreatePfsDialog',
   mixins: [DialogMixin],
+  components: {
+    PfsSelect,
+  },
   data() {
     return {
       id: '',
@@ -93,6 +92,10 @@ export default {
       applies_to: '',
       selectedPfs: null,
       isLoadingPfs: false,
+      touched: {
+        id: false,
+        title: false,
+      },
     };
   },
   computed: {
@@ -103,18 +106,23 @@ export default {
       return this.workspacesStore.workspacePfsOptions || [];
     },
     idError() {
+      if (!this.touched.id) return [];
       if (!this.id || this.id.trim().length < 2) {
         return ['Please provide a PFS ID with at least 2 characters'];
       }
 
-      if (this.id.includes('/')) {
-        return ['PFS ID should not contain /'];
+      return [];
+    },
+    titleError() {
+      if (!this.touched.title) return [];
+      if (!this.title || this.title.trim().length < 1) {
+        return ['Title is required'];
       }
 
       return [];
     },
     isValid() {
-      return this.idError.length === 0 && !!this.selectedPfs;
+      return this.idError.length === 0 && this.titleError.length === 0;
     },
   },
   async created() {
@@ -122,16 +130,16 @@ export default {
     if (workspaceId) {
       this.isLoadingPfs = true;
       try {
-        await this.workspacesStore.fetchWorkspacePfs(workspaceId);
+        await this.workspacesStore.fetchPfs(workspaceId);
       } finally {
         this.isLoadingPfs = false;
       }
     }
-
-    this.selectedPfs = this.pfsOptions.length > 0 ? this.pfsOptions[0].id : null;
   },
   methods: {
     handleCreate() {
+      this.touched.id = true;
+      this.touched.title = true;
       if (!this.isValid) {
         return;
       }
@@ -139,7 +147,7 @@ export default {
       this.accept({
         id: this.id,
         title: this.title,
-        base_pfs: this.selectedPfs,
+        base: this.selectedPfs,
         applies_to: this.applies_to,
       });
     },
