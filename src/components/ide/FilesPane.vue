@@ -314,6 +314,7 @@ export default {
   },
 
   methods: {
+    // Check if the given path is a PFS path (e.g., /pfs or /pfs/<id>)
     isPfsPath(path) {
       return path === '/pfs' || path.startsWith('/pfs/');
     },
@@ -347,6 +348,7 @@ export default {
       return item.type === 'folder' && item.path === '/pfs';
     },
 
+    // Check if the item is a PFS folder (e.g., /pfs/<id>)
     isPfsFolder(item) {
       return item.type === 'folder' && item.path.startsWith('/pfs/') && item.path !== '/pfs';
     },
