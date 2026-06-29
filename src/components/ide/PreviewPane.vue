@@ -132,7 +132,7 @@ export default {
     if (this.selectedPfs === null) {
       this.selectedPfs = this.currentWorkspace.pfs || [];
     }
-    if (this.pfsOptions.length === 0 && this.workspaceId) {
+    if (this.workspaceId) {
       await this.workspacesStore.fetchPfs(this.workspaceId);
     }
   },
