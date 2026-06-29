@@ -555,7 +555,7 @@ export default {
     requestDelete(item) {
       if (item.type === 'folder' && this.isSelectedPfsFolder(item.path)) {
         this.notificationsStore.warning(
-          "You can't delete a selected PFS. Deselect it before deleting.",
+          "You can't delete a PFS that is selected for preview. Deselect it before deleting.",
         );
         return;
       }
