@@ -216,7 +216,7 @@ export default {
       const images = doc.querySelectorAll('img[src]');
       images.forEach((img) => {
         const src = img.getAttribute('src');
-        if (src && !src.match(/^https?:\/\//i)) {
+        if (src && !/^(https?:)?\/\//i.test(src)) {
           img.setAttribute(
             'src',
             `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${src}?authorization=${token}`,
@@ -228,7 +228,7 @@ export default {
       const stylesheets = doc.querySelectorAll('link[rel="stylesheet"]');
       stylesheets.forEach((sheet) => {
         const href = sheet.getAttribute('href');
-        if (href && !href.match(/^https?:\/\//i)) {
+        if (href && !/^(https?:)?\/\//i.test(href)) {
           sheet.setAttribute(
             'href',
             `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${href}?authorization=${token}`,
