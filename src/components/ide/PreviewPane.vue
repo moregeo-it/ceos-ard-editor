@@ -208,6 +208,7 @@ export default {
         if (url !== null) {
           // Valid absolute URL (or mailto: link for example)
           link.setAttribute('target', '_blank');
+          link.setAttribute('rel', 'noopener noreferrer');
         }
       });
 

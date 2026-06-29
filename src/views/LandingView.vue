@@ -44,6 +44,7 @@
                 :prepend-icon="icons.web"
                 href="https://ceos.org/ard/"
                 target="_blank"
+                rel="noopener noreferrer"
               >
                 CEOS-ARD Website
               </v-btn>
@@ -56,6 +57,7 @@
                 :prepend-icon="icons.github"
                 href="https://github.com/ceos-org"
                 target="_blank"
+                rel="noopener noreferrer"
               >
                 CEOS GitHub Organization
               </v-btn>
@@ -68,6 +70,7 @@
                 :prepend-icon="icons.web"
                 href="https://moregeo.it"
                 target="_blank"
+                rel="noopener noreferrer"
               >
                 MoreGeo GmbH
               </v-btn>
@@ -80,6 +83,7 @@
                 :prepend-icon="icons.document"
                 href="https://moregeo.it/imprint"
                 target="_blank"
+                rel="noopener noreferrer"
               >
                 Imprint
               </v-btn>
