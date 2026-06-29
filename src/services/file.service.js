@@ -72,4 +72,8 @@ export default {
       operation: 'revert',
     });
   },
+
+  async createNewPFS(workspaceId, content) {
+    return api.post(`/workspaces/${workspaceId}/pfs`, content);
+  },
 };

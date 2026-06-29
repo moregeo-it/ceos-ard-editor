@@ -536,8 +536,8 @@ export default {
       );
     },
 
-    async handleCreatePfs({ name, sourcePfs }) {
-      await this.filesStore.createNewPfs(name, sourcePfs);
+    async handleCreatePfs(pfsContent) {
+      await this.filesStore.createNewPfs(pfsContent);
       this.notificationsStore.success('PFS created successfully');
     },
 

@@ -172,23 +172,12 @@ export const useFilesStore = defineStore('files', {
     /**
      * Create a new pfs folder and document with content of source pfs
      */
-    async createNewPfs(name, sourcePfs) {
-      const templatePath = `/pfs/${sourcePfs}/document.yaml`;
-      const templateContent = await this.load(templatePath);
+    async createNewPfs(content) {
+      const fileData = await fileService.createNewPFS(getWorkspaceId(), content);
 
-      const folderData = await fileService.createFile(getWorkspaceId(), '/pfs', name, 'folder');
-      this.updateFile(folderData);
+      this.updateFile(fileData);
 
-      await fileService.createFile(getWorkspaceId(), `/pfs/${name}`, 'document.yaml', 'file');
-
-      const savedFileData = await fileService.saveFile(
-        getWorkspaceId(),
-        `/pfs/${name}/document.yaml`,
-        templateContent,
-      );
-      this.updateFile(savedFileData);
-
-      return savedFileData;
+      return fileData;
     },
 
     /**

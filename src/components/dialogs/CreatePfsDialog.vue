@@ -5,17 +5,39 @@
         <v-card-title>Create New PFS</v-card-title>
         <v-card-text>
           <v-text-field
-            v-model.trim="folderName"
+            v-model.trim="id"
             variant="outlined"
-            label="Folder Name"
+            label="ID"
             placeholder="e.g., SR"
             hint="Creates a new PFS folder in the workspace with the specified name"
             persistent-hint
             density="compact"
             class="mb-3"
-            @input="folderName = folderName.toUpperCase()"
-            :error-messages="folderNameError"
+            @input="id = id.toUpperCase()"
+            :error-messages="idError"
             autofocus
+          />
+
+          <v-text-field
+            v-model.trim="title"
+            variant="outlined"
+            label="Title"
+            placeholder="e.g., Surface Temperature"
+            hint="The title of the new PFS document"
+            persistent-hint
+            density="compact"
+            class="mb-3"
+          />
+
+          <v-text-field
+            v-model.trim="applies_to"
+            variant="outlined"
+            label="Applies To"
+            placeholder="e.g., Data collected by Synthetic Aperture Radar sensors"
+            hint="The description of the new PFS document"
+            persistent-hint
+            density="compact"
+            class="mb-3"
           />
 
           <v-select
@@ -24,8 +46,8 @@
             item-title="name"
             item-value="id"
             variant="outlined"
-            label="Source PFS"
-            hint="The selected PFS document will be copied into the new folder"
+            label="Base PFS"
+            hint="The selected PFS document will be used as the base for the new folder"
             persistent-hint
             density="compact"
             class="mb-3"
@@ -66,7 +88,9 @@ export default {
   mixins: [DialogMixin],
   data() {
     return {
-      folderName: '',
+      id: '',
+      title: '',
+      applies_to: '',
       selectedPfs: null,
       isLoadingPfs: false,
     };
@@ -78,19 +102,19 @@ export default {
     pfsOptions() {
       return this.workspacesStore.workspacePfsOptions || [];
     },
-    folderNameError() {
-      if (!this.folderName || this.folderName.trim().length < 2) {
-        return ['Please provide a folder name with at least 2 characters'];
+    idError() {
+      if (!this.id || this.id.trim().length < 2) {
+        return ['Please provide a PFS ID with at least 2 characters'];
       }
 
-      if (this.folderName.includes('/')) {
-        return ['Folder name should not contain /'];
+      if (this.id.includes('/')) {
+        return ['PFS ID should not contain /'];
       }
 
       return [];
     },
     isValid() {
-      return this.folderNameError.length === 0 && !!this.selectedPfs;
+      return this.idError.length === 0 && !!this.selectedPfs;
     },
   },
   async created() {
@@ -113,8 +137,10 @@ export default {
       }
 
       this.accept({
-        name: this.folderName.trim(),
-        sourcePfs: this.selectedPfs,
+        id: this.id,
+        title: this.title,
+        base_pfs: this.selectedPfs,
+        applies_to: this.applies_to,
       });
     },
   },
