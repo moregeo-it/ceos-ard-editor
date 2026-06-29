@@ -29,7 +29,6 @@
         :indent-lines="true"
         :separate-roots="true"
         density="compact"
-        open-on-click
         item-title="name"
         item-value="path"
         @update:activated="openActivatedFile"
@@ -261,11 +260,16 @@ export default {
     },
 
     async loadFolderOnClick(item) {
-      // Load folder contents when clicking on the folder title (text)
-      // The open-on-click prop handles toggling, we just need to load the files
       const isExpanding = !this.openedFolders.includes(item.path);
-      if (isExpanding) {
+      if (isExpanding && item.type === 'folder') {
         await this.loadFiles(item.path);
+        // Add the folder to openedFolders when clicking on a closed folder
+        if (!this.openedFolders.includes(item.path)) {
+          this.openedFolders = [...this.openedFolders, item.path];
+        }
+      } else {
+        // Remove the folder from openedFolders when clicking on an already opened folder
+        this.openedFolders = this.openedFolders.filter((p) => p !== item.path);
       }
     },
 
