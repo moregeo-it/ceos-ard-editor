@@ -210,6 +210,7 @@
 import { useDebounceFn } from '@vueuse/core';
 import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
+import { usePreviewStore } from '@/stores/preview';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import FileStatusBadge from '../FileStatusBadge.vue';
@@ -263,6 +264,9 @@ export default {
     filesStore() {
       return useFilesStore();
     },
+    previewStore() {
+      return usePreviewStore();
+    },
     notificationsStore() {
       return useNotificationsStore();
     },
@@ -312,6 +316,31 @@ export default {
   methods: {
     isPfsPath(path) {
       return path === '/pfs' || path.startsWith('/pfs/');
+    },
+
+    getPfsFolderId(path) {
+      if (typeof path !== 'string') {
+        return null;
+      }
+
+      const parts = path.split('/').filter(Boolean);
+      if (parts.length !== 2 || parts[0] !== 'pfs') {
+        return null;
+      }
+
+      return parts[1];
+    },
+
+    isSelectedPfsFolder(path) {
+      const pfsId = this.getPfsFolderId(path);
+      if (!pfsId) {
+        return false;
+      }
+
+      return (
+        Array.isArray(this.previewStore.selectedPfs) &&
+        this.previewStore.selectedPfs.includes(pfsId)
+      );
     },
 
     isPfsRootFolder(item) {
@@ -524,6 +553,13 @@ export default {
     },
 
     requestDelete(item) {
+      if (item.type === 'folder' && this.isSelectedPfsFolder(item.path)) {
+        this.notificationsStore.warning(
+          "You can't delete a selected PFS. Deselect it before deleting.",
+        );
+        return;
+      }
+
       this.$root.openDialog('DeleteFileDialog', {
         name: item.name,
         type: item.type,
