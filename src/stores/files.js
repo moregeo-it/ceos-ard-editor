@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
 
-import { usePreviewStore } from './preview';
 import { useWorkspacesStore } from './workspaces';
 
 import fileService from '@/services/file.service';
@@ -8,26 +7,6 @@ import fileService from '@/services/file.service';
 const getWorkspaceId = () => {
   const workspaces = useWorkspacesStore();
   return workspaces.currentWorkspace?.id;
-};
-
-const generatePreview = async () => {
-  const previewStore = usePreviewStore();
-  // Trigger preview regeneration, but don't await it to avoid UI delays
-  // and we also don't want to fail on preview errors here
-  await previewStore.generatePreview();
-};
-
-const refreshPreviewOptions = async (filePath) => {
-  if (filePath && !filePath.startsWith('/pfs/')) {
-    return; // Only refresh preview options if a pfs file was changed
-  }
-
-  const workspaces = useWorkspacesStore();
-  const workspaceId = workspaces.currentWorkspace?.id;
-
-  if (workspaceId) {
-    await workspaces.fetchWorkspacePfs(workspaceId);
-  }
 };
 
 const getDefaults = () => ({
@@ -186,8 +165,6 @@ export const useFilesStore = defineStore('files', {
      */
     async createFile(path, name, type) {
       const fileData = await fileService.createFile(getWorkspaceId(), path, name, type);
-      // todo: migrate to an event listener system
-      generatePreview();
       this.updateFile(fileData);
       return fileData;
     },
@@ -211,9 +188,6 @@ export const useFilesStore = defineStore('files', {
       );
       this.updateFile(savedFileData);
 
-      // todo: migrate to an event listener system
-      refreshPreviewOptions();
-
       return savedFileData;
     },
 
@@ -222,10 +196,6 @@ export const useFilesStore = defineStore('files', {
      */
     async renameFile(filePath, newName) {
       const fileData = await fileService.renameFile(getWorkspaceId(), filePath, newName);
-      // todo: migrate to an event listener system
-      generatePreview();
-      // todo: migrate to an event listener system
-      refreshPreviewOptions(filePath);
       this.deleteFileFromStore(filePath);
       this.updateFile(fileData);
       return fileData;
@@ -236,10 +206,6 @@ export const useFilesStore = defineStore('files', {
      */
     async deleteFile(filePath) {
       const fileData = await fileService.deleteFile(getWorkspaceId(), filePath);
-      // todo: migrate to an event listener system
-      generatePreview();
-      // todo: migrate to an event listener system
-      refreshPreviewOptions(filePath);
       if (fileData && fileData.path) {
         this.updateFile(fileData);
       } else {
@@ -257,8 +223,6 @@ export const useFilesStore = defineStore('files', {
      */
     async save(filePath, content) {
       const fileData = await fileService.saveFile(getWorkspaceId(), filePath, content);
-      // todo: migrate to an event listener system
-      generatePreview();
       this.updateFile(fileData);
     },
 
@@ -267,8 +231,6 @@ export const useFilesStore = defineStore('files', {
      */
     async revertFile(filePath) {
       const fileData = await fileService.revertFile(getWorkspaceId(), filePath);
-      // todo: migrate to an event listener system
-      generatePreview();
       if (filePath !== fileData.path) {
         this.deleteFileFromStore(filePath);
       }
