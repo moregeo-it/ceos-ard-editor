@@ -109,7 +109,7 @@ export default {
   methods: {
     handleCreate() {
       if (!this.isValid) {
-        throw new Error('Please resolve the validation errors before submitting.');
+        return;
       }
 
       this.accept({
