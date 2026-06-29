@@ -189,6 +189,9 @@ export default {
       // Fix relative URLs in the iframe content
       this.enhanceHtml(doc);
     },
+    isAbsoluteUrl(url) {
+      return URL.parse(url) !== null;
+    },
     enhanceHtml(doc) {
       const token = this.authStore.accessToken;
 
@@ -208,7 +211,7 @@ export default {
       const images = doc.querySelectorAll('img[src]');
       images.forEach((img) => {
         const src = img.getAttribute('src');
-        if (src && !/^(https?:)?\/\//i.test(src)) {
+        if (src && !this.isAbsoluteUrl(src)) {
           img.setAttribute(
             'src',
             `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${src}?authorization=${token}`,
@@ -220,7 +223,7 @@ export default {
       const stylesheets = doc.querySelectorAll('link[rel="stylesheet"]');
       stylesheets.forEach((sheet) => {
         const href = sheet.getAttribute('href');
-        if (href && !/^(https?:)?\/\//i.test(href)) {
+        if (href && !this.isAbsoluteUrl(href)) {
           sheet.setAttribute(
             'href',
             `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${href}?authorization=${token}`,
