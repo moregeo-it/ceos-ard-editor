@@ -42,6 +42,8 @@
           :key="file.path"
           :value="file.path"
           class="fill-height"
+          :transition="false"
+          :reverse-transition="false"
         >
           <v-container
             v-if="editorStore.data[file.path] === undefined"
