@@ -18,58 +18,20 @@
 
     <!-- File Tree -->
     <div class="flex-grow-1 overflow-hidden pa-0 fill-height">
-      <v-treeview
-        ref="treeview"
+      <FileTree
+        ref="fileTree"
         v-if="treeItems.length > 0"
         v-model:opened="openedFolders"
         v-model:activated="activatedItems"
-        class="fill-height"
-        activatable
         :items="treeItems"
-        :indent-lines="true"
-        :separate-roots="true"
-        density="compact"
-        open-on-click
-        item-title="name"
-        item-value="path"
+        :loading-paths="filesStore.isPathLoading"
         @update:activated="openActivatedFile"
+        @folder-expand="onFolderExpand"
       >
-        <template v-slot:prepend="{ item }">
-          <v-icon :icon="getFileIcon(item)" size="small" :color="getIconColor(item)" />
-        </template>
-
-        <template v-slot:toggle="{ props, item }">
-          <VBtn
-            key="prepend-toggle"
-            density="compact"
-            :icon="props.toggleIcon"
-            :loading="filesStore.isPathLoading.includes(item.path)"
-            variant="text"
-            @click="expandFolder($event, props, item)"
-          >
-            <template v-slot:loader>
-              <VProgressCircular indeterminate="disable-shrink" size="20" width="2" />
-            </template>
-          </VBtn>
-        </template>
-
-        <template v-slot:title="{ item }">
-          <div
-            class="file-item d-flex align-center justify-space-between"
-            @click="item.type === 'folder' && loadFolderOnClick(item)"
-          >
-            <span class="file-name">{{ item.name }}</span>
-            <FileStatusBadge v-if="item.status" :status="item.status" class="ml-2" />
-          </div>
-          <div class="text-caption text-pre-wrap text-subtle">
-            {{ item.excerpt }}
-          </div>
-        </template>
-
-        <template v-slot:append="{ item }">
+        <template #append="{ item }">
           <FileContextMenu :item="item" />
         </template>
-      </v-treeview>
+      </FileTree>
 
       <div v-else-if="filesStore.isPathLoading.includes('/')" class="text-center pa-4">
         <v-progress-circular indeterminate color="primary" />
@@ -88,29 +50,22 @@ import { useDebounceFn } from '@vueuse/core';
 import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
-import FileStatusBadge from '../FileStatusBadge.vue';
 import FileContextMenu from './FileContextMenu.vue';
-import {
-  mdiFileDocumentOutline,
-  mdiFolderOutline,
-  mdiFolderOpenOutline,
-  mdiMagnify,
-} from '@mdi/js';
+import FileTree from './FileTree.vue';
+import { mdiFolderOutline, mdiMagnify } from '@mdi/js';
 
 export default {
   name: 'FilesPane',
 
   components: {
-    FileStatusBadge,
     FileContextMenu,
+    FileTree,
   },
 
   data() {
     return {
       icons: {
-        file: mdiFileDocumentOutline,
         folder: mdiFolderOutline,
-        folderOpen: mdiFolderOpenOutline,
         search: mdiMagnify,
       },
       debouncedSearch: null,
@@ -168,21 +123,8 @@ export default {
   },
 
   methods: {
-    async expandFolder(event, props, item) {
-      const isExpanding = !this.openedFolders.includes(item.path);
-      props.onClick(event);
-      if (isExpanding && item.type === 'folder') {
-        await this.loadFiles(item.path);
-      }
-    },
-
-    async loadFolderOnClick(item) {
-      // Load folder contents when clicking on the folder title (text)
-      // The open-on-click prop handles toggling, we just need to load the files
-      const isExpanding = !this.openedFolders.includes(item.path);
-      if (isExpanding) {
-        await this.loadFiles(item.path);
-      }
+    async onFolderExpand(item) {
+      await this.loadFiles(item.path);
     },
 
     async loadFiles(path = '/') {
@@ -229,22 +171,10 @@ export default {
     },
 
     /**
-     * Scroll the currently activated item in the treeview into view
+     * Scroll the currently activated item into view
      */
     async scrollToActivatedItem() {
-      const treeview = this.$refs.treeview;
-      if (!treeview?.$el) {
-        return;
-      }
-
-      const activatedElement = treeview.$el.querySelector(
-        '.v-treeview-item--activated, .v-list-item--active',
-      );
-      if (activatedElement) {
-        activatedElement.scrollIntoView({
-          behavior: 'smooth',
-        });
-      }
+      this.$refs.fileTree?.scrollToActivated();
     },
 
     openActivatedFile(activated) {
@@ -277,37 +207,11 @@ export default {
       this.filesStore.searchQuery = '';
       this.filesStore.searchResults = null;
     },
-
-    getFileIcon(item) {
-      if (item.type === 'folder') {
-        return this.openedFolders.includes(item.path) ? this.icons.folderOpen : this.icons.folder;
-      }
-      return this.icons.file;
-    },
-
-    getIconColor(item) {
-      if (item.status === 'added') return 'green';
-      else if (item.status === 'modified') return 'warning';
-      else if (item.status === 'renamed') return 'blue';
-      else if (item.status === 'deleted') return 'red';
-      return undefined;
-    },
   },
 };
 </script>
 
 <style scoped>
-.file-item {
-  user-select: none;
-}
-
-.file-name {
-  flex-grow: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .empty-state {
   display: flex;
   flex-direction: column;
