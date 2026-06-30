@@ -1,25 +1,16 @@
 <template>
   <div class="d-flex flex-column fill-height">
     <div v-if="pfsOptions.length > 0" class="pa-2 pt-3 d-flex align-center border-b-sm">
-      <v-select
+      <PfsSelect
         v-model="selectedPfs"
         :items="pfsOptions"
         label="Select PFS for Preview"
         multiple
         chips
-        density="compact"
-        variant="outlined"
         hide-details
         class="preview-select mr-2 flex-grow-1"
-        :prepend-inner-icon="icons.product"
         @update:focused="handleSelect"
-      >
-        <template v-slot:chip="{ item, props }">
-          <v-chip v-bind="props" size="small">
-            {{ item.title }}
-          </v-chip>
-        </template>
-      </v-select>
+      />
       <v-btn
         color="primary"
         class="ml-2"
@@ -64,7 +55,7 @@
           frameborder="0"
           width="100%"
           height="100%"
-          sandbox="allow-same-origin"
+          sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         ></iframe>
       </div>
     </div>
@@ -77,14 +68,18 @@ import { useEditorStore } from '@/stores/editor';
 import { usePreviewStore } from '@/stores/preview';
 import previewService from '@/services/preview.service';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import { mdiFileDocumentOutline, mdiDownload } from '@mdi/js';
+import { mdiDownload } from '@mdi/js';
 import { useNotificationsStore } from '@/stores/notifications';
 import { downloadBlob } from '@/utils/api';
+import PfsSelect from '@/components/PfsSelect.vue';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export default {
   name: 'PreviewPane',
+  components: {
+    PfsSelect,
+  },
   data() {
     return {
       isDownloading: {
@@ -93,7 +88,6 @@ export default {
       },
       icons: {
         download: mdiDownload,
-        product: mdiFileDocumentOutline,
       },
     };
   },
@@ -117,7 +111,7 @@ export default {
       return this.workspacesStore?.currentWorkspace;
     },
     pfsOptions() {
-      return this.workspacesStore?.pfsOptions || [];
+      return this.workspacesStore?.workspacePfsOptions || [];
     },
     selectedPfs: {
       get() {
@@ -138,8 +132,8 @@ export default {
     if (this.selectedPfs === null) {
       this.selectedPfs = this.currentWorkspace.pfs || [];
     }
-    if (this.pfsOptions.length === 0) {
-      await this.workspacesStore.fetchPfs();
+    if (this.workspaceId) {
+      await this.workspacesStore.fetchPfs(this.workspaceId);
     }
   },
   async mounted() {
@@ -195,18 +189,21 @@ export default {
       // Fix relative URLs in the iframe content
       this.enhanceHtml(doc);
     },
+    isAbsoluteUrl(url) {
+      return URL.parse(url) !== null;
+    },
     enhanceHtml(doc) {
       const token = this.authStore.accessToken;
 
-      // Fix relative links
+      // Fix relative links and target
       const links = doc.querySelectorAll('a[href]');
       links.forEach((link) => {
         const href = link.getAttribute('href');
-        if (href && !href.startsWith('http') && !href.startsWith('#')) {
-          link.setAttribute(
-            'href',
-            `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${href}?authorization=${token}`,
-          );
+        const url = URL.parse(href);
+        if (url !== null) {
+          // Valid absolute URL (or mailto: link for example)
+          link.setAttribute('target', '_blank');
+          link.setAttribute('rel', 'noopener noreferrer');
         }
       });
 
@@ -214,7 +211,7 @@ export default {
       const images = doc.querySelectorAll('img[src]');
       images.forEach((img) => {
         const src = img.getAttribute('src');
-        if (src && !src.startsWith('http')) {
+        if (src && !this.isAbsoluteUrl(src)) {
           img.setAttribute(
             'src',
             `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${src}?authorization=${token}`,
@@ -226,7 +223,7 @@ export default {
       const stylesheets = doc.querySelectorAll('link[rel="stylesheet"]');
       stylesheets.forEach((sheet) => {
         const href = sheet.getAttribute('href');
-        if (href && !href.startsWith('http')) {
+        if (href && !this.isAbsoluteUrl(href)) {
           sheet.setAttribute(
             'href',
             `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${href}?authorization=${token}`,

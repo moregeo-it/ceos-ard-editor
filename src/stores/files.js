@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
 
-import { usePreviewStore } from './preview';
 import { useWorkspacesStore } from './workspaces';
 
 import fileService from '@/services/file.service';
@@ -8,13 +7,6 @@ import fileService from '@/services/file.service';
 const getWorkspaceId = () => {
   const workspaces = useWorkspacesStore();
   return workspaces.currentWorkspace?.id;
-};
-
-const generatePreview = () => {
-  const previewStore = usePreviewStore();
-  // Trigger preview regeneration, but don't await it to avoid UI delays
-  // and we also don't want to fail on preview errors here
-  previewStore.generatePreview();
 };
 
 const getDefaults = () => ({
@@ -173,8 +165,18 @@ export const useFilesStore = defineStore('files', {
      */
     async createFile(path, name, type) {
       const fileData = await fileService.createFile(getWorkspaceId(), path, name, type);
-      generatePreview();
       this.updateFile(fileData);
+      return fileData;
+    },
+
+    /**
+     * Create a new pfs folder and document with content of source pfs
+     */
+    async createNewPfs(content) {
+      const fileData = await fileService.createNewPFS(getWorkspaceId(), content);
+
+      this.updateFile(fileData);
+
       return fileData;
     },
 
@@ -183,7 +185,6 @@ export const useFilesStore = defineStore('files', {
      */
     async renameFile(filePath, newName) {
       const fileData = await fileService.renameFile(getWorkspaceId(), filePath, newName);
-      generatePreview();
       this.deleteFileFromStore(filePath);
       this.updateFile(fileData);
       return fileData;
@@ -194,7 +195,6 @@ export const useFilesStore = defineStore('files', {
      */
     async deleteFile(filePath) {
       const fileData = await fileService.deleteFile(getWorkspaceId(), filePath);
-      generatePreview();
       if (fileData && fileData.path) {
         this.updateFile(fileData);
       } else {
@@ -212,7 +212,6 @@ export const useFilesStore = defineStore('files', {
      */
     async save(filePath, content) {
       const fileData = await fileService.saveFile(getWorkspaceId(), filePath, content);
-      generatePreview();
       this.updateFile(fileData);
     },
 
@@ -221,7 +220,6 @@ export const useFilesStore = defineStore('files', {
      */
     async revertFile(filePath) {
       const fileData = await fileService.revertFile(getWorkspaceId(), filePath);
-      generatePreview();
       if (filePath !== fileData.path) {
         this.deleteFileFromStore(filePath);
       }

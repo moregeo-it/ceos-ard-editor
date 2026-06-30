@@ -30,7 +30,13 @@
             please visit the Pull Request on GitHub and change its status there.
           </p>
 
-          <v-btn :href="proposal.url" target="_blank" color="primary" class="ma-2">
+          <v-btn
+            :href="proposal.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            color="primary"
+            class="ma-2"
+          >
             View Pull Request on GitHub
           </v-btn>
           <v-btn
@@ -53,7 +59,13 @@
             reasons for rejection.
           </p>
 
-          <v-btn :href="proposal.url" target="_blank" color="primary" class="ma-2">
+          <v-btn
+            :href="proposal.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            color="primary"
+            class="ma-2"
+          >
             View Pull Request on GitHub
           </v-btn>
           <v-btn
@@ -71,7 +83,13 @@
             the CEOS-ARD community. Thank you for your contribution!
           </p>
 
-          <v-btn :href="proposal.url" target="_blank" color="primary" class="ma-2">
+          <v-btn
+            :href="proposal.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            color="primary"
+            class="ma-2"
+          >
             View Pull Request on GitHub
           </v-btn>
         </template>

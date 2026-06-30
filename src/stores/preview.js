@@ -85,3 +85,60 @@ export const usePreviewStore = defineStore('preview', {
     },
   },
 });
+
+export function filesPreviewSyncPlugin({ store }) {
+  if (store.$id !== 'files') {
+    return;
+  }
+
+  store.$onAction(({ name, args, after }) => {
+    const preview = usePreviewStore();
+    after(async () => {
+      // Regenerate preview
+      switch (name) {
+        case 'createFile':
+        case 'renameFile':
+        case 'deleteFile':
+        case 'save':
+        case 'revertFile': {
+          try {
+            await preview.generatePreview();
+          } catch (error) {
+            useNotificationsStore().error(
+              'Updating preview after file operation failed: ' + error.message,
+            );
+          }
+          break;
+        }
+      }
+
+      // Refresh preview options
+      switch (name) {
+        case 'createNewPfs':
+        case 'renameFile':
+        case 'deleteFile':
+        case 'revertFile': {
+          try {
+            if (name !== 'createNewPfs') {
+              const [filePath] = args;
+              if (filePath && !filePath.startsWith('/pfs/')) {
+                break; // Only refresh preview options if a pfs file was changed
+              }
+            }
+
+            const workspaces = useWorkspacesStore();
+            const workspaceId = workspaces.currentWorkspace?.id;
+            if (workspaceId) {
+              await workspaces.fetchPfs(workspaceId);
+            }
+          } catch (error) {
+            useNotificationsStore().error(
+              'Updating preview options after file operation failed: ' + error.message,
+            );
+          }
+          break;
+        }
+      }
+    });
+  });
+}

@@ -67,12 +67,70 @@
         </template>
 
         <template v-slot:append="{ item }">
-          <v-menu location="end">
+          <v-menu v-if="shouldShowMenu(item)" location="end">
             <template v-slot:activator="{ props }">
               <v-btn v-bind="props" :icon="icons.menu" size="x-small" variant="text" @click.stop />
             </template>
             <v-list density="compact">
-              <template v-if="item.type === 'file'">
+              <template v-if="isPfsRootFolder(item)">
+                <v-list-item @click="requestNewPfs">
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.add" size="small" />
+                  </template>
+                  <v-list-item-title>Add New PFS</v-list-item-title>
+                </v-list-item>
+              </template>
+
+              <template v-else-if="isNewPfsFolder(item)">
+                <v-list-item @click="requestRename(item)">
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.rename" size="small" />
+                  </template>
+                  <v-list-item-title>Rename</v-list-item-title>
+                </v-list-item>
+
+                <v-list-item @click="requestDelete(item)">
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.delete" size="small" color="error" />
+                  </template>
+                  <v-list-item-title class="text-error">Delete</v-list-item-title>
+                </v-list-item>
+              </template>
+
+              <template v-else-if="isPfsFile(item)">
+                <v-list-item @click="openFile(item.path, true)">
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.codeeditor" size="small" />
+                  </template>
+                  <v-list-item-title>Open in Source Code Editor</v-list-item-title>
+                </v-list-item>
+
+                <v-list-item @click="handleDownload(item)">
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.download" size="small" />
+                  </template>
+                  <v-list-item-title>Download</v-list-item-title>
+                </v-list-item>
+
+                <v-list-item
+                  v-if="item.status === 'modified' || item.status === 'added'"
+                  @click="requestDiff(item)"
+                >
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.diff" size="small" />
+                  </template>
+                  <v-list-item-title>Show Changes</v-list-item-title>
+                </v-list-item>
+
+                <v-list-item v-if="item.status === 'modified'" @click="handleRevert(item)">
+                  <template v-slot:prepend>
+                    <v-icon :icon="icons.revert" size="small" />
+                  </template>
+                  <v-list-item-title>Revert</v-list-item-title>
+                </v-list-item>
+              </template>
+
+              <template v-else-if="item.type === 'file'">
                 <v-list-item v-if="item.status !== 'deleted'" @click="openFile(item.path, true)">
                   <template v-slot:prepend>
                     <v-icon :icon="icons.codeeditor" size="small" />
@@ -116,7 +174,7 @@
                 </v-list-item>
               </template>
 
-              <template v-if="item.status !== 'deleted'">
+              <template v-if="item.status !== 'deleted' && !isPfsItem(item)">
                 <v-list-item @click="requestRename(item)">
                   <template v-slot:prepend>
                     <v-icon :icon="icons.rename" size="small" />
@@ -152,6 +210,7 @@
 import { useDebounceFn } from '@vueuse/core';
 import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
+import { usePreviewStore } from '@/stores/preview';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import FileStatusBadge from '../FileStatusBadge.vue';
@@ -205,6 +264,9 @@ export default {
     filesStore() {
       return useFilesStore();
     },
+    previewStore() {
+      return usePreviewStore();
+    },
     notificationsStore() {
       return useNotificationsStore();
     },
@@ -252,6 +314,79 @@ export default {
   },
 
   methods: {
+    // Check if the given path is a PFS path (e.g., /pfs or /pfs/<id>)
+    isPfsPath(path) {
+      return path === '/pfs' || path.startsWith('/pfs/');
+    },
+
+    getPfsFolderId(path) {
+      if (typeof path !== 'string') {
+        return null;
+      }
+
+      const parts = path.split('/').filter(Boolean);
+      if (parts.length !== 2 || parts[0] !== 'pfs') {
+        return null;
+      }
+
+      return parts[1];
+    },
+
+    isSelectedPfsFolder(path) {
+      const pfsId = this.getPfsFolderId(path);
+      if (!pfsId) {
+        return false;
+      }
+
+      return (
+        Array.isArray(this.previewStore.selectedPfs) &&
+        this.previewStore.selectedPfs.includes(pfsId)
+      );
+    },
+
+    isPfsRootFolder(item) {
+      return item.type === 'folder' && item.path === '/pfs';
+    },
+
+    // Check if the item is a PFS folder (e.g., /pfs/<id>)
+    isPfsFolder(item) {
+      return item.type === 'folder' && item.path.startsWith('/pfs/') && item.path !== '/pfs';
+    },
+
+    isNewPfsFolder(item) {
+      if (!this.isPfsFolder(item)) {
+        return false;
+      }
+
+      const documentPath = `${item.path}/document.yaml`;
+      if (this.filesStore.all[documentPath]?.status === 'added') {
+        return true;
+      }
+
+      const documentFile = item.children?.find((child) => child.path === documentPath);
+      return documentFile?.status === 'added';
+    },
+
+    shouldShowMenu(item) {
+      if (this.isPfsRootFolder(item)) {
+        return true;
+      }
+
+      if (this.isPfsFolder(item)) {
+        return this.isNewPfsFolder(item);
+      }
+
+      return true;
+    },
+
+    isPfsFile(item) {
+      return item.type === 'file' && this.isPfsPath(item.path);
+    },
+
+    isPfsItem(item) {
+      return this.isPfsPath(item.path);
+    },
+
     async expandFolder(event, props, item) {
       const isExpanding = !this.openedFolders.includes(item.path);
       props.onClick(event);
@@ -388,11 +523,22 @@ export default {
       });
     },
 
+    requestNewPfs() {
+      this.$root.openDialog('CreatePfsDialog', {
+        onAcceptance: this.handleCreatePfs,
+      });
+    },
+
     async handleCreate({ type, path, name }) {
       await this.filesStore.createFile(path, name, type);
       this.notificationsStore.success(
         `${type === 'folder' ? 'Folder' : 'File'} created successfully`,
       );
+    },
+
+    async handleCreatePfs(pfsContent) {
+      await this.filesStore.createNewPfs(pfsContent);
+      this.notificationsStore.success('PFS created successfully');
     },
 
     requestRename(source) {
@@ -409,6 +555,13 @@ export default {
     },
 
     requestDelete(item) {
+      if (item.type === 'folder' && this.isSelectedPfsFolder(item.path)) {
+        this.notificationsStore.warning(
+          "You can't delete a PFS that is selected for preview. Deselect it before deleting.",
+        );
+        return;
+      }
+
       this.$root.openDialog('DeleteFileDialog', {
         name: item.name,
         type: item.type,

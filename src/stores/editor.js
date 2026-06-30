@@ -79,6 +79,7 @@ export const useEditorStore = defineStore('editor', {
           // Trigger preview regeneration, but don't await it to avoid UI delays
           // and we also don't want to fail on preview errors here
           const previewStore = usePreviewStore();
+          // todo: migrate to an event listener system
           previewStore.generatePreview();
         }
         this.original[path] = data;
@@ -97,6 +98,7 @@ export const useEditorStore = defineStore('editor', {
         // Trigger preview regeneration if at least one file was saved successfully
         // Don't await it to avoid UI delays and we also don't want to fail on preview errors here.
         const previewStore = usePreviewStore();
+        // todo: migrate to an event listener system
         previewStore.generatePreview();
       }
       return results;
@@ -228,6 +230,11 @@ export function filesEditorSyncPlugin({ store }) {
       try {
         switch (name) {
           case 'createFile': {
+            await editor.onFileCreated(result);
+            break;
+          }
+
+          case 'createNewPfs': {
             await editor.onFileCreated(result);
             break;
           }
