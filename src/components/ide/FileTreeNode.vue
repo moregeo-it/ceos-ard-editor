@@ -15,7 +15,11 @@
         'file-tree-row--folder': item.type === 'folder',
       }"
       :style="{ paddingLeft: depth * 1.5 + 0.25 + 'rem' }"
+      role="button"
+      tabindex="0"
       @click="handleClick"
+      @keydown.enter.prevent="handleClick"
+      @keydown.space.prevent="handleClick"
     >
       <!-- Toggle button (folders only) -->
       <div class="file-tree-toggle" v-if="item.type === 'folder'">
@@ -25,6 +29,7 @@
           :loading="isLoading"
           variant="text"
           size="small"
+          tabindex="-1"
           @click.stop="handleToggle"
         >
           <template v-slot:loader>
