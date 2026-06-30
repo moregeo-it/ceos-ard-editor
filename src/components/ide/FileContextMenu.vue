@@ -1,7 +1,15 @@
 <template>
   <v-menu v-if="shouldShowMenu" location="end">
     <template v-slot:activator="{ props }">
-      <v-btn v-bind="props" :icon="icons.menu" size="x-small" variant="text" @click.stop />
+      <v-btn
+        v-bind="props"
+        :icon="icons.menu"
+        size="x-small"
+        variant="text"
+        @click.stop
+        @keydown.enter.stop
+        @keydown.space.stop
+      />
     </template>
     <v-list density="compact">
       <template v-if="isPfsRootFolder">
