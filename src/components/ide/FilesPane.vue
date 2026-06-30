@@ -67,130 +67,7 @@
         </template>
 
         <template v-slot:append="{ item }">
-          <v-menu v-if="shouldShowMenu(item)" location="end">
-            <template v-slot:activator="{ props }">
-              <v-btn v-bind="props" :icon="icons.menu" size="x-small" variant="text" @click.stop />
-            </template>
-            <v-list density="compact">
-              <template v-if="isPfsRootFolder(item)">
-                <v-list-item @click="requestNewPfs">
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.add" size="small" />
-                  </template>
-                  <v-list-item-title>Add New PFS</v-list-item-title>
-                </v-list-item>
-              </template>
-
-              <template v-else-if="isNewPfsFolder(item)">
-                <v-list-item @click="requestRename(item)">
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.rename" size="small" />
-                  </template>
-                  <v-list-item-title>Rename</v-list-item-title>
-                </v-list-item>
-
-                <v-list-item @click="requestDelete(item)">
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.delete" size="small" color="error" />
-                  </template>
-                  <v-list-item-title class="text-error">Delete</v-list-item-title>
-                </v-list-item>
-              </template>
-
-              <template v-else-if="isPfsFile(item)">
-                <v-list-item @click="openFile(item.path, true)">
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.codeeditor" size="small" />
-                  </template>
-                  <v-list-item-title>Open in Source Code Editor</v-list-item-title>
-                </v-list-item>
-
-                <v-list-item @click="handleDownload(item)">
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.download" size="small" />
-                  </template>
-                  <v-list-item-title>Download</v-list-item-title>
-                </v-list-item>
-
-                <v-list-item
-                  v-if="item.status === 'modified' || item.status === 'added'"
-                  @click="requestDiff(item)"
-                >
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.diff" size="small" />
-                  </template>
-                  <v-list-item-title>Show Changes</v-list-item-title>
-                </v-list-item>
-
-                <v-list-item v-if="item.status === 'modified'" @click="handleRevert(item)">
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.revert" size="small" />
-                  </template>
-                  <v-list-item-title>Revert</v-list-item-title>
-                </v-list-item>
-              </template>
-
-              <template v-else-if="item.type === 'file'">
-                <v-list-item v-if="item.status !== 'deleted'" @click="openFile(item.path, true)">
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.codeeditor" size="small" />
-                  </template>
-                  <v-list-item-title>Open in Source Code Editor</v-list-item-title>
-                </v-list-item>
-
-                <v-list-item
-                  v-if="item.status && !['added', 'deleted'].includes(item.status)"
-                  @click="requestDiff(item)"
-                >
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.diff" size="small" />
-                  </template>
-                  <v-list-item-title>Show Changes</v-list-item-title>
-                </v-list-item>
-
-                <v-list-item v-if="item.status !== 'deleted'" @click="handleDownload(item)">
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.download" size="small" />
-                  </template>
-                  <v-list-item-title>Download</v-list-item-title>
-                </v-list-item>
-
-                <v-list-item
-                  v-if="item.status && item.status !== 'added'"
-                  @click="handleRevert(item)"
-                >
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.revert" size="small" />
-                  </template>
-                  <v-list-item-title>Revert</v-list-item-title>
-                </v-list-item>
-              </template>
-              <template v-else>
-                <v-list-item @click="requestNewFile(item)">
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.add" size="small" />
-                  </template>
-                  <v-list-item-title>Create</v-list-item-title>
-                </v-list-item>
-              </template>
-
-              <template v-if="item.status !== 'deleted' && !isPfsItem(item)">
-                <v-list-item @click="requestRename(item)">
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.rename" size="small" />
-                  </template>
-                  <v-list-item-title>Rename</v-list-item-title>
-                </v-list-item>
-
-                <v-list-item @click="requestDelete(item)">
-                  <template v-slot:prepend>
-                    <v-icon :icon="icons.delete" size="small" color="error" />
-                  </template>
-                  <v-list-item-title class="text-error">Delete</v-list-item-title>
-                </v-list-item>
-              </template>
-            </v-list>
-          </v-menu>
+          <FileContextMenu :item="item" />
         </template>
       </v-treeview>
 
@@ -210,48 +87,31 @@
 import { useDebounceFn } from '@vueuse/core';
 import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
-import { usePreviewStore } from '@/stores/preview';
 import { useNotificationsStore } from '@/stores/notifications';
-import { useWorkspacesStore } from '@/stores/workspaces';
 import FileStatusBadge from '../FileStatusBadge.vue';
+import FileContextMenu from './FileContextMenu.vue';
 import {
-  mdiFileCompare,
   mdiFileDocumentOutline,
   mdiFolderOutline,
   mdiFolderOpenOutline,
   mdiMagnify,
-  mdiPlus,
-  mdiDotsVertical,
-  mdiPencilOutline,
-  mdiDeleteOutline,
-  mdiUndoVariant,
-  mdiDownload,
-  mdiCodeJson,
 } from '@mdi/js';
-import { downloadBlob } from '@/utils/api';
 
 export default {
   name: 'FilesPane',
 
   components: {
     FileStatusBadge,
+    FileContextMenu,
   },
 
   data() {
     return {
       icons: {
-        diff: mdiFileCompare,
         file: mdiFileDocumentOutline,
         folder: mdiFolderOutline,
         folderOpen: mdiFolderOpenOutline,
         search: mdiMagnify,
-        add: mdiPlus,
-        menu: mdiDotsVertical,
-        rename: mdiPencilOutline,
-        delete: mdiDeleteOutline,
-        revert: mdiUndoVariant,
-        download: mdiDownload,
-        codeeditor: mdiCodeJson,
       },
       debouncedSearch: null,
     };
@@ -264,14 +124,8 @@ export default {
     filesStore() {
       return useFilesStore();
     },
-    previewStore() {
-      return usePreviewStore();
-    },
     notificationsStore() {
       return useNotificationsStore();
-    },
-    workspacesStore() {
-      return useWorkspacesStore();
     },
     treeItems() {
       return this.filesStore.searchResults ?? this.filesStore.fileTree;
@@ -314,79 +168,6 @@ export default {
   },
 
   methods: {
-    // Check if the given path is a PFS path (e.g., /pfs or /pfs/<id>)
-    isPfsPath(path) {
-      return path === '/pfs' || path.startsWith('/pfs/');
-    },
-
-    getPfsFolderId(path) {
-      if (typeof path !== 'string') {
-        return null;
-      }
-
-      const parts = path.split('/').filter(Boolean);
-      if (parts.length !== 2 || parts[0] !== 'pfs') {
-        return null;
-      }
-
-      return parts[1];
-    },
-
-    isSelectedPfsFolder(path) {
-      const pfsId = this.getPfsFolderId(path);
-      if (!pfsId) {
-        return false;
-      }
-
-      return (
-        Array.isArray(this.previewStore.selectedPfs) &&
-        this.previewStore.selectedPfs.includes(pfsId)
-      );
-    },
-
-    isPfsRootFolder(item) {
-      return item.type === 'folder' && item.path === '/pfs';
-    },
-
-    // Check if the item is a PFS folder (e.g., /pfs/<id>)
-    isPfsFolder(item) {
-      return item.type === 'folder' && item.path.startsWith('/pfs/') && item.path !== '/pfs';
-    },
-
-    isNewPfsFolder(item) {
-      if (!this.isPfsFolder(item)) {
-        return false;
-      }
-
-      const documentPath = `${item.path}/document.yaml`;
-      if (this.filesStore.all[documentPath]?.status === 'added') {
-        return true;
-      }
-
-      const documentFile = item.children?.find((child) => child.path === documentPath);
-      return documentFile?.status === 'added';
-    },
-
-    shouldShowMenu(item) {
-      if (this.isPfsRootFolder(item)) {
-        return true;
-      }
-
-      if (this.isPfsFolder(item)) {
-        return this.isNewPfsFolder(item);
-      }
-
-      return true;
-    },
-
-    isPfsFile(item) {
-      return item.type === 'file' && this.isPfsPath(item.path);
-    },
-
-    isPfsItem(item) {
-      return this.isPfsPath(item.path);
-    },
-
     async expandFolder(event, props, item) {
       const isExpanding = !this.openedFolders.includes(item.path);
       props.onClick(event);
@@ -510,87 +291,6 @@ export default {
       else if (item.status === 'renamed') return 'blue';
       else if (item.status === 'deleted') return 'red';
       return undefined;
-    },
-
-    requestDiff(item) {
-      this.$root.openDialog('DiffDialog', { item });
-    },
-
-    requestNewFile(item) {
-      this.$root.openDialog('CreateFileDialog', {
-        initialPath: item.path,
-        onAcceptance: this.handleCreate,
-      });
-    },
-
-    requestNewPfs() {
-      this.$root.openDialog('CreatePfsDialog', {
-        onAcceptance: this.handleCreatePfs,
-      });
-    },
-
-    async handleCreate({ type, path, name }) {
-      await this.filesStore.createFile(path, name, type);
-      this.notificationsStore.success(
-        `${type === 'folder' ? 'Folder' : 'File'} created successfully`,
-      );
-    },
-
-    async handleCreatePfs(pfsContent) {
-      await this.filesStore.createNewPfs(pfsContent);
-      this.notificationsStore.success('PFS created successfully');
-    },
-
-    requestRename(source) {
-      this.$root.openDialog('RenameFileDialog', {
-        currentName: source.name,
-        itemType: source.type,
-        onAcceptance: async (target) => this.handleRename(source, target),
-      });
-    },
-
-    async handleRename(source, target) {
-      await this.filesStore.renameFile(source.path, target);
-      this.notificationsStore.success('Renamed successfully');
-    },
-
-    requestDelete(item) {
-      if (item.type === 'folder' && this.isSelectedPfsFolder(item.path)) {
-        this.notificationsStore.warning(
-          "You can't delete a PFS that is selected for preview. Deselect it before deleting.",
-        );
-        return;
-      }
-
-      this.$root.openDialog('DeleteFileDialog', {
-        name: item.name,
-        type: item.type,
-        onAcceptance: async () => await this.handleDelete(item),
-      });
-    },
-
-    async handleDelete(item) {
-      await this.filesStore.deleteFile(item.path);
-      this.notificationsStore.success('Deleted successfully');
-    },
-
-    async handleRevert(item) {
-      try {
-        await this.filesStore.revertFile(item.path);
-        await this.editorStore.sync(item.path);
-        this.notificationsStore.success('File reverted successfully');
-      } catch (error) {
-        this.notificationsStore.error(`Failed to revert: ${error.message}`);
-      }
-    },
-
-    async handleDownload(item) {
-      try {
-        const data = await this.filesStore.load(item.path);
-        downloadBlob(data, item.name);
-      } catch (error) {
-        this.notificationsStore.error(`Failed to start download: ${error.message}`);
-      }
     },
   },
 };
