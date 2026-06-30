@@ -24,6 +24,9 @@ export const useEditorStore = defineStore('editor', {
 
   actions: {
     async show(path, forceSourceCodeEditor = false) {
+      if (typeof path !== 'string' || path.length === 0) {
+        return;
+      }
       const files = useFilesStore();
       if (!path.startsWith('/')) {
         console.warn('File path should start with /. Prepending it automatically.');

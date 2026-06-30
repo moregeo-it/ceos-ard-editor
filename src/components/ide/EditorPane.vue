@@ -36,12 +36,14 @@
         </v-tab>
       </v-tabs>
 
-      <v-tabs-window v-model="model" crossfade class="editor-content flex-grow-1">
+      <v-tabs-window v-model="model" class="editor-content flex-grow-1">
         <v-tabs-window-item
           v-for="file in openedFiles"
           :key="file.path"
           :value="file.path"
           class="fill-height"
+          :transition="false"
+          :reverse-transition="false"
         >
           <v-container
             v-if="editorStore.data[file.path] === undefined"
@@ -163,9 +165,12 @@ export default {
     },
     model: {
       get() {
-        return this.editorStore.active.path;
+        return this.editorStore.active?.path ?? null;
       },
       set(value) {
+        if (typeof value !== 'string' || value.length === 0) {
+          return;
+        }
         this.editorStore.show(value);
       },
     },
