@@ -1,5 +1,13 @@
 <template>
-  <div class="file-tree-node">
+  <div
+    class="file-tree-node"
+    :class="{
+      'file-tree-node--child': depth > 0,
+      'file-tree-node--last': isLast,
+      'file-tree-node--folder': item.type === 'folder',
+    }"
+    :style="depth > 0 ? { '--connector-left': (depth - 1) * 1.5 + 1.25 + 'rem' } : undefined"
+  >
     <div
       class="file-tree-row d-flex align-center"
       :class="{
@@ -9,14 +17,6 @@
       :style="{ paddingLeft: depth * 1.5 + 0.25 + 'rem' }"
       @click="handleClick"
     >
-      <!-- Indent lines -->
-      <div
-        v-for="level in depth"
-        :key="level"
-        class="file-tree-indent-line"
-        :style="{ left: (level - 1) * 1.5 + 1 + 'rem' }"
-      />
-
       <!-- Toggle button (folders only) -->
       <div class="file-tree-toggle" v-if="item.type === 'folder'">
         <v-btn
@@ -57,10 +57,11 @@
     <!-- Children (recursive) -->
     <div v-if="item.type === 'folder' && isOpen" class="file-tree-children">
       <FileTreeNode
-        v-for="child in item.children"
+        v-for="(child, index) in item.children"
         :key="child.path"
         :item="child"
         :depth="depth + 1"
+        :is-last="index === item.children.length - 1"
         :opened-set="openedSet"
         :activated-path="activatedPath"
         :loading-paths="loadingPaths"
@@ -95,6 +96,7 @@ export default {
   props: {
     item: { type: Object, required: true },
     depth: { type: Number, default: 0 },
+    isLast: { type: Boolean, default: false },
     openedSet: { type: Set, required: true },
     activatedPath: { type: String, default: null },
     loadingPaths: { type: Array, default: () => [] },
@@ -162,12 +164,53 @@ export default {
   background-color: rgba(var(--v-theme-primary), 0.12) !important;
 }
 
-.file-tree-indent-line {
+.file-tree-node--child {
+  position: relative;
+}
+
+/* Vertical line spanning full node height for non-last children */
+.file-tree-node--child:not(.file-tree-node--last)::before {
+  content: '';
   position: absolute;
+  left: var(--connector-left);
   top: 0;
   bottom: 0;
-  width: 1px;
-  background-color: rgba(var(--v-theme-on-surface), 0.12);
+  border-left: 1px solid rgba(var(--v-theme-on-surface), 0.3);
+}
+
+/* Horizontal branch at row center for non-last children */
+.file-tree-node--child:not(.file-tree-node--last)::after {
+  content: '';
+  position: absolute;
+  left: var(--connector-left);
+  top: 1.25rem;
+  width: 2.25rem;
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.3);
+}
+
+.file-tree-node--child.file-tree-node--folder:not(.file-tree-node--last)::after {
+  width: 0.5rem;
+}
+
+/* L-shaped connector with rounded corner for last child */
+.file-tree-node--last::before {
+  content: '';
+  position: absolute;
+  left: var(--connector-left);
+  top: 0;
+  height: 1.25rem;
+  width: 2.25rem;
+  border-left: 1px solid rgba(var(--v-theme-on-surface), 0.3);
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.3);
+  border-bottom-left-radius: 0.375rem;
+}
+
+.file-tree-node--last.file-tree-node--folder::before {
+  width: 0.5rem;
+}
+
+.file-tree-children {
+  position: relative;
 }
 
 .file-tree-toggle {

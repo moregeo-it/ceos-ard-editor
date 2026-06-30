@@ -1,10 +1,11 @@
 <template>
   <div ref="container" class="file-tree overflow-y-auto fill-height">
     <FileTreeNode
-      v-for="item in items"
+      v-for="(item, index) in items"
       :key="item.path"
       :item="item"
       :depth="0"
+      :is-last="index === items.length - 1"
       :opened-set="openedSet"
       :activated-path="activatedPathInternal"
       :loading-paths="loadingPaths"
