@@ -8,7 +8,7 @@
             v-model.trim="id"
             variant="outlined"
             label="ID"
-            placeholder="e.g. SR"
+            placeholder="e.g. NRB"
             hint="Creates a new PFS folder in the workspace with the specified name"
             persistent-hint
             density="compact"
@@ -22,7 +22,7 @@
             v-model.trim="title"
             variant="outlined"
             label="Title"
-            placeholder="e.g. Surface Temperature"
+            placeholder="e.g. Normalised Radar Backscatter"
             hint="The title of the new PFS document"
             persistent-hint
             density="compact"
@@ -35,7 +35,7 @@
             v-model="selectedType"
             :items="typeOptions"
             label="Type"
-            placeholder="e.g. SAR"
+            placeholder="e.g. SAR or Optical"
             hint="The type of the new PFS document"
             persistent-hint
             density="compact"
