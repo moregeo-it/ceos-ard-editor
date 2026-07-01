@@ -106,7 +106,7 @@ export default {
       applies_to: '',
       selectedType: null,
       selectedBasePfs: null,
-      typeOptions: ['SAR', 'Optical'],
+      typeOptions: Object.freeze(['SAR', 'Optical']),
       isLoadingPfs: false,
       touched: {
         id: false,
