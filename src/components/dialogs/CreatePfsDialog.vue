@@ -8,7 +8,7 @@
             v-model.trim="id"
             variant="outlined"
             label="ID"
-            placeholder="e.g., SR"
+            placeholder="e.g. NRB"
             hint="Creates a new PFS folder in the workspace with the specified name"
             persistent-hint
             density="compact"
@@ -22,7 +22,7 @@
             v-model.trim="title"
             variant="outlined"
             label="Title"
-            placeholder="e.g., Surface Temperature"
+            placeholder="e.g. Normalised Radar Backscatter"
             hint="The title of the new PFS document"
             persistent-hint
             density="compact"
@@ -31,11 +31,25 @@
             @blur="touched.title = true"
           />
 
+          <v-select
+            v-model="selectedType"
+            :items="typeOptions"
+            label="Type"
+            placeholder="e.g. SAR or Optical"
+            hint="The type of the new PFS document"
+            persistent-hint
+            density="compact"
+            variant="outlined"
+            class="mb-4"
+            :error-messages="typeError"
+            @blur="touched.type = true"
+          />
+
           <v-textarea
             v-model.trim="applies_to"
             variant="outlined"
             label="Applies To"
-            placeholder="e.g., Data collected by Synthetic Aperture Radar sensors"
+            placeholder="e.g. Data collected by Synthetic Aperture Radar sensors"
             hint="The description of the new PFS document"
             persistent-hint
             density="compact"
@@ -43,7 +57,7 @@
           />
 
           <PfsSelect
-            v-model="selectedPfs"
+            v-model="selectedBasePfs"
             :items="pfsOptions"
             label="Base PFS"
             hint="The selected PFS document will be used as the base for the new folder"
@@ -90,11 +104,14 @@ export default {
       id: '',
       title: '',
       applies_to: '',
-      selectedPfs: null,
+      selectedType: null,
+      selectedBasePfs: null,
+      typeOptions: Object.freeze(['SAR', 'Optical']),
       isLoadingPfs: false,
       touched: {
         id: false,
         title: false,
+        type: false,
       },
     };
   },
@@ -121,8 +138,18 @@ export default {
 
       return [];
     },
+    typeError() {
+      if (!this.touched.type) return [];
+      if (!this.selectedType) {
+        return ['Type is required'];
+      }
+
+      return [];
+    },
     isValid() {
-      return this.idError.length === 0 && this.titleError.length === 0;
+      return (
+        this.idError.length === 0 && this.titleError.length === 0 && this.typeError.length === 0
+      );
     },
   },
   async created() {
@@ -140,6 +167,7 @@ export default {
     handleCreate() {
       this.touched.id = true;
       this.touched.title = true;
+      this.touched.type = true;
       if (!this.isValid) {
         return;
       }
@@ -147,7 +175,8 @@ export default {
       this.accept({
         id: this.id,
         title: this.title,
-        base: this.selectedPfs,
+        type: this.selectedType,
+        base: this.selectedBasePfs,
         applies_to: this.applies_to,
       });
     },
