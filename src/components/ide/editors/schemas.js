@@ -6,10 +6,10 @@ const baseInputOptions = {
   ...baseOptions,
 };
 
-const baseTextareaOptions = {
+/*const baseTextareaOptions = {
   ...baseOptions,
   multi: true,
-};
+};*/
 
 export const GLOSSARY_SCHEMA = {
   type: 'object',
@@ -21,6 +21,7 @@ export const GLOSSARY_SCHEMA = {
     description: {
       type: 'string',
       minLength: 2,
+      description: 'Markdown is supported for formatting.',
     },
   },
 };
@@ -36,7 +37,8 @@ export const GLOSSARY_UI_SCHEMA = {
     {
       type: 'Control',
       scope: '#/properties/description',
-      options: baseTextareaOptions,
+      // The description can't be multiline for glossary descriptions yet
+      options: baseInputOptions,
     },
   ],
 };
