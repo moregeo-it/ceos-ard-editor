@@ -144,7 +144,7 @@ export default {
     formatDate(dateString) {
       if (!dateString) return 'n/a';
       const date = new Date(dateString);
-      return date.toLocaleDateString();
+      return date.toLocaleString();
     },
   },
 };
