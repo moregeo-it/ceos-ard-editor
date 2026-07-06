@@ -226,7 +226,8 @@ export default {
         this.isSubmitting ||
         this.isChangingState ||
         (this.proposal && this.proposal.state === 'closed') ||
-        this.workspacesStore.isArchived
+        this.workspacesStore.isArchived ||
+        !this.workspacesStore.isOwner
       );
     },
     title: {

@@ -17,7 +17,10 @@
             <v-btn value="all">
               All
               <v-chip size="x-small" class="ml-2">
-                {{ workspacesStore.workspaces.length }}
+                {{
+                  workspacesStore.activeWorkspaces.length +
+                  workspacesStore.archivedWorkspaces.length
+                }}
               </v-chip>
             </v-btn>
             <v-btn value="active">
@@ -30,6 +33,12 @@
               Archived
               <v-chip size="x-small" class="ml-2" color="grey">
                 {{ workspacesStore.archivedWorkspaces.length }}
+              </v-chip>
+            </v-btn>
+            <v-btn value="shared">
+              Shared with me
+              <v-chip size="x-small" class="ml-2" color="primary">
+                {{ workspacesStore.sharedWorkspaces.length }}
               </v-chip>
             </v-btn>
           </v-btn-toggle>
@@ -83,6 +92,7 @@
             :workspace="workspace"
             @view="handleViewWorkspace"
             @edit="handleEditWorkspace"
+            @share="handleShareWorkspace"
             @toggle-status="handleToggleStatus"
             @delete="confirmDelete"
           />
@@ -145,8 +155,10 @@ export default {
           return store.activeWorkspaces;
         case 'archived':
           return store.archivedWorkspaces;
+        case 'shared':
+          return store.sharedWorkspaces;
         default:
-          return store.workspaces;
+          return [...store.activeWorkspaces, ...store.archivedWorkspaces];
       }
     },
   },
@@ -209,6 +221,13 @@ export default {
           workspace,
           onAcceptance: async (data) => await this.handleWorkspaceSubmit(data, mode),
         });
+      }
+    },
+
+    handleShareWorkspace(workspaceId) {
+      const workspace = this.workspacesStore.workspaces.find((w) => w.id === workspaceId);
+      if (workspace) {
+        this.$root.openDialog('ShareDialog', { workspace });
       }
     },
 

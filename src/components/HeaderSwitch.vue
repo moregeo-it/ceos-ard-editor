@@ -1,7 +1,14 @@
 <template>
   <v-btn-toggle mandatory v-model="view" color="primary">
     <v-btn value="editor" :prepend-icon="icons.edit" :ripple="false"> Editor </v-btn>
-    <v-btn value="propose" :prepend-icon="icons.propose" :ripple="false"> Propose </v-btn>
+    <v-btn
+      v-if="workspacesStore.isOwner"
+      value="propose"
+      :prepend-icon="icons.propose"
+      :ripple="false"
+    >
+      Propose
+    </v-btn>
     <v-btn value="workspaces" :prepend-icon="icons.close" :ripple="false"> Close </v-btn>
   </v-btn-toggle>
 </template>

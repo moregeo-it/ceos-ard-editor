@@ -104,7 +104,8 @@ export default {
       return (
         this.proposalStore.isCommitting ||
         this.proposalStore.proposal?.state === 'closed' ||
-        this.workspacesStore.isArchived
+        this.workspacesStore.isArchived ||
+        !this.workspacesStore.isOwner
       );
     },
   },

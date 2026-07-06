@@ -12,7 +12,7 @@
       />
     </template>
     <v-list density="compact">
-      <template v-if="isPfsRootFolder">
+      <template v-if="isPfsRootFolder && !workspacesStore.isReadOnly">
         <v-list-item @click="requestNewPfs">
           <template v-slot:prepend>
             <v-icon :icon="icons.add" size="small" />
@@ -22,14 +22,14 @@
       </template>
 
       <template v-else-if="isNewPfsFolder">
-        <v-list-item @click="requestRename">
+        <v-list-item v-if="!workspacesStore.isReadOnly" @click="requestRename">
           <template v-slot:prepend>
             <v-icon :icon="icons.rename" size="small" />
           </template>
           <v-list-item-title>Rename</v-list-item-title>
         </v-list-item>
 
-        <v-list-item @click="requestDelete">
+        <v-list-item v-if="!workspacesStore.isReadOnly" @click="requestDelete">
           <template v-slot:prepend>
             <v-icon :icon="icons.delete" size="small" color="error" />
           </template>
@@ -62,7 +62,10 @@
           <v-list-item-title>Show Changes</v-list-item-title>
         </v-list-item>
 
-        <v-list-item v-if="item.status === 'modified'" @click="handleRevert">
+        <v-list-item
+          v-if="item.status === 'modified' && !workspacesStore.isReadOnly"
+          @click="handleRevert"
+        >
           <template v-slot:prepend>
             <v-icon :icon="icons.revert" size="small" />
           </template>
@@ -95,7 +98,10 @@
           <v-list-item-title>Download</v-list-item-title>
         </v-list-item>
 
-        <v-list-item v-if="item.status && item.status !== 'added'" @click="handleRevert">
+        <v-list-item
+          v-if="item.status && item.status !== 'added' && !workspacesStore.isReadOnly"
+          @click="handleRevert"
+        >
           <template v-slot:prepend>
             <v-icon :icon="icons.revert" size="small" />
           </template>
@@ -104,7 +110,7 @@
       </template>
 
       <template v-else>
-        <v-list-item @click="requestNewFile">
+        <v-list-item v-if="!workspacesStore.isReadOnly" @click="requestNewFile">
           <template v-slot:prepend>
             <v-icon :icon="icons.add" size="small" />
           </template>
@@ -112,7 +118,7 @@
         </v-list-item>
       </template>
 
-      <template v-if="item.status !== 'deleted' && !isPfsItem">
+      <template v-if="item.status !== 'deleted' && !isPfsItem && !workspacesStore.isReadOnly">
         <v-list-item @click="requestRename">
           <template v-slot:prepend>
             <v-icon :icon="icons.rename" size="small" />
@@ -147,6 +153,7 @@ import {
   mdiCodeJson,
 } from '@mdi/js';
 import { downloadBlob } from '@/utils/api';
+import { useWorkspacesStore } from '@/stores/workspaces';
 
 export default {
   name: 'FileContextMenu',
@@ -186,13 +193,22 @@ export default {
     notificationsStore() {
       return useNotificationsStore();
     },
+    workspacesStore() {
+      return useWorkspacesStore();
+    },
     shouldShowMenu() {
       if (this.isPfsRootFolder) {
-        return true;
+        return !this.workspacesStore.isReadOnly;
       }
 
       if (this.isPfsFolder) {
-        return this.isNewPfsFolder;
+        return this.isNewPfsFolder && !this.workspacesStore.isReadOnly;
+      }
+
+      if (this.workspacesStore.isReadOnly) {
+        // Read-only/comment collaborators only keep read-safe actions (open/download/diff),
+        // which only ever apply to non-deleted files. Everything else has no items to show.
+        return (this.item.type === 'file' || this.isPfsFile) && this.item.status !== 'deleted';
       }
 
       return true;

@@ -4,6 +4,9 @@
       <v-icon :icon="icons.folder" start></v-icon>
       {{ workspace.title }}
       <v-spacer></v-spacer>
+      <v-chip v-if="!isOwner" color="primary" size="small" variant="tonal" class="mr-2">
+        {{ roleLabel }}
+      </v-chip>
       <v-chip :color="statusColor" size="small" variant="flat">
         {{ workspace.status }}
       </v-chip>
@@ -44,19 +47,25 @@
     </v-card-text>
 
     <v-card-actions class="mt-auto flex-wrap cursor-default border-t-sm" @click.stop>
-      <v-btn variant="text" :prepend-icon="icons.pencil" @click.stop="handleEdit">Settings</v-btn>
-      <v-spacer></v-spacer>
-      <v-btn
-        :color="toggleStatusColor"
-        variant="text"
-        :prepend-icon="toggleStatusIcon"
-        @click.stop="handleToggleStatus"
-      >
-        {{ toggleStatusLabel }}
-      </v-btn>
-      <v-btn color="error" variant="text" :prepend-icon="icons.delete" @click.stop="handleDelete">
-        Delete
-      </v-btn>
+      <template v-if="isOwner">
+        <v-btn variant="text" :prepend-icon="icons.pencil" @click.stop="handleEdit">Settings</v-btn>
+        <v-btn variant="text" :prepend-icon="icons.share" @click.stop="handleShare">Share</v-btn>
+        <v-spacer></v-spacer>
+        <v-btn
+          :color="toggleStatusColor"
+          variant="text"
+          :prepend-icon="toggleStatusIcon"
+          @click.stop="handleToggleStatus"
+        >
+          {{ toggleStatusLabel }}
+        </v-btn>
+        <v-btn color="error" variant="text" :prepend-icon="icons.delete" @click.stop="handleDelete">
+          Delete
+        </v-btn>
+      </template>
+      <template v-else>
+        <span class="text-caption text-medium-emphasis">Shared by {{ ownerLabel }}</span>
+      </template>
     </v-card-actions>
   </v-card>
 </template>
@@ -71,6 +80,7 @@ import {
   mdiPencil,
   mdiDelete,
   mdiPackageUp,
+  mdiShareVariant,
 } from '@mdi/js';
 
 export default {
@@ -87,7 +97,7 @@ export default {
     },
   },
 
-  emits: ['view', 'edit', 'toggle-status', 'delete'],
+  emits: ['view', 'edit', 'toggle-status', 'delete', 'share'],
 
   data() {
     return {
@@ -99,6 +109,7 @@ export default {
         pencil: mdiPencil,
         delete: mdiDelete,
         activate: mdiPackageUp,
+        share: mdiShareVariant,
       },
     };
   },
@@ -110,6 +121,22 @@ export default {
 
     isArchived() {
       return this.workspace.status === 'archived' || false;
+    },
+
+    isOwner() {
+      return this.workspace.viewer_role === 'owner';
+    },
+
+    roleLabel() {
+      return (
+        { edit: 'Can edit', comment: 'Can comment', readonly: 'View only' }[
+          this.workspace.viewer_role
+        ] || this.workspace.viewer_role
+      );
+    },
+
+    ownerLabel() {
+      return this.workspace.owner_username || 'another user';
     },
 
     toggleStatusLabel() {
@@ -132,6 +159,10 @@ export default {
 
     handleEdit() {
       this.$emit('edit', this.workspace.id);
+    },
+
+    handleShare() {
+      this.$emit('share', this.workspace.id);
     },
 
     handleToggleStatus() {

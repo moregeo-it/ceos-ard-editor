@@ -19,12 +19,38 @@ export const useWorkspacesStore = defineStore('workspaces', {
       return state.currentWorkspace?.status === 'archived' || false;
     },
 
+    // "owner" | "edit" | "comment" | "readonly" | undefined (not yet loaded)
+    viewerRole: (state) => {
+      return state.currentWorkspace?.viewer_role;
+    },
+
+    isOwner: (state) => {
+      return state.currentWorkspace?.viewer_role === 'owner';
+    },
+
+    // True for readonly/comment collaborators, or for anyone browsing an archived workspace
+    // (mirrors the pre-existing archived-browsing behavior owners already relied on).
+    isReadOnly() {
+      if (!this.viewerRole) return false;
+      return this.viewerRole === 'readonly' || this.viewerRole === 'comment' || this.isArchived;
+    },
+
+    // Kept distinct from isReadOnly/readonly so a future commenting feature can key off this
+    // without any backend or permission-model changes - behavior is identical to readonly today.
+    isCommentMode: (state) => {
+      return state.currentWorkspace?.viewer_role === 'comment';
+    },
+
     activeWorkspaces: (state) => {
-      return state.workspaces.filter((w) => w.status === 'active');
+      return state.workspaces.filter((w) => w.status === 'active' && w.viewer_role === 'owner');
     },
 
     archivedWorkspaces: (state) => {
-      return state.workspaces.filter((w) => w.status === 'archived');
+      return state.workspaces.filter((w) => w.status === 'archived' && w.viewer_role === 'owner');
+    },
+
+    sharedWorkspaces: (state) => {
+      return state.workspaces.filter((w) => w.viewer_role && w.viewer_role !== 'owner');
     },
 
     getWorkspaceById: (state) => (id) => {

@@ -17,6 +17,12 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
     {
+      path: '/share/:token',
+      name: 'share',
+      component: () => import('@/views/ShareLandingView.vue'),
+      meta: { requiresAuth: false },
+    },
+    {
       path: '/workspaces',
       name: 'workspaces',
       component: () => import('@/views/WorkspacesView.vue'),
