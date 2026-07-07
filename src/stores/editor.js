@@ -3,6 +3,8 @@ import { defineStore } from 'pinia';
 import { useFilesStore } from './files';
 import { useNotificationsStore } from './notifications';
 import { usePreviewStore } from './preview';
+import { useWorkspacesStore } from './workspaces';
+import * as collabService from '@/services/collab.service';
 
 const getDefaults = () => ({
   opened: [], // Opened files
@@ -11,6 +13,7 @@ const getDefaults = () => ({
   changed: {}, // Changed status per file path
   saving: {}, // Saving status per file path
   active: null, // Currently active file
+  collabDocs: {}, // Live Yjs collaboration session per file path (text files only)
 });
 
 export const useEditorStore = defineStore('editor', {
@@ -59,11 +62,61 @@ export const useEditorStore = defineStore('editor', {
         this.data[path] = data;
       } else {
         const text = await data.text();
-        this.original[path] = text;
-        this.data[path] = text;
+        // yCollab only ever applies the room's content as an *insert* on top of
+        // whatever CodeMirror already shows - it never reconciles a pre-existing
+        // doc against the Y.Text. So the REST-fetched text must never be used as
+        // the editor's displayed content once collab is going to attach: doing so
+        // would show up as duplicated content the moment the room's identical
+        // seed content arrives and gets inserted on top of it. Wait for the
+        // collab session's initial sync and use its content as the source of
+        // truth instead; if it can't sync in time, fall back to the REST copy
+        // and drop the connection so no delayed insert can duplicate it later.
+        const collabContent = await this.connectCollab(path);
+        const initialText = collabContent ?? text;
+        this.original[path] = initialText;
+        this.data[path] = initialText;
       }
       this.changed[path] = false;
       this.saving[path] = false;
+    },
+
+    /**
+     * Opens a live collaborative session for a text file and waits for the initial
+     * sync. Returns the room's synced content, or null if collab isn't available/
+     * didn't sync in time (in which case no connection is left open for this path).
+     */
+    async connectCollab(path, timeoutMs = 8000) {
+      if (this.collabDocs[path]) {
+        return this.collabDocs[path].ytext.toString();
+      }
+      const workspacesStore = useWorkspacesStore();
+      const workspaceId = workspacesStore.currentWorkspace?.id;
+      if (!workspaceId) {
+        return null;
+      }
+      const collabDoc = collabService.connect(workspaceId, path);
+      const synced = await new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(false), timeoutMs);
+        collabDoc.provider.once('sync', (isSynced) => {
+          clearTimeout(timer);
+          resolve(!!isSynced);
+        });
+      });
+      if (!synced) {
+        collabService.disconnect(collabDoc);
+        return null;
+      }
+      this.collabDocs[path] = collabDoc;
+      return collabDoc.ytext.toString();
+    },
+
+    disconnectCollab(path) {
+      const collabDoc = this.collabDocs[path];
+      if (!collabDoc) {
+        return;
+      }
+      collabService.disconnect(collabDoc);
+      delete this.collabDocs[path];
     },
     async applyEdits(path, content) {
       this.data[path] = content;
@@ -113,6 +166,7 @@ export const useEditorStore = defineStore('editor', {
         delete this.original[path];
         delete this.data[path];
         delete this.changed[path];
+        this.disconnectCollab(path);
       }
       if (this.active && this.active.path === path) {
         // Open the tab on the right, or the last one if there is none
@@ -177,6 +231,14 @@ export const useEditorStore = defineStore('editor', {
         delete this.saving[oldPath];
       }
 
+      // The collab room is keyed by path, so the old session is no longer valid.
+      // Deliberately not reconnecting under the new path here: the CodeMirror view
+      // stays mounted with its current (correct) content, and a fresh yCollab
+      // attachment would insert the reconnected room's seed content on top of it,
+      // duplicating it - the same failure mode connectCollab's sync-wait guards
+      // against on initial open. Collab resumes next time the file is reopened.
+      this.disconnectCollab(oldPath);
+
       // Update active file reference if needed
       if (this.active && this.active.path === oldPath) {
         this.active = newFile;
@@ -217,6 +279,7 @@ export const useEditorStore = defineStore('editor', {
     },
 
     reset() {
+      Object.keys(this.collabDocs).forEach((path) => this.disconnectCollab(path));
       Object.assign(this, getDefaults());
     },
   },

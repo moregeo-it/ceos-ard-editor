@@ -13,6 +13,7 @@ import { markdown } from '@codemirror/lang-markdown';
 import { yaml } from '@codemirror/lang-yaml';
 import { bibtex } from '@citedrive/codemirror-lang-bibtex';
 import { hyperLink } from '@uiw/codemirror-extensions-hyper-link';
+import { yCollab } from 'y-codemirror.next';
 
 const MAX_DIAGNOSTICS = 100;
 
@@ -21,6 +22,13 @@ export default {
   mixins: [BaseEditorMixin],
   components: {
     CodeMirror,
+  },
+  props: {
+    // Live Yjs session for this file ({ ytext, awareness }), if collaboration is active.
+    collab: {
+      type: Object,
+      default: null,
+    },
   },
   computed: {
     fileExtension() {
@@ -76,6 +84,9 @@ export default {
       ];
       if (this.languageExtension) {
         extensions.push(this.languageExtension);
+      }
+      if (this.collab) {
+        extensions.push(yCollab(this.collab.ytext, this.collab.awareness));
       }
       const settings = {
         basic: true,

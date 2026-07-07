@@ -60,6 +60,7 @@
             @error="error(file.path, $event)"
             :file="file"
             :readOnly="workspacesStore.isReadOnly"
+            :collab="editorStore.collabDocs[file.path]"
             class="fill-height"
           />
         </v-tabs-window-item>
@@ -83,16 +84,19 @@
           </ul>
         </v-toolbar-title>
 
-        <template v-slot:append v-if="!workspacesStore.isReadOnly">
-          <v-btn
-            :disabled="isActiveSaving || !hasActiveChanges"
-            :loading="isActiveSaving"
-            @click="save(activeFile.path)"
-            ><v-icon :icon="icons.save" /> Save</v-btn
-          >
-          <v-btn :disabled="isAnySaving || !hasAnyChanges" :loading="isAnySaving" @click="saveAll"
-            ><v-icon :icon="icons.saveAll" /> Save All</v-btn
-          >
+        <template v-slot:append>
+          <CollabPresence :collab="editorStore.collabDocs[activeFile?.path]" class="mr-3" />
+          <template v-if="!workspacesStore.isReadOnly">
+            <v-btn
+              :disabled="isActiveSaving || !hasActiveChanges"
+              :loading="isActiveSaving"
+              @click="save(activeFile.path)"
+              ><v-icon :icon="icons.save" /> Save</v-btn
+            >
+            <v-btn :disabled="isAnySaving || !hasAnyChanges" :loading="isAnySaving" @click="saveAll"
+              ><v-icon :icon="icons.saveAll" /> Save All</v-btn
+            >
+          </template>
         </template>
       </v-toolbar>
     </template>
@@ -111,6 +115,7 @@ import { useWorkspacesStore } from '@/stores/workspaces';
 import { defineAsyncComponent } from 'vue';
 import BrowserViewer from './editors/BrowserViewer.vue';
 import UnsupportedViewer from './editors/UnsupportedViewer.vue';
+import CollabPresence from './CollabPresence.vue';
 import { mdiClose, mdiContentSave, mdiContentSaveAll, mdiMenu } from '@mdi/js';
 import { supportVisualEditing } from '@/components/ide/editors/utils';
 
@@ -131,6 +136,7 @@ export default {
     BrowserViewer,
     SourceCodeEditor: defineAsyncComponent(() => import('./editors/SourceCodeEditor.vue')),
     UnsupportedViewer,
+    CollabPresence,
     JsonSchemaEditor: defineAsyncComponent(() => import('./editors/JsonSchemaEditor.vue')),
   },
 
