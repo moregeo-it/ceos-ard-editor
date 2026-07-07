@@ -128,7 +128,7 @@ export default {
     },
 
     ownerLabel() {
-      return this.workspace.owner_username || 'another user';
+      return this.workspace.owner_full_name || this.workspace.owner_username || 'Unknown';
     },
 
     toggleStatusLabel() {
