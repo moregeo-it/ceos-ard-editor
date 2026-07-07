@@ -19,7 +19,8 @@
               <v-chip size="x-small" class="ml-2">
                 {{
                   workspacesStore.activeWorkspaces.length +
-                  workspacesStore.archivedWorkspaces.length
+                  workspacesStore.archivedWorkspaces.length +
+                  workspacesStore.sharedWorkspaces.length
                 }}
               </v-chip>
             </v-btn>
@@ -126,7 +127,7 @@ export default {
         plus: mdiPlus,
         folderOff: mdiFolderOff,
       },
-      filter: 'active', // 'all', 'active', 'archived'
+      filter: 'active', // 'all', 'active', 'archived', 'shared'
     };
   },
 
@@ -158,7 +159,11 @@ export default {
         case 'shared':
           return store.sharedWorkspaces;
         default:
-          return [...store.activeWorkspaces, ...store.archivedWorkspaces];
+          return [
+            ...store.activeWorkspaces,
+            ...store.archivedWorkspaces,
+            ...store.sharedWorkspaces,
+          ];
       }
     },
   },
