@@ -37,7 +37,7 @@
               </v-chip>
             </v-btn>
             <v-btn value="shared">
-              Shared with me
+              Shared
               <v-chip size="x-small" class="ml-2" color="primary">
                 {{ workspacesStore.sharedWorkspaces.length }}
               </v-chip>

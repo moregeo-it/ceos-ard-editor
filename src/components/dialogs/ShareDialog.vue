@@ -2,6 +2,7 @@
   <v-dialog v-model="show" :width="sizes.medium" scrollable>
     <v-card>
       <v-card-title>Share "{{ workspace.title }}"</v-card-title>
+      <v-card-subtitle>Manage who can view, comment, and edit this workspace.</v-card-subtitle>
 
       <v-tabs v-model="tab">
         <v-tab value="people">People with access</v-tab>
@@ -68,20 +69,25 @@
                     density="compact"
                     hide-details
                     variant="underlined"
-                    style="max-width: 130px"
+                    style="max-width: 150px"
                     class="mr-2"
                     :disabled="share.status === 'revoked' || shareStore.isMutating"
                     @update:model-value="(mode) => changeShareMode(share, mode)"
                   />
-                  <v-btn
-                    icon
-                    variant="text"
-                    size="small"
-                    :disabled="shareStore.isMutating"
-                    @click="removeShare(share)"
-                  >
-                    <v-icon :icon="icons.close" />
-                  </v-btn>
+                  <v-tooltip text="Remove access" location="top">
+                    <template v-slot:activator="{ props }">
+                      <v-btn
+                        v-bind="props"
+                        icon
+                        variant="text"
+                        size="small"
+                        :disabled="shareStore.isMutating"
+                        @click="removeShare(share)"
+                      >
+                        <v-icon :icon="icons.close" />
+                      </v-btn>
+                    </template>
+                  </v-tooltip>
                 </template>
               </v-list-item>
             </v-list>
@@ -129,18 +135,33 @@
                     :disabled="shareStore.isMutating"
                     @update:model-value="(active) => toggleLinkActive(link, active)"
                   />
-                  <v-btn icon variant="text" size="small" @click="copyLink(link)">
-                    <v-icon :icon="icons.copy" />
-                  </v-btn>
-                  <v-btn
-                    icon
-                    variant="text"
-                    size="small"
-                    :disabled="shareStore.isMutating"
-                    @click="deleteLink(link)"
-                  >
-                    <v-icon :icon="icons.delete" />
-                  </v-btn>
+                  <v-tooltip text="Copy link" location="top">
+                    <template v-slot:activator="{ props }">
+                      <v-btn
+                        v-bind="props"
+                        icon
+                        variant="text"
+                        size="small"
+                        @click="copyLink(link)"
+                      >
+                        <v-icon :icon="icons.copy" />
+                      </v-btn>
+                    </template>
+                  </v-tooltip>
+                  <v-tooltip text="Delete link" location="top">
+                    <template v-slot:activator="{ props }">
+                      <v-btn
+                        v-bind="props"
+                        icon
+                        variant="text"
+                        size="small"
+                        :disabled="shareStore.isMutating"
+                        @click="deleteLink(link)"
+                      >
+                        <v-icon :icon="icons.delete" />
+                      </v-btn>
+                    </template>
+                  </v-tooltip>
                 </template>
               </v-list-item>
             </v-list>
@@ -161,6 +182,7 @@ import { mdiAccountCircle, mdiClose, mdiContentCopy, mdiDelete } from '@mdi/js';
 import DialogMixin from '@/components/DialogMixin';
 import { useShareStore } from '@/stores/share';
 import { useNotificationsStore } from '@/stores/notifications';
+import { SHARE_MODES, shareModeLabel } from '@/utils/shareMode';
 
 export default {
   name: 'ShareDialog',
@@ -187,11 +209,7 @@ export default {
       isInviting: false,
       linkMode: 'edit',
       isCreatingLink: false,
-      modeOptions: [
-        { title: 'Can edit', value: 'edit' },
-        { title: 'Can comment', value: 'comment' },
-        { title: 'View only', value: 'readonly' },
-      ],
+      modeOptions: SHARE_MODES,
     };
   },
 
@@ -227,7 +245,7 @@ export default {
     },
 
     modeLabel(mode) {
-      return this.modeOptions.find((option) => option.value === mode)?.title || mode;
+      return shareModeLabel(mode);
     },
 
     statusColor(status) {

@@ -4,9 +4,7 @@
       <v-icon :icon="icons.folder" start></v-icon>
       {{ workspace.title }}
       <v-spacer></v-spacer>
-      <v-chip v-if="!isOwner" color="primary" size="small" variant="tonal" class="mr-2">
-        {{ roleLabel }}
-      </v-chip>
+      <ShareModeChip v-if="!isOwner" :mode="workspace.viewer_role" class="mr-2" />
       <v-chip :color="statusColor" size="small" variant="flat">
         {{ workspace.status }}
       </v-chip>
@@ -72,6 +70,7 @@
 
 <script>
 import PfsBadges from './PfsBadges.vue';
+import ShareModeChip from './ShareModeChip.vue';
 import {
   mdiFolder,
   mdiCalendar,
@@ -88,6 +87,7 @@ export default {
 
   components: {
     PfsBadges,
+    ShareModeChip,
   },
 
   props: {
@@ -125,14 +125,6 @@ export default {
 
     isOwner() {
       return this.workspace.viewer_role === 'owner';
-    },
-
-    roleLabel() {
-      return (
-        { edit: 'Can edit', comment: 'Can comment', readonly: 'View only' }[
-          this.workspace.viewer_role
-        ] || this.workspace.viewer_role
-      );
     },
 
     ownerLabel() {

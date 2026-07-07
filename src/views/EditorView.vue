@@ -3,9 +3,17 @@
     <HeaderBar :title="workspace.title" :icon="icons.title">
       <template #central-actions>
         <HeaderSwitch />
+      </template>
+      <template #actions>
+        <ShareModeChip
+          v-if="!workspacesStore.isOwner && workspacesStore.viewerRole"
+          :mode="workspacesStore.viewerRole"
+          color="white"
+        />
         <v-btn
           v-if="workspacesStore.isOwner"
-          variant="text"
+          color="white"
+          variant="tonal"
           :prepend-icon="icons.share"
           @click="openShareDialog"
         >
@@ -46,6 +54,7 @@ import HeaderSwitch from '@/components/HeaderSwitch.vue';
 import EditorPane from '@/components/ide/EditorPane.vue';
 import FilesPane from '@/components/ide/FilesPane.vue';
 import PreviewPane from '@/components/ide/PreviewPane.vue';
+import ShareModeChip from '@/components/workspace/ShareModeChip.vue';
 import { Splitpanes, Pane } from 'splitpanes';
 
 export default {
@@ -57,6 +66,7 @@ export default {
     HeaderSwitch,
     Pane,
     PreviewPane,
+    ShareModeChip,
     Splitpanes,
   },
   data() {

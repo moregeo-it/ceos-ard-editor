@@ -53,6 +53,7 @@
 import { mdiAlertCircle, mdiGithub, mdiShareVariant } from '@mdi/js';
 import { useAuthStore } from '@/stores/auth';
 import { useShareStore } from '@/stores/share';
+import { shareModeLabel } from '@/utils/shareMode';
 
 export default {
   name: 'ShareLandingView',
@@ -88,12 +89,7 @@ export default {
 
   methods: {
     modeLabel(mode) {
-      const labels = {
-        readonly: 'View only',
-        comment: 'Can comment',
-        edit: 'Can edit',
-      };
-      return labels[mode] || mode;
+      return shareModeLabel(mode);
     },
 
     async redeem() {
