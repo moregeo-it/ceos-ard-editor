@@ -20,6 +20,7 @@ import { useNotificationsStore } from '@/stores/notifications';
 import { usePreviewStore } from '@/stores/preview';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useProposalStore } from '@/stores/proposal';
+import { useShareStore } from '@/stores/share';
 import { mdiCheckCircle, mdiClose, mdiNotebookEdit } from '@mdi/js';
 
 export default {
@@ -57,6 +58,9 @@ export default {
     proposalStore() {
       return useProposalStore();
     },
+    shareStore() {
+      return useShareStore();
+    },
     view: {
       get() {
         return this.$route.name;
@@ -92,6 +96,7 @@ export default {
       this.notificationsStore.reset();
       this.previewStore.reset();
       this.proposalStore.reset();
+      this.shareStore.reset();
       this.$router.push({ name: 'workspaces' });
     },
   },
