@@ -47,7 +47,7 @@
 
             <v-list class="mt-4">
               <v-list-item v-if="shareStore.isLoading">
-                <v-progress-circular indeterminate size="24" color="primary" />
+                <v-progress-linear indeterminate size="24" color="primary" />
               </v-list-item>
               <v-list-item v-else-if="shares.length === 0">
                 <span class="text-medium-emphasis">Not shared with anyone yet.</span>
@@ -234,6 +234,7 @@ export default {
 
   methods: {
     async loadData() {
+      this.shareStore.clearData();
       try {
         await Promise.all([
           this.shareStore.fetchShares(this.workspace.id),
