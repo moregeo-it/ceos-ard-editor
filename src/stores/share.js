@@ -133,5 +133,14 @@ export const useShareStore = defineStore('share', {
       sessionStorage.removeItem(PENDING_SHARE_TOKEN_KEY);
       return token;
     },
+
+    clearData() {
+      this.shares = [];
+      this.shareLinks = [];
+    },
+
+    reset() {
+      Object.assign(this, getDefaults());
+    },
   },
 });
