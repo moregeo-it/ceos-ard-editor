@@ -209,11 +209,9 @@ export const useEditorStore = defineStore('editor', {
         return; // File has changes, don't reload content from server
       }
 
-      // Reload the file content from server if the opened file has no unsaved changes
-      const files = useFilesStore();
-      const data = await files.load(path);
-      this.original[path] = data;
-      this.data[path] = data;
+      // Reload the file content from server. Use sync() so text blobs are decoded to strings -
+      // assigning the raw Blob would make the editor treat a text file as an unsupported type.
+      await this.sync(path);
     },
 
     reset() {
