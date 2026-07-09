@@ -47,6 +47,7 @@
 
 <script>
 import { useNotificationsStore } from '@/stores/notifications';
+import { useRealtimeStore } from '@/stores/realtime';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { mdiCheckCircle, mdiMenuDown, mdiNotebookEdit, mdiShareVariant } from '@mdi/js';
 import HeaderBar from '@/components/HeaderBar.vue';
@@ -107,10 +108,18 @@ export default {
     notificationsStore() {
       return useNotificationsStore();
     },
+    realtimeStore() {
+      return useRealtimeStore();
+    },
   },
 
   async created() {
     await this.loadWorkspace();
+    // Subscribe to live changes once the workspace has loaded. Everyone connects (the owner's
+    // own events are echo-suppressed client-side); read-only viewers get the owner's changes live.
+    if (this.workspace) {
+      this.realtimeStore.connect(this.workspaceId);
+    }
     // Must be called after the workspace has loaded, otherwise isArchived is always false.
     // Only offer reactivation to the owner - collaborators can't reactivate a workspace anyway,
     // they just see it read-only (enforced separately via workspacesStore.isReadOnly).
@@ -120,6 +129,10 @@ export default {
         onAcceptance: async () => await this.handleToggleStatus(),
       });
     }
+  },
+
+  beforeUnmount() {
+    this.realtimeStore.disconnect();
   },
 
   methods: {

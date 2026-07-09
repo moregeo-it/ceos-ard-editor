@@ -2,7 +2,7 @@
   <v-dialog v-model="show" :width="sizes.medium" scrollable>
     <v-card>
       <v-card-title>Share "{{ workspace.title }}"</v-card-title>
-      <v-card-subtitle>Manage who can view, comment, and edit this workspace.</v-card-subtitle>
+      <v-card-subtitle>Manage who can view this workspace.</v-card-subtitle>
 
       <v-tabs v-model="tab">
         <v-tab value="people">People with access</v-tab>
@@ -205,9 +205,9 @@ export default {
       },
       tab: 'people',
       inviteUsernames: [],
-      inviteMode: 'edit',
+      inviteMode: 'readonly',
       isInviting: false,
-      linkMode: 'edit',
+      linkMode: 'readonly',
       isCreatingLink: false,
       modeOptions: SHARE_MODES,
     };

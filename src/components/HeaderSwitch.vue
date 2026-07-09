@@ -18,6 +18,7 @@ import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
 import { usePreviewStore } from '@/stores/preview';
+import { useRealtimeStore } from '@/stores/realtime';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useProposalStore } from '@/stores/proposal';
 import { useShareStore } from '@/stores/share';
@@ -51,6 +52,9 @@ export default {
     },
     previewStore() {
       return usePreviewStore();
+    },
+    realtimeStore() {
+      return useRealtimeStore();
     },
     workspacesStore() {
       return useWorkspacesStore();
@@ -91,6 +95,7 @@ export default {
       }
     },
     forceCloseWorkspace() {
+      this.realtimeStore.reset();
       this.editorStore.reset();
       this.filesStore.reset();
       this.notificationsStore.reset();
