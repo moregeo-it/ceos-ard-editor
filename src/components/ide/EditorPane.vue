@@ -56,10 +56,12 @@
             :is="getEditorType(file, editorStore.data[file.path], file.forceSourceCodeEditor)"
             :value="editorStore.data[file.path]"
             @update="(val) => editorStore.applyEdits(file.path, val)"
+            @collab-edit="editorStore.markCollabDirty(file.path)"
             @save="save(file.path)"
             @error="error(file.path, $event)"
             :file="file"
             :readOnly="workspacesStore.isReadOnly"
+            :collab="editorStore.collabDocs[file.path]"
             class="fill-height"
           />
         </v-tabs-window-item>
