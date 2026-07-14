@@ -23,6 +23,7 @@
 <script>
 import { useNotificationsStore } from '@/stores/notifications';
 import { useAuthStore } from '@/stores/auth';
+import { useRealtimeStore } from '@/stores/realtime';
 import DialogControl from '@/components/DialogControl.vue';
 
 export default {
@@ -39,6 +40,10 @@ export default {
 
     authStore() {
       return useAuthStore();
+    },
+
+    realtimeStore() {
+      return useRealtimeStore();
     },
 
     snackbarColor() {
@@ -60,6 +65,9 @@ export default {
         });
       } else {
         this.closeDialog('ReauthenticationDialog');
+        // Reauth completed - revive the SSE stream if it stalled waiting for a fresh token
+        // (no-op unless a workspace stream is currently stalled).
+        this.realtimeStore.resumeIfStalled();
       }
     },
 

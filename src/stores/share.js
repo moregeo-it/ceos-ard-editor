@@ -6,8 +6,10 @@ const PENDING_SHARE_TOKEN_KEY = 'ceos_ard_editor_pending_share_token';
 const getDefaults = () => ({
   shares: [],
   shareLinks: [],
-  isLoading: false,
+  isLoadingShares: false,
+  isLoadingShareLinks: false,
   isMutating: false,
+  activeWorkspaceId: null,
 });
 
 export const useShareStore = defineStore('share', {
@@ -15,22 +17,26 @@ export const useShareStore = defineStore('share', {
 
   actions: {
     async fetchShares(workspaceId) {
-      this.isLoading = true;
+      this.isLoadingShares = true;
       try {
         const response = await shareService.listShares(workspaceId);
+        // Ignore responses for a workspace the dialog has since moved away from.
+        if (workspaceId !== this.activeWorkspaceId) return;
         this.shares = response.shares || [];
       } finally {
-        this.isLoading = false;
+        if (workspaceId === this.activeWorkspaceId) this.isLoadingShares = false;
       }
     },
 
     async fetchShareLinks(workspaceId) {
-      this.isLoading = true;
+      this.isLoadingShareLinks = true;
       try {
         const response = await shareService.listShareLinks(workspaceId);
+        // Ignore responses for a workspace the dialog has since moved away from.
+        if (workspaceId !== this.activeWorkspaceId) return;
         this.shareLinks = response.shareLinks || [];
       } finally {
-        this.isLoading = false;
+        if (workspaceId === this.activeWorkspaceId) this.isLoadingShareLinks = false;
       }
     },
 
@@ -134,7 +140,11 @@ export const useShareStore = defineStore('share', {
       return token;
     },
 
-    clearData() {
+    /**
+     * Reset the people/links lists and mark which workspace the dialog is now showing.
+     */
+    setActiveWorkspace(workspaceId) {
+      this.activeWorkspaceId = workspaceId;
       this.shares = [];
       this.shareLinks = [];
     },

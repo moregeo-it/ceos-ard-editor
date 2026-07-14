@@ -39,14 +39,14 @@
                 type="submit"
                 color="primary"
                 :loading="isInviting"
-                :disabled="inviteUsernames.length === 0"
+                :disabled="inviteUsernames.length === 0 || shareStore.isLoadingShares"
               >
                 Invite
               </v-btn>
             </v-form>
 
             <v-list class="mt-4">
-              <v-list-item v-if="shareStore.isLoading">
+              <v-list-item v-if="shareStore.isLoadingShares">
                 <v-progress-linear indeterminate size="24" color="primary" />
               </v-list-item>
               <v-list-item v-else-if="shares.length === 0">
@@ -106,11 +106,18 @@
                 :disabled="isCreatingLink"
                 variant="outlined"
               />
-              <v-btn type="submit" color="primary" :loading="isCreatingLink"> Create link </v-btn>
+              <v-btn
+                type="submit"
+                color="primary"
+                :loading="isCreatingLink"
+                :disabled="shareStore.isLoadingShareLinks"
+              >
+                Create link
+              </v-btn>
             </v-form>
 
             <v-list class="mt-4">
-              <v-list-item v-if="shareStore.isLoading">
+              <v-list-item v-if="shareStore.isLoadingShareLinks">
                 <v-progress-circular indeterminate size="24" color="primary" />
               </v-list-item>
               <v-list-item v-else-if="shareLinks.length === 0">
@@ -127,6 +134,7 @@
                 </v-list-item-subtitle>
                 <template v-slot:append>
                   <v-switch
+                    :aria-label="link.isActive ? 'Deactivate share link' : 'Activate share link'"
                     :model-value="link.isActive"
                     color="primary"
                     density="compact"
@@ -234,7 +242,7 @@ export default {
 
   methods: {
     async loadData() {
-      this.shareStore.clearData();
+      this.shareStore.setActiveWorkspace(this.workspace.id);
       try {
         await Promise.all([
           this.shareStore.fetchShares(this.workspace.id),

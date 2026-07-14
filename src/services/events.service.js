@@ -19,9 +19,8 @@ export const WORKSPACE_EVENT_TYPES = [
 /**
  * Open a Server-Sent Events connection to a workspace's real-time change stream.
  *
- * Native EventSource cannot set request headers, so the JWT is passed as a query param -
- * the backend's `get_jwt_token` accepts `?authorization=<token>` (the same mechanism
- * PreviewPane uses for asset URLs).
+ * Native EventSource can't set request headers, so the JWT goes in a query param -
+ * the backend's `get_jwt_token` accepts `?authorization=<token>`.
  *
  * @param {Object} params
  * @param {string} params.workspaceId

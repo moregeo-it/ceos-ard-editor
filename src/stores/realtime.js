@@ -12,8 +12,8 @@ import { useWorkspacesStore } from './workspaces';
 const RECONNECT_MIN_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 
-// Connection internals are kept in module scope (not Pinia state) so the non-serializable
-// EventSource client and timers are never wrapped in a reactive proxy.
+// Kept in module scope (not Pinia state) so the non-serializable EventSource + timers aren't
+// wrapped in a reactive proxy.
 let client = null;
 let reconnectTimer = null;
 let backoff = 0;
@@ -40,12 +40,9 @@ const getDefaults = () => ({
 });
 
 /**
- * Applies the owner's live changes (received over SSE) to the read-only viewer's local stores.
- *
- * Phase 1: reuses the existing editor/preview handlers rather than re-issuing the mutation.
- * It calls the low-level files-store mutators (`updateFile`/`deleteFileFromStore`) - which do NOT
- * trip the local `filesEditorSyncPlugin`/`filesPreviewSyncPlugin` - then replicates their editor
- * and preview follow-up explicitly.
+ * Applies the owner's live SSE changes to a read-only viewer's local stores. Uses the low-level
+ * files mutators (`updateFile`/`deleteFileFromStore`), which bypass the local sync plugins, then
+ * replicates their editor/preview follow-up explicitly.
  */
 export const useRealtimeStore = defineStore('realtime', {
   state: () => getDefaults(),
@@ -90,6 +87,18 @@ export const useRealtimeStore = defineStore('realtime', {
       Object.assign(this, getDefaults());
     },
 
+    /**
+     * Re-open a stream that stalled waiting for reauth (see `_scheduleReconnect`). No-ops unless a
+     * workspace stream is stalled with a now-valid token, so it can't create a duplicate or
+     * unauthenticated connection - e.g. when reauth is cancelled via logout and the token cleared.
+     */
+    resumeIfStalled() {
+      const auth = useAuthStore();
+      if (this.workspaceId && !client && !closing && auth.accessToken && !auth.isTokenExpired) {
+        this._open();
+      }
+    },
+
     _open() {
       const auth = useAuthStore();
       const workspaceId = this.workspaceId;
@@ -117,8 +126,7 @@ export const useRealtimeStore = defineStore('realtime', {
     },
 
     _onError() {
-      // We manage reconnection ourselves (for backoff + token refresh) instead of relying on
-      // EventSource's built-in retry, so close the current source first.
+      // Manage reconnection ourselves (backoff + token refresh), so close the source first.
       closeClient();
       if (closing) {
         return;
@@ -144,8 +152,8 @@ export const useRealtimeStore = defineStore('realtime', {
     },
 
     /**
-     * Full reconciliation used on (re)connect: reload the file tree, re-sync open files, and
-     * regenerate the preview. Cheaper than server-side event replay and always converges.
+     * Full reconciliation on reconnect: reload the tree, re-sync open files, regenerate preview.
+     * Cheaper than server-side event replay and always converges.
      */
     async resync() {
       const files = useFilesStore();
