@@ -214,7 +214,7 @@ export const useRealtimeStore = defineStore('realtime', {
               await editor.onFileRenamed(event.path, event.file);
               if (event.file.path.startsWith('/pfs/')) {
                 const workspaceId = workspaces.currentWorkspace?.id;
-                if (workspaceId) workspaces.fetchPfs(workspaceId);
+if (workspaceId) await workspaces.fetchPfs(workspaceId);
               }
             }
             preview.generatePreview();
