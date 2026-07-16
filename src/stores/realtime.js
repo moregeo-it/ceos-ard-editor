@@ -19,6 +19,8 @@ let reconnectTimer = null;
 let backoff = 0;
 let closing = false;
 let hasConnected = false; // true once the first open succeeds, so a re-open triggers a resync
+// Promise chain that serializes event handling, so events are applied in order
+let eventQueue = Promise.resolve();
 
 function clearReconnectTimer() {
   if (reconnectTimer) {
@@ -76,6 +78,7 @@ export const useRealtimeStore = defineStore('realtime', {
       closing = true;
       clearReconnectTimer();
       closeClient();
+      eventQueue = Promise.resolve();
       this.status = 'idle';
       this.workspaceId = null;
     },
@@ -84,6 +87,7 @@ export const useRealtimeStore = defineStore('realtime', {
       this.disconnect();
       backoff = 0;
       hasConnected = false;
+      eventQueue = Promise.resolve();
       Object.assign(this, getDefaults());
     },
 
@@ -111,16 +115,25 @@ export const useRealtimeStore = defineStore('realtime', {
         token: auth.accessToken,
         onOpen: () => this._onOpen(),
         onError: () => this._onError(),
-        onEvent: (event) => this._handleEvent(event),
+        onEvent: (event) => this._enqueue(() => this._handleEvent(event)),
       });
+    },
+
+    /**
+     * Append a task to the serialized event queue; it runs only after the previous task settles.
+     */
+    _enqueue(task) {
+      eventQueue = eventQueue.then(task).catch(() => {});
+      return eventQueue;
     },
 
     _onOpen() {
       backoff = 0;
       this.status = 'open';
       if (hasConnected) {
-        // Reconnected after a drop - reconcile anything missed while offline.
-        this.resync();
+        // Reconnected after a drop - reconcile anything missed while offline. Enqueued so it runs
+        // ahead of live events that arrive during reconciliation, instead of racing them.
+        this._enqueue(() => this.resync());
       }
       hasConnected = true;
     },
@@ -214,7 +227,7 @@ export const useRealtimeStore = defineStore('realtime', {
               await editor.onFileRenamed(event.path, event.file);
               if (event.file.path.startsWith('/pfs/')) {
                 const workspaceId = workspaces.currentWorkspace?.id;
-if (workspaceId) await workspaces.fetchPfs(workspaceId);
+                if (workspaceId) await workspaces.fetchPfs(workspaceId);
               }
             }
             preview.generatePreview();
