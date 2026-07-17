@@ -198,13 +198,13 @@ export const useRealtimeStore = defineStore('realtime', {
           case 'file.saved': {
             if (event.file) files.updateFile(event.file);
             await editor.sync(event.path); // no-op if the file isn't open
-            preview.generatePreview();
+            await preview.generatePreview();
             break;
           }
 
           case 'file.created': {
             if (event.file) files.updateFile(event.file);
-            preview.generatePreview();
+            await preview.generatePreview();
             // Deliberately do NOT open a tab - viewers shouldn't get tabs opened by the owner.
             break;
           }
@@ -216,7 +216,7 @@ export const useRealtimeStore = defineStore('realtime', {
               files.deleteFileFromStore(event.path);
             }
             await editor.onFileDeleted(event.path);
-            preview.generatePreview();
+            await preview.generatePreview();
             break;
           }
 
@@ -230,7 +230,7 @@ export const useRealtimeStore = defineStore('realtime', {
                 if (workspaceId) await workspaces.fetchPfs(workspaceId);
               }
             }
-            preview.generatePreview();
+            await preview.generatePreview();
             break;
           }
 
@@ -242,7 +242,7 @@ export const useRealtimeStore = defineStore('realtime', {
             if (event.file && event.file.path) {
               await editor.onFileReverted(event.path, event.file);
             }
-            preview.generatePreview();
+            await preview.generatePreview();
             break;
           }
 

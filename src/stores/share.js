@@ -22,7 +22,7 @@ export const useShareStore = defineStore('share', {
         const response = await shareService.listShares(workspaceId);
         // Ignore responses for a workspace the dialog has since moved away from.
         if (workspaceId !== this.activeWorkspaceId) return;
-        this.shares = response.shares || [];
+        this.shares = response || [];
       } finally {
         if (workspaceId === this.activeWorkspaceId) this.isLoadingShares = false;
       }
@@ -34,7 +34,7 @@ export const useShareStore = defineStore('share', {
         const response = await shareService.listShareLinks(workspaceId);
         // Ignore responses for a workspace the dialog has since moved away from.
         if (workspaceId !== this.activeWorkspaceId) return;
-        this.shareLinks = response.shareLinks || [];
+        this.shareLinks = response || [];
       } finally {
         if (workspaceId === this.activeWorkspaceId) this.isLoadingShareLinks = false;
       }
@@ -44,7 +44,7 @@ export const useShareStore = defineStore('share', {
       this.isMutating = true;
       try {
         const response = await shareService.createShares(workspaceId, githubUsernames, mode);
-        const newShares = response.shares || [];
+        const newShares = response || [];
         // Merge: replace any existing shares with the same id, append the rest
         for (const share of newShares) {
           const index = this.shares.findIndex((s) => s.id === share.id);
