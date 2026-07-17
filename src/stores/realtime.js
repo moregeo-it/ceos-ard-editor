@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import router from '@/router';
 
-import { openWorkspaceEvents } from '@/services/events.service';
+import { openWorkspaceConnection } from '@/services/collab.service';
 import { useAuthStore } from './auth';
 import { useEditorStore } from './editor';
 import { useFilesStore } from './files';
@@ -12,7 +12,7 @@ import { useWorkspacesStore } from './workspaces';
 const RECONNECT_MIN_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 
-// Kept in module scope (not Pinia state) so the non-serializable EventSource + timers aren't
+// Kept in module scope (not Pinia state) so the non-serializable WebSocket + timers aren't
 // wrapped in a reactive proxy.
 let client = null;
 let reconnectTimer = null;
@@ -42,7 +42,7 @@ const getDefaults = () => ({
 });
 
 /**
- * Applies the owner's live SSE changes to a read-only viewer's local stores. Uses the low-level
+ * Applies the owner's live changes to a read-only viewer's local stores. Uses the low-level
  * files mutators (`updateFile`/`deleteFileFromStore`), which bypass the local sync plugins, then
  * replicates their editor/preview follow-up explicitly.
  */
@@ -51,7 +51,7 @@ export const useRealtimeStore = defineStore('realtime', {
 
   actions: {
     /**
-     * Open (or re-open) the SSE stream for a workspace. Safe to call repeatedly.
+     * Open (or re-open) the realtime stream for a workspace. Safe to call repeatedly.
      */
     connect(workspaceId) {
       const auth = useAuthStore();
@@ -110,7 +110,7 @@ export const useRealtimeStore = defineStore('realtime', {
         return;
       }
       this.status = 'connecting';
-      client = openWorkspaceEvents({
+      client = openWorkspaceConnection({
         workspaceId,
         token: auth.accessToken,
         onOpen: () => this._onOpen(),
@@ -210,12 +210,18 @@ export const useRealtimeStore = defineStore('realtime', {
           }
 
           case 'file.deleted': {
-            if (event.file && event.file.path) {
+            if (event.file?.is_directory) {
+              // A folder delete is one event with no per-file events for its contents, so mirror it
+              // by removing the whole subtree locally and closing any open tabs inside it.
+              files.deleteFolderFromStore(event.path);
+              await editor.onFolderDeleted(event.path);
+            } else if (event.file && event.file.path) {
               files.updateFile(event.file); // tracked delete keeps a "deleted" status in the tree
+              await editor.onFileDeleted(event.path);
             } else {
               files.deleteFileFromStore(event.path);
+              await editor.onFileDeleted(event.path);
             }
-            await editor.onFileDeleted(event.path);
             await preview.generatePreview();
             break;
           }

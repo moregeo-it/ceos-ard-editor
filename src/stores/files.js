@@ -161,6 +161,22 @@ export const useFilesStore = defineStore('files', {
     },
 
     /**
+     * Remove a folder and everything inside it from the store.
+     *
+     * `all` is a flat path->file map and the tree is derived from those paths, so removing only the
+     * folder's own entry would leave its descendants (paths under `${folderPath}/`) behind. Delete
+     * the folder entry and every descendant entry.
+     */
+    deleteFolderFromStore(folderPath) {
+      const prefix = folderPath.endsWith('/') ? folderPath : `${folderPath}/`;
+      for (const path of Object.keys(this.all)) {
+        if (path === folderPath || path.startsWith(prefix)) {
+          delete this.all[path];
+        }
+      }
+    },
+
+    /**
      * Create new file or folder
      */
     async createFile(path, name, type) {
@@ -194,8 +210,13 @@ export const useFilesStore = defineStore('files', {
      * Delete file or folder
      */
     async deleteFile(filePath) {
+      // Is this a folder? We need to know to remove its whole subtree, but an untracked delete
+      // responds with no body (204), so read is_directory from the entry we still hold.
+      const isDirectory = this.all[filePath]?.is_directory ?? false;
       const fileData = await fileService.deleteFile(getWorkspaceId(), filePath);
-      if (fileData && fileData.path) {
+      if (isDirectory || fileData?.is_directory) {
+        this.deleteFolderFromStore(filePath);
+      } else if (fileData && fileData.path) {
         this.updateFile(fileData);
       } else {
         this.deleteFileFromStore(filePath);

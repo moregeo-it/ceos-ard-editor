@@ -65,7 +65,7 @@ export default {
         });
       } else {
         this.closeDialog('ReauthenticationDialog');
-        // Reauth completed - revive the SSE stream if it stalled waiting for a fresh token
+        // Reauth completed - revive the realtime stream if it stalled waiting for a fresh token
         // (no-op unless a workspace stream is currently stalled).
         this.realtimeStore.resumeIfStalled();
       }

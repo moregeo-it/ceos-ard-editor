@@ -145,6 +145,23 @@ export const useEditorStore = defineStore('editor', {
     },
 
     /**
+     * Close open tabs for files inside a deleted folder.
+     *
+     * A folder delete is a single event with no per-file events for its contents, so its open
+     * descendant tabs are closed here. Only tabs without unsaved changes are closed, mirroring
+     * onFileDeleted.
+     */
+    async onFolderDeleted(folderPath) {
+      const prefix = folderPath.endsWith('/') ? folderPath : `${folderPath}/`;
+      const openUnderFolder = this.opened.filter(
+        (f) => f.path.startsWith(prefix) && !this.changed[f.path],
+      );
+      for (const file of openUnderFolder) {
+        await this.close(file.path);
+      }
+    },
+
+    /**
      * Handle file rename from files store.
      * Updates all editor state from old path to new path.
      */
@@ -227,6 +244,10 @@ export function filesEditorSyncPlugin({ store }) {
 
   store.$onAction(({ name, args, after }) => {
     const editor = useEditorStore();
+    // Was the deleted path a folder? Check now, before the action runs: by the time `after` fires
+    // the store entry is gone, and an untracked delete returns no body so its result can't tell us.
+    const wasDirectory =
+      name === 'deleteFile' ? (store.all[args[0]]?.is_directory ?? false) : false;
     after(async (result) => {
       try {
         switch (name) {
@@ -242,7 +263,11 @@ export function filesEditorSyncPlugin({ store }) {
 
           case 'deleteFile': {
             const [filePath] = args;
-            await editor.onFileDeleted(filePath);
+            if (wasDirectory || result?.is_directory) {
+              await editor.onFolderDeleted(filePath);
+            } else {
+              await editor.onFileDeleted(filePath);
+            }
             break;
           }
 

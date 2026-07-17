@@ -78,7 +78,13 @@ export const useShareStore = defineStore('share', {
       this.isMutating = true;
       try {
         await shareService.revokeShare(workspaceId, shareId);
-        this.shares = this.shares.filter((s) => s.id !== shareId);
+        // Revoke returns 204 (no body). A revoked invitee isn't dropped from the list - it stays,
+        // shown greyed-out as "revoked" (that's what a reload returns and what the dialog renders),
+        // so flip the row's status in place instead of removing it.
+        const index = this.shares.findIndex((s) => s.id === shareId);
+        if (index !== -1) {
+          this.shares[index] = { ...this.shares[index], status: 'revoked' };
+        }
       } finally {
         this.isMutating = false;
       }
