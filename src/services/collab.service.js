@@ -11,13 +11,11 @@ function toWebSocketUrl(httpUrl) {
 /**
  * Open a WebSocket connection to a workspace's real-time change stream.
  *
- * Replaces the former SSE (EventSource) transport. Browsers can't set headers on a WebSocket
- * handshake, so the JWT goes in a query param - the backend's collab gateway reads `?authorization=`
- * (the same mechanism the SSE stream used).
+ * Browsers can't set headers on a WebSocket handshake, so the JWT is passed as a query param -
+ * the backend reads `?authorization=`.
  *
- * The callback surface matches the former `openWorkspaceEvents` so the realtime store is unchanged:
- * `onOpen` fires once connected, `onEvent` for each parsed event envelope, `onError` when the socket
- * closes or fails (which drives the store's reconnect/backoff logic).
+ * Callbacks: `onOpen` fires once connected, `onEvent` for each parsed event envelope, and `onError`
+ * when the socket closes or fails (which drives the store's reconnect/backoff logic).
  *
  * @param {Object} params
  * @param {string} params.workspaceId
