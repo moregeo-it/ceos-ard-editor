@@ -81,7 +81,7 @@
                         icon
                         variant="text"
                         size="small"
-                        :disabled="shareStore.isMutating"
+                        :disabled="shareStore.isMutating || share.status === 'revoked'"
                         @click="removeShare(share)"
                       >
                         <v-icon :icon="icons.close" />
