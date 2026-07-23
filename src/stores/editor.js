@@ -135,12 +135,28 @@ export const useEditorStore = defineStore('editor', {
 
     /**
      * Handle file deletion from files store.
-     * If file has no unsaved changes, close it.
-     * Otherwise keep it open and mark it specifically.
+     * A tracked (revertible) delete leaves the tab open when it has unsaved changes, so the
+     * user can still revert from the tree. An untracked delete is permanent (nothing to revert
+     * to), so the tab always closes, even with unsaved changes.
      */
     async onFileDeleted(filePath) {
-      if (!this.changed[filePath]) {
+      const files = useFilesStore();
+      const canRevert = filePath in files.all;
+      if (!canRevert || !this.changed[filePath]) {
         await this.close(filePath);
+      }
+    },
+
+    /**
+     * Handle folder deletion from files store.
+     * Folder deletion always purges descendant entries from the files store (see
+     * deleteFolderDescendants), so there's nothing to preserve - close every open tab under it.
+     */
+    async onFolderDeleted(folderPath) {
+      const prefix = folderPath.endsWith('/') ? folderPath : `${folderPath}/`;
+      const openUnderFolder = this.opened.filter((f) => f.path.startsWith(prefix));
+      for (const file of openUnderFolder) {
+        await this.close(file.path);
       }
     },
 
@@ -229,6 +245,10 @@ export function filesEditorSyncPlugin({ store }) {
 
   store.$onAction(({ name, args, after }) => {
     const editor = useEditorStore();
+    // An untracked delete returns no body, so by the time
+    // `after` fires there's no way to tell from the result whether the path was a directory.
+    const wasDirectory =
+      name === 'deleteFile' ? (store.all[args[0]]?.is_directory ?? false) : false;
     after(async (result) => {
       try {
         switch (name) {
@@ -244,7 +264,11 @@ export function filesEditorSyncPlugin({ store }) {
 
           case 'deleteFile': {
             const [filePath] = args;
-            await editor.onFileDeleted(filePath);
+            if (wasDirectory || result?.is_directory) {
+              await editor.onFolderDeleted(filePath);
+            } else {
+              await editor.onFileDeleted(filePath);
+            }
             break;
           }
 

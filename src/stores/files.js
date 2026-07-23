@@ -161,6 +161,19 @@ export const useFilesStore = defineStore('files', {
     },
 
     /**
+     * Remove everything under a deleted folder from the store. `all` is a flat path->file map,
+     * so descendant paths would otherwise linger with stale, now-meaningless status.
+     */
+    deleteFolderDescendants(folderPath) {
+      const prefix = folderPath.endsWith('/') ? folderPath : `${folderPath}/`;
+      for (const path of Object.keys(this.all)) {
+        if (path.startsWith(prefix)) {
+          delete this.all[path];
+        }
+      }
+    },
+
+    /**
      * Create new file or folder
      */
     async createFile(path, name, type) {
@@ -194,7 +207,11 @@ export const useFilesStore = defineStore('files', {
      * Delete file or folder
      */
     async deleteFile(filePath) {
+      const isDirectory = this.all[filePath]?.is_directory ?? false;
       const fileData = await fileService.deleteFile(getWorkspaceId(), filePath);
+      if (isDirectory || fileData?.is_directory) {
+        this.deleteFolderDescendants(filePath);
+      }
       if (fileData && fileData.path) {
         this.updateFile(fileData);
       } else {
