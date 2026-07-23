@@ -171,7 +171,10 @@ export const useFilesStore = defineStore('files', {
           delete this.all[path];
         }
       }
-    },
+      if (this.searchResults) {
+        this.searchResults = this.searchResults.filter((file) => !file.path.startsWith(prefix));
+      }
+    }
 
     /**
      * Create new file or folder
