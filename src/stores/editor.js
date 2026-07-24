@@ -134,10 +134,8 @@ export const useEditorStore = defineStore('editor', {
     },
 
     /**
-     * Handle file deletion from files store.
-     * A tracked (revertible) delete leaves the tab open when it has unsaved changes, so the
-     * user can still revert from the tree. An untracked delete is permanent (nothing to revert
-     * to), so the tab always closes, even with unsaved changes.
+     * Close the tab of a deleted file. Keep it open only for a revertible (tracked) delete with
+     * unsaved changes; an untracked delete is permanent, so always close it.
      */
     async onFileDeleted(filePath) {
       const files = useFilesStore();
@@ -148,9 +146,7 @@ export const useEditorStore = defineStore('editor', {
     },
 
     /**
-     * Handle folder deletion from files store.
-     * Folder deletion always purges descendant entries from the files store (see
-     * deleteFolderDescendants), so there's nothing to preserve - close every open tab under it.
+     * Close every open tab for a file inside a deleted folder.
      */
     async onFolderDeleted(folderPath) {
       const prefix = folderPath.endsWith('/') ? folderPath : `${folderPath}/`;
@@ -245,8 +241,8 @@ export function filesEditorSyncPlugin({ store }) {
 
   store.$onAction(({ name, args, after }) => {
     const editor = useEditorStore();
-    // An untracked delete returns no body, so by the time
-    // `after` fires there's no way to tell from the result whether the path was a directory.
+    // Capture before the delete runs: an untracked delete returns no body, so the result can't
+    // tell us whether it was a folder.
     const wasDirectory =
       name === 'deleteFile' ? (store.all[args[0]]?.is_directory ?? false) : false;
     after(async (result) => {

@@ -161,8 +161,25 @@ export const useFilesStore = defineStore('files', {
     },
 
     /**
-     * Remove everything under a deleted folder from the store. `all` is a flat path->file map,
-     * so descendant paths would otherwise linger with stale, now-meaningless status.
+     * Un-mark any ancestor folder still flagged as deleted. Restoring a file recreates its parent
+     * directories, so they are no longer deleted. Keep the entries (status -> null) so the folders
+     * stay in the tree.
+     */
+    clearAncestorDeletedStatus(filePath) {
+      let parent = getParentPath(filePath);
+      while (parent) {
+        const entry = this.all[parent];
+        if (entry && entry.status === 'deleted') {
+          this.all[parent] = { ...entry, status: null };
+        }
+        parent = getParentPath(parent);
+      }
+    },
+
+    /**
+     * Drop a deleted folder's descendants and collapse it, so re-expanding it re-fetches its
+     * now-deleted contents from the backend. Clearing isFolderComplete defeats loadFiles' cache;
+     * collapsing (removing from openedFolders) lets the next expand fire folder-expand again.
      */
     deleteFolderDescendants(folderPath) {
       const prefix = folderPath.endsWith('/') ? folderPath : `${folderPath}/`;
@@ -171,6 +188,14 @@ export const useFilesStore = defineStore('files', {
           delete this.all[path];
         }
       }
+      for (const path of Object.keys(this.isFolderComplete)) {
+        if (path === folderPath || path.startsWith(prefix)) {
+          delete this.isFolderComplete[path];
+        }
+      }
+      this.openedFolders = this.openedFolders.filter(
+        (path) => path !== folderPath && !path.startsWith(prefix),
+      );
       if (this.searchResults) {
         this.searchResults = this.searchResults.filter((file) => !file.path.startsWith(prefix));
       }
@@ -239,11 +264,16 @@ export const useFilesStore = defineStore('files', {
      * Revert file to last saved state
      */
     async revertFile(filePath) {
+      // Only a deleted file's revert restores parent folders; check before the status is updated.
+      const wasDeleted = this.all[filePath]?.status === 'deleted';
       const fileData = await fileService.revertFile(getWorkspaceId(), filePath);
       if (filePath !== fileData.path) {
         this.deleteFileFromStore(filePath);
       }
       this.updateFile(fileData);
+      if (wasDeleted) {
+        this.clearAncestorDeletedStatus(fileData.path);
+      }
       return fileData;
     },
 
