@@ -174,7 +174,7 @@ export const useFilesStore = defineStore('files', {
       if (this.searchResults) {
         this.searchResults = this.searchResults.filter((file) => !file.path.startsWith(prefix));
       }
-    }
+    },
 
     /**
      * Create new file or folder
