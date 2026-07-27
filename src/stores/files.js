@@ -77,6 +77,14 @@ export const useFilesStore = defineStore('files', {
       };
       return getTree('/');
     },
+    /**
+     * Whether a path is a folder. Falls back to search results, since a searched folder can
+     * exist in searchResults but not yet in `all`.
+     */
+    isDirectory: (state) => (path) =>
+      state.all[path]?.is_directory ??
+      state.searchResults?.find((file) => file.path === path)?.is_directory ??
+      false,
   },
 
   actions: {
@@ -161,16 +169,26 @@ export const useFilesStore = defineStore('files', {
     },
 
     /**
-     * Un-mark any ancestor folder still flagged as deleted. Restoring a file recreates its parent
-     * directories, so they are no longer deleted. Keep the entries (status -> null) so the folders
-     * stay in the tree.
+     * Restoring a file (save/revert) recreates its parent folders on the server; mirror that in the
+     * tree. Walk up the chain, un-marking deleted folders and recreating ones pruned on delete (else
+     * the file is orphaned), stopping at the first live ancestor.
      */
-    clearAncestorDeletedStatus(filePath) {
+    syncAncestorFolders(filePath) {
       let parent = getParentPath(filePath);
-      while (parent) {
+      while (parent && parent !== '/') {
         const entry = this.all[parent];
-        if (entry && entry.status === 'deleted') {
+        if (!entry) {
+          // Recreate an ancestor pruned on delete.
+          this.all[parent] = {
+            name: parent.substring(parent.lastIndexOf('/') + 1),
+            path: parent,
+            is_directory: true,
+            status: null,
+          };
+        } else if (entry.status === 'deleted') {
           this.all[parent] = { ...entry, status: null };
+        } else {
+          break;
         }
         parent = getParentPath(parent);
       }
@@ -237,7 +255,7 @@ export const useFilesStore = defineStore('files', {
      * Delete file or folder
      */
     async deleteFile(filePath) {
-      const isDirectory = this.all[filePath]?.is_directory ?? false;
+      const isDirectory = this.isDirectory(filePath);
       const fileData = await fileService.deleteFile(getWorkspaceId(), filePath);
       if (isDirectory || fileData?.is_directory) {
         this.deleteFolderDescendants(filePath);
@@ -260,8 +278,7 @@ export const useFilesStore = defineStore('files', {
     async save(filePath, content) {
       const fileData = await fileService.saveFile(getWorkspaceId(), filePath, content);
       this.updateFile(fileData);
-      // Saving recreates any deleted ancestor folders on the server, so un-mark them in the tree.
-      this.clearAncestorDeletedStatus(filePath);
+      this.syncAncestorFolders(filePath);
     },
 
     /**
@@ -276,7 +293,7 @@ export const useFilesStore = defineStore('files', {
       }
       this.updateFile(fileData);
       if (wasDeleted) {
-        this.clearAncestorDeletedStatus(fileData.path);
+        this.syncAncestorFolders(fileData.path);
       }
       return fileData;
     },

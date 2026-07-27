@@ -252,7 +252,7 @@ export function filesEditorSyncPlugin({ store }) {
     const editor = useEditorStore();
     // Capture before the delete runs: an untracked delete returns no body, so the result can't
     // tell us whether it was a folder.
-    const wasDirectory = name === 'deleteFile' && store.all[args[0]]?.is_directory;
+    const wasDirectory = name === 'deleteFile' && store.isDirectory(args[0]);
     after(async (result) => {
       try {
         switch (name) {
