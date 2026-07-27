@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 
 import { useWorkspacesStore } from './workspaces';
 
+import { EVENTS, emit, on } from '@/services/events';
 import fileService from '@/services/file.service';
 
 const getWorkspaceId = () => {
@@ -125,6 +126,27 @@ export const useFilesStore = defineStore('files', {
       return await Promise.all(requests);
     },
 
+    /**
+     * Apply the change list of a `file.committed` event, avoiding the per-file refetch of
+     * `updateFilesAfterCommit`: committed deletes drop their entry, everything else just loses
+     * its pending status.
+     */
+    applyCommittedChanges(changes) {
+      for (const change of changes) {
+        // Change paths come from git and may lack the leading slash the store keys have.
+        const path = change.path.startsWith('/') ? change.path : '/' + change.path;
+        const entry = this.all[path];
+        if (!entry) {
+          continue;
+        }
+        if (change.status === 'deleted') {
+          this.deleteFileFromStore(path);
+        } else {
+          entry.status = null;
+        }
+      }
+    },
+
     resetPathLoading(path) {
       const ix = this.isPathLoading.indexOf(path);
       if (ix !== -1) {
@@ -182,6 +204,7 @@ export const useFilesStore = defineStore('files', {
     async createFile(path, name, type) {
       const fileData = await fileService.createFile(getWorkspaceId(), path, name, type);
       this.updateFile(fileData);
+      emit(EVENTS.FILE_CREATED, { path: fileData.path, file: fileData });
       return fileData;
     },
 
@@ -190,9 +213,8 @@ export const useFilesStore = defineStore('files', {
      */
     async createNewPfs(content) {
       const fileData = await fileService.createNewPFS(getWorkspaceId(), content);
-
       this.updateFile(fileData);
-
+      emit(EVENTS.FILE_CREATED, { path: fileData.path, file: fileData });
       return fileData;
     },
 
@@ -203,6 +225,7 @@ export const useFilesStore = defineStore('files', {
       const fileData = await fileService.renameFile(getWorkspaceId(), filePath, newName);
       this.deleteFileFromStore(filePath);
       this.updateFile(fileData);
+      emit(EVENTS.FILE_RENAMED, { path: filePath, old_path: filePath, file: fileData });
       return fileData;
     },
 
@@ -210,17 +233,23 @@ export const useFilesStore = defineStore('files', {
      * Delete file or folder
      */
     async deleteFile(filePath) {
-      // Is this a folder? We need to know to remove its whole subtree, but an untracked delete
-      // responds with no body (204), so read is_directory from the entry we still hold.
-      const isDirectory = this.all[filePath]?.is_directory ?? false;
+      // Snapshot the entry before deleting: an untracked delete responds with no body (204), so
+      // the subtree handling and the event payload need the entry we still hold.
+      const existing = this.all[filePath];
       const fileData = await fileService.deleteFile(getWorkspaceId(), filePath);
-      if (isDirectory || fileData?.is_directory) {
+      const tracked = !!(fileData && fileData.path);
+      if (existing?.is_directory || fileData?.is_directory) {
         this.deleteFolderFromStore(filePath);
-      } else if (fileData && fileData.path) {
+      } else if (tracked) {
         this.updateFile(fileData);
       } else {
         this.deleteFileFromStore(filePath);
       }
+      emit(EVENTS.FILE_DELETED, {
+        path: filePath,
+        file: tracked ? fileData : (existing ?? null),
+        tracked,
+      });
       return fileData;
     },
 
@@ -234,6 +263,7 @@ export const useFilesStore = defineStore('files', {
     async save(filePath, content) {
       const fileData = await fileService.saveFile(getWorkspaceId(), filePath, content);
       this.updateFile(fileData);
+      emit(EVENTS.FILE_SAVED, { path: fileData.path, file: fileData });
     },
 
     /**
@@ -245,6 +275,11 @@ export const useFilesStore = defineStore('files', {
         this.deleteFileFromStore(filePath);
       }
       this.updateFile(fileData);
+      emit(EVENTS.FILE_REVERTED, {
+        path: filePath,
+        old_path: filePath !== fileData.path ? filePath : undefined,
+        file: fileData,
+      });
       return fileData;
     },
 
@@ -256,3 +291,80 @@ export const useFilesStore = defineStore('files', {
     },
   },
 });
+
+let listenersRegistered = false;
+
+/**
+ * Apply workspace events to the files store. Remote events (another user's changes forwarded from
+ * the WebSocket) are applied through the low-level mutators; local events already mutated the
+ * store inside the action that emitted them.
+ */
+export function registerFilesEventListeners() {
+  if (listenersRegistered) {
+    return;
+  }
+  listenersRegistered = true;
+
+  on(EVENTS.FILE_SAVED, (event) => {
+    if (event.source === 'remote' && event.file) {
+      useFilesStore().updateFile(event.file);
+    }
+  });
+
+  on(EVENTS.FILE_CREATED, (event) => {
+    if (event.source === 'remote' && event.file) {
+      useFilesStore().updateFile(event.file);
+    }
+  });
+
+  on(EVENTS.FILE_DELETED, (event) => {
+    if (event.source !== 'remote') {
+      return;
+    }
+    const files = useFilesStore();
+    if (event.file?.is_directory) {
+      // A folder delete is one event with no per-file events for its contents, so mirror it by
+      // removing the whole subtree locally.
+      files.deleteFolderFromStore(event.path);
+    } else if (event.tracked && event.file?.path) {
+      files.updateFile(event.file); // tracked delete keeps a "deleted" status in the tree
+    } else {
+      files.deleteFileFromStore(event.path);
+    }
+  });
+
+  on(EVENTS.FILE_RENAMED, (event) => {
+    if (event.source !== 'remote') {
+      return;
+    }
+    const files = useFilesStore();
+    files.deleteFileFromStore(event.old_path ?? event.path);
+    if (event.file) {
+      files.updateFile(event.file);
+    }
+  });
+
+  on(EVENTS.FILE_REVERTED, (event) => {
+    if (event.source !== 'remote') {
+      return;
+    }
+    const files = useFilesStore();
+    const oldPath = event.old_path ?? event.path;
+    if (event.file && event.file.path !== oldPath) {
+      files.deleteFileFromStore(oldPath);
+    }
+    if (event.file) {
+      files.updateFile(event.file);
+    }
+  });
+
+  // Both sources: local commits emit without a change list until the server exposes one.
+  on(EVENTS.FILE_COMMITTED, async (event) => {
+    const files = useFilesStore();
+    if (Array.isArray(event.changes) && event.changes.length > 0) {
+      files.applyCommittedChanges(event.changes);
+    } else {
+      await files.updateFilesAfterCommit();
+    }
+  });
+}

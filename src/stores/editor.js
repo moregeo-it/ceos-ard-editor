@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia';
 
 import { useFilesStore } from './files';
-import { useNotificationsStore } from './notifications';
-import { usePreviewStore } from './preview';
+
+import { EVENTS, on } from '@/services/events';
 
 const getDefaults = () => ({
   opened: [], // Opened files
@@ -69,7 +69,7 @@ export const useEditorStore = defineStore('editor', {
       this.data[path] = content;
       this.changed[path] = this.original[path] !== content;
     },
-    async save(path, regenerate = true) {
+    async save(path) {
       if (!this.changed[path]) {
         return false;
       }
@@ -77,14 +77,8 @@ export const useEditorStore = defineStore('editor', {
       try {
         const data = this.data[path];
         const files = useFilesStore();
+        // Preview regeneration happens via the `file.saved` event files.save() emits.
         await files.save(path, data);
-        if (regenerate) {
-          // Trigger preview regeneration, but don't await it to avoid UI delays
-          // and we also don't want to fail on preview errors here
-          const previewStore = usePreviewStore();
-          // todo: migrate to an event listener system
-          previewStore.generatePreview();
-        }
         this.original[path] = data;
         this.changed[path] = false;
         return true;
@@ -95,16 +89,8 @@ export const useEditorStore = defineStore('editor', {
       }
     },
     async saveAll() {
-      const savePromises = this.opened.map((file) => this.save(file.path, false));
-      const results = await Promise.all(savePromises);
-      if (results.some((res) => res === true)) {
-        // Trigger preview regeneration if at least one file was saved successfully
-        // Don't await it to avoid UI delays and we also don't want to fail on preview errors here.
-        const previewStore = usePreviewStore();
-        // todo: migrate to an event listener system
-        previewStore.generatePreview();
-      }
-      return results;
+      const savePromises = this.opened.map((file) => this.save(file.path));
+      return await Promise.all(savePromises);
     },
     close(path) {
       const index = this.opened.findIndex((f) => f.path === path);
@@ -237,60 +223,50 @@ export const useEditorStore = defineStore('editor', {
   },
 });
 
-export function filesEditorSyncPlugin({ store }) {
-  if (store.$id !== 'files') {
+let listenersRegistered = false;
+
+/**
+ * React to workspace events with editor follow-ups (tabs, open-file state). Self-contained:
+ * reads only the event payload and editor state, never the files tree.
+ */
+export function registerEditorEventListeners() {
+  if (listenersRegistered) {
     return;
   }
+  listenersRegistered = true;
 
-  store.$onAction(({ name, args, after }) => {
+  on(EVENTS.FILE_CREATED, async (event) => {
+    // Only open a tab for files this user created - viewers shouldn't get tabs opened by others.
+    if (event.source === 'local') {
+      await useEditorStore().onFileCreated(event.file);
+    }
+  });
+
+  on(EVENTS.FILE_SAVED, async (event) => {
+    // A local save already holds the content; only remote saves need a re-sync of the open tab.
+    if (event.source === 'remote') {
+      await useEditorStore().sync(event.path); // no-op if the file isn't open
+    }
+  });
+
+  on(EVENTS.FILE_DELETED, async (event) => {
     const editor = useEditorStore();
-    // Was the deleted path a folder? Check now, before the action runs: by the time `after` fires
-    // the store entry is gone, and an untracked delete returns no body so its result can't tell us.
-    const wasDirectory =
-      name === 'deleteFile' ? (store.all[args[0]]?.is_directory ?? false) : false;
-    after(async (result) => {
-      try {
-        switch (name) {
-          case 'createFile': {
-            await editor.onFileCreated(result);
-            break;
-          }
+    if (event.file?.is_directory) {
+      await editor.onFolderDeleted(event.path);
+    } else {
+      await editor.onFileDeleted(event.path);
+    }
+  });
 
-          case 'createNewPfs': {
-            await editor.onFileCreated(result);
-            break;
-          }
+  on(EVENTS.FILE_RENAMED, async (event) => {
+    if (event.file?.path) {
+      await useEditorStore().onFileRenamed(event.old_path ?? event.path, event.file);
+    }
+  });
 
-          case 'deleteFile': {
-            const [filePath] = args;
-            if (wasDirectory || result?.is_directory) {
-              await editor.onFolderDeleted(filePath);
-            } else {
-              await editor.onFileDeleted(filePath);
-            }
-            break;
-          }
-
-          case 'renameFile': {
-            const [oldPath] = args;
-            if (result && result.path) {
-              await editor.onFileRenamed(oldPath, result);
-            }
-            break;
-          }
-
-          case 'revertFile': {
-            const [filePath] = args;
-            if (result && result.path) {
-              await editor.onFileReverted(filePath, result);
-            }
-            break;
-          }
-        }
-      } catch (error) {
-        const notifications = useNotificationsStore();
-        notifications.error('Updating editor after file operation failed: ' + error.message);
-      }
-    });
+  on(EVENTS.FILE_REVERTED, async (event) => {
+    if (event.file?.path) {
+      await useEditorStore().onFileReverted(event.old_path ?? event.path, event.file);
+    }
   });
 }

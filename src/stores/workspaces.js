@@ -1,4 +1,13 @@
 import { defineStore } from 'pinia';
+import router from '@/router';
+
+import { useEditorStore } from './editor';
+import { useFilesStore } from './files';
+import { useNotificationsStore } from './notifications';
+import { usePreviewStore } from './preview';
+import { useRealtimeStore } from './realtime';
+
+import { EVENTS, on } from '@/services/events';
 import workspaceService from '@/services/workspace.service';
 
 export const useWorkspacesStore = defineStore('workspaces', {
@@ -170,3 +179,63 @@ export const useWorkspacesStore = defineStore('workspaces', {
     },
   },
 });
+
+// Events after which the PFS options may have changed (a save doesn't add/remove PFS folders).
+const PFS_AFFECTING_EVENTS = new Set([
+  EVENTS.FILE_CREATED,
+  EVENTS.FILE_RENAMED,
+  EVENTS.FILE_DELETED,
+  EVENTS.FILE_REVERTED,
+]);
+
+function affectsPfs(event) {
+  const paths = [event.path, event.old_path, event.file?.path];
+  return paths.some((path) => typeof path === 'string' && path.startsWith('/pfs/'));
+}
+
+let listenersRegistered = false;
+
+/**
+ * React to workspace events: refresh the PFS options when files under /pfs/ change, reload the
+ * workspace when it is archived, and leave the workspace when access is lost.
+ */
+export function registerWorkspacesEventListeners() {
+  if (listenersRegistered) {
+    return;
+  }
+  listenersRegistered = true;
+
+  on('file.*', async (event) => {
+    if (!PFS_AFFECTING_EVENTS.has(event.type) || !affectsPfs(event)) {
+      return;
+    }
+    const workspaces = useWorkspacesStore();
+    const workspaceId = workspaces.currentWorkspace?.id;
+    if (workspaceId) {
+      await workspaces.fetchPfs(workspaceId);
+    }
+  });
+
+  on(EVENTS.WORKSPACE_ARCHIVED, async () => {
+    const workspaces = useWorkspacesStore();
+    const workspaceId = workspaces.currentWorkspace?.id || useRealtimeStore().workspaceId;
+    if (workspaceId) {
+      await workspaces.getWorkspace(workspaceId);
+    }
+  });
+
+  // Access is gone (terminal events - the server closes the socket after delivering them):
+  // tear down the realtime stream, clear workspace-scoped state, and leave.
+  const handleAccessLost = () => {
+    useNotificationsStore().warning(
+      'Your access to this workspace has changed. Returning to your workspaces.',
+    );
+    useRealtimeStore().disconnect();
+    useEditorStore().reset();
+    useFilesStore().reset();
+    usePreviewStore().reset();
+    router.push({ name: 'workspaces' }).catch(() => {});
+  };
+  on(EVENTS.SHARE_REVOKED, handleAccessLost);
+  on(EVENTS.WORKSPACE_DELETED, handleAccessLost);
+}

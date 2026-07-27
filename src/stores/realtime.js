@@ -1,13 +1,11 @@
 import { defineStore } from 'pinia';
-import router from '@/router';
 
+import { EVENTS, emit, enqueue } from '@/services/events';
 import { openWorkspaceConnection } from '@/services/collab.service';
 import { useAuthStore } from './auth';
 import { useEditorStore } from './editor';
 import { useFilesStore } from './files';
 import { useNotificationsStore } from './notifications';
-import { usePreviewStore } from './preview';
-import { useWorkspacesStore } from './workspaces';
 
 const RECONNECT_MIN_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
@@ -19,8 +17,6 @@ let reconnectTimer = null;
 let backoff = 0;
 let closing = false;
 let hasConnected = false; // true once the first open succeeds, so a re-open triggers a resync
-// Promise chain that serializes event handling, so events are applied in order
-let eventQueue = Promise.resolve();
 
 function clearReconnectTimer() {
   if (reconnectTimer) {
@@ -42,9 +38,9 @@ const getDefaults = () => ({
 });
 
 /**
- * Applies the owner's live changes to a read-only viewer's local stores. Uses the low-level
- * files mutators (`updateFile`/`deleteFileFromStore`), which bypass the local sync plugins, then
- * replicates their editor/preview follow-up explicitly.
+ * Manages the realtime WebSocket stream and forwards its events onto the central event bus
+ * (see `@/services/events`) with `source: 'remote'`. The store listeners registered in main.js
+ * apply them - the same handlers that react to local operations.
  */
 export const useRealtimeStore = defineStore('realtime', {
   state: () => getDefaults(),
@@ -78,7 +74,6 @@ export const useRealtimeStore = defineStore('realtime', {
       closing = true;
       clearReconnectTimer();
       closeClient();
-      eventQueue = Promise.resolve();
       this.status = 'idle';
       this.workspaceId = null;
     },
@@ -87,7 +82,6 @@ export const useRealtimeStore = defineStore('realtime', {
       this.disconnect();
       backoff = 0;
       hasConnected = false;
-      eventQueue = Promise.resolve();
       Object.assign(this, getDefaults());
     },
 
@@ -115,25 +109,17 @@ export const useRealtimeStore = defineStore('realtime', {
         token: auth.accessToken,
         onOpen: () => this._onOpen(),
         onError: () => this._onError(),
-        onEvent: (event) => this._enqueue(() => this._handleEvent(event)),
+        onEvent: (event) => this._handleEvent(event),
       });
-    },
-
-    /**
-     * Append a task to the serialized event queue; it runs only after the previous task settles.
-     */
-    _enqueue(task) {
-      eventQueue = eventQueue.then(task).catch(() => {});
-      return eventQueue;
     },
 
     _onOpen() {
       backoff = 0;
       this.status = 'open';
       if (hasConnected) {
-        // Reconnected after a drop - reconcile anything missed while offline. Enqueued so it runs
-        // ahead of live events that arrive during reconciliation, instead of racing them.
-        this._enqueue(() => this.resync());
+        // Reconnected after a drop - reconcile anything missed while offline. Runs on the bus
+        // queue so it stays ahead of live events that arrive during reconciliation.
+        enqueue(() => this.resync());
       }
       hasConnected = true;
     },
@@ -165,125 +151,34 @@ export const useRealtimeStore = defineStore('realtime', {
     },
 
     /**
-     * Full reconciliation on reconnect: reload the tree, re-sync open files, regenerate preview.
-     * Cheaper than server-side event replay and always converges.
+     * Full reconciliation on reconnect: reload the tree, re-sync open files, then announce it via
+     * a single `realtime.resynced` event (no per-file event storm). Cheaper than server-side
+     * event replay and always converges.
      */
     async resync() {
       const files = useFilesStore();
       const editor = useEditorStore();
-      const preview = usePreviewStore();
       try {
         await files.loadFiles('/', true);
         await Promise.all(editor.opened.map((file) => editor.sync(file.path)));
-        preview.generatePreview();
+        emit(EVENTS.REALTIME_RESYNCED, { workspaceId: this.workspaceId });
       } catch (error) {
         useNotificationsStore().error('Failed to resync workspace: ' + error.message);
       }
     },
 
-    async _handleEvent(event) {
+    /**
+     * Forward a WebSocket event onto the central event bus. The bus serializes dispatches, so
+     * events are applied in the order they arrive.
+     */
+    _handleEvent(event) {
       const auth = useAuthStore();
-      // Echo suppression: ignore events caused by this user (e.g. the owner's own actions).
+      // Echo suppression: ignore events caused by this user (e.g. the owner's own actions) -
+      // the local action already emitted the equivalent event with `source: 'local'`.
       if (event.actor_user_id && event.actor_user_id === auth.userId) {
         return;
       }
-
-      const files = useFilesStore();
-      const editor = useEditorStore();
-      const preview = usePreviewStore();
-      const workspaces = useWorkspacesStore();
-
-      try {
-        switch (event.type) {
-          case 'file.saved': {
-            if (event.file) files.updateFile(event.file);
-            await editor.sync(event.path); // no-op if the file isn't open
-            await preview.generatePreview();
-            break;
-          }
-
-          case 'file.created': {
-            if (event.file) files.updateFile(event.file);
-            await preview.generatePreview();
-            // Deliberately do NOT open a tab - viewers shouldn't get tabs opened by the owner.
-            break;
-          }
-
-          case 'file.deleted': {
-            if (event.file?.is_directory) {
-              // A folder delete is one event with no per-file events for its contents, so mirror it
-              // by removing the whole subtree locally and closing any open tabs inside it.
-              files.deleteFolderFromStore(event.path);
-              await editor.onFolderDeleted(event.path);
-            } else if (event.file && event.file.path) {
-              files.updateFile(event.file); // tracked delete keeps a "deleted" status in the tree
-              await editor.onFileDeleted(event.path);
-            } else {
-              files.deleteFileFromStore(event.path);
-              await editor.onFileDeleted(event.path);
-            }
-            await preview.generatePreview();
-            break;
-          }
-
-          case 'file.renamed': {
-            files.deleteFileFromStore(event.path);
-            if (event.file) files.updateFile(event.file);
-            if (event.file && event.file.path) {
-              await editor.onFileRenamed(event.path, event.file);
-              if (event.file.path.startsWith('/pfs/')) {
-                const workspaceId = workspaces.currentWorkspace?.id;
-                if (workspaceId) await workspaces.fetchPfs(workspaceId);
-              }
-            }
-            await preview.generatePreview();
-            break;
-          }
-
-          case 'file.reverted': {
-            if (event.file && event.file.path !== event.path) {
-              files.deleteFileFromStore(event.path);
-            }
-            if (event.file) files.updateFile(event.file);
-            if (event.file && event.file.path) {
-              await editor.onFileReverted(event.path, event.file);
-            }
-            await preview.generatePreview();
-            break;
-          }
-
-          case 'file.committed': {
-            await files.updateFilesAfterCommit();
-            break;
-          }
-
-          case 'workspace.archived': {
-            const workspaceId = workspaces.currentWorkspace?.id || this.workspaceId;
-            if (workspaceId) await workspaces.getWorkspace(workspaceId);
-            break;
-          }
-
-          case 'share.revoked':
-          case 'workspace.deleted': {
-            this._handleAccessLost();
-            break;
-          }
-        }
-      } catch (error) {
-        useNotificationsStore().error('Failed to apply live update: ' + error.message);
-      }
-    },
-
-    _handleAccessLost() {
-      useNotificationsStore().warning(
-        'Your access to this workspace has changed. Returning to your workspaces.',
-      );
-      this.disconnect();
-      // Clear workspace-scoped state so the editor doesn't linger with stale data.
-      useEditorStore().reset();
-      useFilesStore().reset();
-      usePreviewStore().reset();
-      router.push({ name: 'workspaces' }).catch(() => {});
+      return emit(event.type, { ...event, source: 'remote' });
     },
   },
 });
