@@ -197,7 +197,9 @@ export const useFilesStore = defineStore('files', {
         (path) => path !== folderPath && !path.startsWith(prefix),
       );
       if (this.searchResults) {
-        this.searchResults = this.searchResults.filter((file) => !file.path.startsWith(prefix));
+        this.searchResults = this.searchResults.filter(
+          (file) => file.path !== folderPath && !file.path.startsWith(prefix),
+        );
       }
     },
 
