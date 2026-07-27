@@ -183,18 +183,55 @@ export const useFilesStore = defineStore('files', {
     },
 
     /**
-     * Remove a folder and everything inside it from the store.
-     *
-     * `all` is a flat path->file map and the tree is derived from those paths, so removing only the
-     * folder's own entry would leave its descendants (paths under `${folderPath}/`) behind. Delete
-     * the folder entry and every descendant entry.
+     * Restoring a file (save/revert) recreates its parent folders on the server; mirror that in the
+     * tree. Walk up the chain, un-marking deleted folders and recreating ones pruned on delete (else
+     * the file is orphaned), stopping at the first live ancestor.
      */
-    deleteFolderFromStore(folderPath) {
+    syncAncestorFolders(filePath) {
+      let parent = getParentPath(filePath);
+      while (parent && parent !== '/') {
+        const entry = this.all[parent];
+        if (!entry) {
+          // Recreate an ancestor pruned on delete.
+          this.all[parent] = {
+            name: parent.substring(parent.lastIndexOf('/') + 1),
+            path: parent,
+            is_directory: true,
+            status: null,
+          };
+        } else if (entry.status === 'deleted') {
+          this.all[parent] = { ...entry, status: null };
+        } else {
+          break;
+        }
+        parent = getParentPath(parent);
+      }
+    },
+
+    /**
+     * Drop a deleted folder's descendants and collapse it, so re-expanding it re-fetches its
+     * now-deleted contents from the backend. Clearing isFolderComplete defeats loadFiles' cache;
+     * collapsing (removing from openedFolders) lets the next expand fire folder-expand again.
+     */
+    deleteFolderDescendants(folderPath) {
       const prefix = folderPath.endsWith('/') ? folderPath : `${folderPath}/`;
       for (const path of Object.keys(this.all)) {
-        if (path === folderPath || path.startsWith(prefix)) {
+        if (path.startsWith(prefix)) {
           delete this.all[path];
         }
+      }
+      for (const path of Object.keys(this.isFolderComplete)) {
+        if (path === folderPath || path.startsWith(prefix)) {
+          delete this.isFolderComplete[path];
+        }
+      }
+      this.openedFolders = this.openedFolders.filter(
+        (path) => path !== folderPath && !path.startsWith(prefix),
+      );
+      if (this.searchResults) {
+        this.searchResults = this.searchResults.filter(
+          (file) => file.path !== folderPath && !file.path.startsWith(prefix),
+        );
       }
     },
 
@@ -239,7 +276,7 @@ export const useFilesStore = defineStore('files', {
       const fileData = await fileService.deleteFile(getWorkspaceId(), filePath);
       const tracked = !!(fileData && fileData.path);
       if (existing?.is_directory || fileData?.is_directory) {
-        this.deleteFolderFromStore(filePath);
+        this.deleteFolderDescendants(filePath);
       } else if (tracked) {
         this.updateFile(fileData);
       } else {
@@ -263,6 +300,7 @@ export const useFilesStore = defineStore('files', {
     async save(filePath, content) {
       const fileData = await fileService.saveFile(getWorkspaceId(), filePath, content);
       this.updateFile(fileData);
+      this.syncAncestorFolders(filePath);
       emit(EVENTS.FILE_SAVED, { path: fileData.path, file: fileData });
     },
 
@@ -270,11 +308,16 @@ export const useFilesStore = defineStore('files', {
      * Revert file to last saved state
      */
     async revertFile(filePath) {
+      // Only a deleted file's revert restores parent folders; check before the status is updated.
+      const wasDeleted = this.all[filePath]?.status === 'deleted';
       const fileData = await fileService.revertFile(getWorkspaceId(), filePath);
       if (filePath !== fileData.path) {
         this.deleteFileFromStore(filePath);
       }
       this.updateFile(fileData);
+      if (wasDeleted) {
+        this.syncAncestorFolders(fileData.path);
+      }
       emit(EVENTS.FILE_REVERTED, {
         path: filePath,
         old_path: filePath !== fileData.path ? filePath : undefined,

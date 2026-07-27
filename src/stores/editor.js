@@ -120,30 +120,34 @@ export const useEditorStore = defineStore('editor', {
     },
 
     /**
-     * Handle file deletion from files store.
-     * If file has no unsaved changes, close it.
-     * Otherwise keep it open and mark it specifically.
+     * Close a deleted file's tab only when it has no local unsaved changes.
+     * A dirty tab is kept open so the user can close it themselves via the
+     * tab's close button, which warns before discarding changes.
      */
-    async onFileDeleted(filePath) {
+    closeUnchangedFile(filePath) {
       if (!this.changed[filePath]) {
-        await this.close(filePath);
+        return this.close(filePath);
       }
     },
 
     /**
-     * Close open tabs for files inside a deleted folder.
-     *
-     * A folder delete is a single event with no per-file events for its contents, so its open
-     * descendant tabs are closed here. Only tabs without unsaved changes are closed, mirroring
-     * onFileDeleted.
+     * React to a deleted file. Close its tab if there are no unsaved changes;
+     * otherwise keep it open (regardless of whether the delete is revertible)
+     * so the user closes it themselves via the tab's close button.
+     */
+    async onFileDeleted(filePath) {
+      await this.closeUnchangedFile(filePath);
+    },
+
+    /**
+     * React to a deleted folder. Close every clean open tab underneath it;
+     * tabs with unsaved changes stay open for the user to close manually.
      */
     async onFolderDeleted(folderPath) {
       const prefix = folderPath.endsWith('/') ? folderPath : `${folderPath}/`;
-      const openUnderFolder = this.opened.filter(
-        (f) => f.path.startsWith(prefix) && !this.changed[f.path],
-      );
+      const openUnderFolder = this.opened.filter((f) => f.path.startsWith(prefix));
       for (const file of openUnderFolder) {
-        await this.close(file.path);
+        await this.closeUnchangedFile(file.path);
       }
     },
 
