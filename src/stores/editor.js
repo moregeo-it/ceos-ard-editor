@@ -134,13 +134,34 @@ export const useEditorStore = defineStore('editor', {
     },
 
     /**
-     * Handle file deletion from files store.
-     * If file has no unsaved changes, close it.
-     * Otherwise keep it open and mark it specifically.
+     * Close a deleted file's tab only when it has no local unsaved changes.
+     * A dirty tab is kept open so the user can close it themselves via the
+     * tab's close button, which warns before discarding changes.
+     */
+    closeUnchangedFile(filePath) {
+      if (!this.changed[filePath]) {
+        return this.close(filePath);
+      }
+    },
+
+    /**
+     * React to a deleted file. Close its tab if there are no unsaved changes;
+     * otherwise keep it open (regardless of whether the delete is revertible)
+     * so the user closes it themselves via the tab's close button.
      */
     async onFileDeleted(filePath) {
-      if (!this.changed[filePath]) {
-        await this.close(filePath);
+      await this.closeUnchangedFile(filePath);
+    },
+
+    /**
+     * React to a deleted folder. Close every clean open tab underneath it;
+     * tabs with unsaved changes stay open for the user to close manually.
+     */
+    async onFolderDeleted(folderPath) {
+      const prefix = folderPath.endsWith('/') ? folderPath : `${folderPath}/`;
+      const openUnderFolder = this.opened.filter((f) => f.path.startsWith(prefix));
+      for (const file of openUnderFolder) {
+        await this.closeUnchangedFile(file.path);
       }
     },
 
@@ -229,6 +250,9 @@ export function filesEditorSyncPlugin({ store }) {
 
   store.$onAction(({ name, args, after }) => {
     const editor = useEditorStore();
+    // Capture before the delete runs: an untracked delete returns no body, so the result can't
+    // tell us whether it was a folder.
+    const wasDirectory = name === 'deleteFile' && store.isDirectory(args[0]);
     after(async (result) => {
       try {
         switch (name) {
@@ -244,7 +268,11 @@ export function filesEditorSyncPlugin({ store }) {
 
           case 'deleteFile': {
             const [filePath] = args;
-            await editor.onFileDeleted(filePath);
+            if (wasDirectory || result?.is_directory) {
+              await editor.onFolderDeleted(filePath);
+            } else {
+              await editor.onFileDeleted(filePath);
+            }
             break;
           }
 
