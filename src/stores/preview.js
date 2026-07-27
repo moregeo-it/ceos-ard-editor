@@ -8,6 +8,9 @@ const getDefaults = () => ({
   selectedPfs: null,
   oldSelectedPfs: null,
   previewHtml: '',
+  // Increments on every regeneration, even when the HTML is unchanged
+  // (e.g. only an asset was deleted). Watch this instead of previewHtml.
+  previewGeneration: 0,
   isGenerating: false,
   scrollPosition: [0, 0], // x, y
 });
@@ -51,9 +54,14 @@ export const usePreviewStore = defineStore('preview', {
      * Generate preview for the selected PFS
      * @returns {Promise<string>} The generated HTML
      */
+    setPreviewHtml(html) {
+      this.previewHtml = html;
+      this.previewGeneration++;
+    },
+
     async generatePreview() {
       if (!this.hasSelectedPfs) {
-        this.previewHtml = '';
+        this.setPreviewHtml('');
         return;
       }
 
@@ -68,10 +76,10 @@ export const usePreviewStore = defineStore('preview', {
 
       this.isGenerating = true;
       try {
-        this.previewHtml = await previewService.generatePreview(workspaceId, this.selectedPfs);
+        this.setPreviewHtml(await previewService.generatePreview(workspaceId, this.selectedPfs));
       } catch (error) {
         notifications.error(`Failed to generate preview: ${error.message}`);
-        this.previewHtml = '';
+        this.setPreviewHtml('');
       } finally {
         this.isGenerating = false;
       }
