@@ -258,6 +258,8 @@ export const useFilesStore = defineStore('files', {
     async save(filePath, content) {
       const fileData = await fileService.saveFile(getWorkspaceId(), filePath, content);
       this.updateFile(fileData);
+      // Saving recreates any deleted ancestor folders on the server, so un-mark them in the tree.
+      this.clearAncestorDeletedStatus(filePath);
     },
 
     /**
