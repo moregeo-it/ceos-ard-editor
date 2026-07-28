@@ -12,8 +12,7 @@
         />
         <v-btn
           v-if="workspacesStore.isOwner"
-          color="white"
-          variant="tonal"
+          variant="outlined"
           :prepend-icon="icons.share"
           @click="openShareDialog"
         >
