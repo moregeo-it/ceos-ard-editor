@@ -236,6 +236,20 @@ export const useFilesStore = defineStore('files', {
     },
 
     /**
+     * Apply a folder deletion: prune the descendants (see deleteFolderDescendants), then keep the
+     * folder marked "deleted" if tracked/revertible, or remove it if untracked. Shared by the local
+     * action and the remote handler so owner and invitee converge.
+     */
+    deleteFolderFromStore(folderPath, { tracked = false, folderData = null } = {}) {
+      this.deleteFolderDescendants(folderPath);
+      if (tracked && folderData) {
+        this.updateFile(folderData);
+      } else {
+        this.deleteFileFromStore(folderPath);
+      }
+    },
+
+    /**
      * Create new file or folder
      */
     async createFile(path, name, type) {
@@ -270,23 +284,21 @@ export const useFilesStore = defineStore('files', {
      * Delete file or folder
      */
     async deleteFile(filePath) {
-      // Snapshot the entry before deleting: an untracked delete responds with no body (204), so
-      // the subtree handling and the event payload need the entry we still hold.
-      const existing = this.all[filePath];
+      // Snapshot before deleting: an untracked delete returns no body (204), so the subtree handling
+      // and event payload need it. Fall back to search results, where a folder may not be in `all`.
+      const existing =
+        this.all[filePath] ?? this.searchResults?.find((file) => file.path === filePath) ?? null;
       const fileData = await fileService.deleteFile(getWorkspaceId(), filePath);
       const tracked = !!(fileData && fileData.path);
+      const file = tracked ? fileData : existing;
       if (existing?.is_directory || fileData?.is_directory) {
-        this.deleteFolderDescendants(filePath);
+        this.deleteFolderFromStore(filePath, { tracked, folderData: file });
       } else if (tracked) {
         this.updateFile(fileData);
       } else {
         this.deleteFileFromStore(filePath);
       }
-      emit(EVENTS.FILE_DELETED, {
-        path: filePath,
-        file: tracked ? fileData : (existing ?? null),
-        tracked,
-      });
+      emit(EVENTS.FILE_DELETED, { path: filePath, file, tracked });
       return fileData;
     },
 
@@ -350,7 +362,9 @@ export function registerFilesEventListeners() {
 
   on(EVENTS.FILE_SAVED, (event) => {
     if (event.source === 'remote' && event.file) {
-      useFilesStore().updateFile(event.file);
+      const files = useFilesStore();
+      files.updateFile(event.file);
+      files.syncAncestorFolders(event.file.path);
     }
   });
 
@@ -368,7 +382,7 @@ export function registerFilesEventListeners() {
     if (event.file?.is_directory) {
       // A folder delete is one event with no per-file events for its contents, so mirror it by
       // removing the whole subtree locally.
-      files.deleteFolderFromStore(event.path);
+      files.deleteFolderFromStore(event.path, { tracked: event.tracked, folderData: event.file });
     } else if (event.tracked && event.file?.path) {
       files.updateFile(event.file); // tracked delete keeps a "deleted" status in the tree
     } else {
@@ -398,6 +412,7 @@ export function registerFilesEventListeners() {
     }
     if (event.file) {
       files.updateFile(event.file);
+      files.syncAncestorFolders(event.file.path);
     }
   });
 
