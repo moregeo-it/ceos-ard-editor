@@ -114,16 +114,18 @@ export const useFilesStore = defineStore('files', {
     },
 
     async updateFilesAfterCommit() {
-      const requests = [];
-      // After commit, we need to refresh the file tree to reflect any changes
-      for (const path in this.all) {
-        const data = this.all[path];
-        if (data.status !== null) {
-          // If file has a status, it means it was changed in the commit, so we need to reload its context
-          requests.push(this.loadFileContext(path, true));
+      // Refresh every file that had a pending status. Capture paths first — reloading clears them.
+      const changedPaths = Object.keys(this.all).filter((path) => this.all[path].status !== null);
+      const results = await Promise.all(
+        changedPaths.map((path) => this.loadFileContext(path, true)),
+      );
+      // Mirror the cleared status into any matching search rows.
+      changedPaths.forEach((path) => {
+        if (this.all[path]) {
+          this.syncSearchResultUpsert(path, this.all[path]);
         }
-      }
-      return await Promise.all(requests);
+      });
+      return results;
     },
 
     /**
@@ -135,6 +137,10 @@ export const useFilesStore = defineStore('files', {
       for (const change of changes) {
         // Change paths come from git and may lack the leading slash the store keys have.
         const path = change.path.startsWith('/') ? change.path : '/' + change.path;
+        // Sync the row before the `!entry` guard: results can hold paths not loaded into `all`.
+        if (change.status === 'deleted') {
+          this.syncSearchResultDelete(path);
+        }
         const entry = this.all[path];
         if (!entry) {
           continue;
@@ -143,6 +149,7 @@ export const useFilesStore = defineStore('files', {
           this.deleteFileFromStore(path);
         } else {
           entry.status = null;
+          this.syncSearchResultUpsert(path, entry); // clear the row's now-committed status badge
         }
       }
     },
@@ -180,6 +187,38 @@ export const useFilesStore = defineStore('files', {
 
     deleteFileFromStore(filePath) {
       delete this.all[filePath];
+    },
+
+    /**
+     * Drop a path (and its descendants, for a folder) from the active search results. No-op when
+     * not searching.
+     */
+    syncSearchResultDelete(path) {
+      if (!this.searchResults) {
+        return;
+      }
+      const prefix = path.endsWith('/') ? path : `${path}/`;
+      this.searchResults = this.searchResults.filter(
+        (file) => file.path !== path && !file.path.startsWith(prefix),
+      );
+    },
+
+    /**
+     * Refresh a search-result row in place (rename/revert/save): find it by `oldPath`, take live
+     * fields from `file`, keep the search-only ones (excerpt, line, column). No-op when not
+     * searching or the row isn't shown. File-only — rename/revert never span folders (delete does,
+     * via syncSearchResultDelete).
+     */
+    syncSearchResultUpsert(oldPath, file) {
+      if (!this.searchResults || !file) {
+        return;
+      }
+      const ix = this.searchResults.findIndex((result) => result.path === oldPath);
+      if (ix === -1) {
+        return;
+      }
+      // Snapshot fields overwrite; search-only fields survive. Index assignment is reactive in Vue 3.
+      this.searchResults[ix] = { ...this.searchResults[ix], ...toFileTreeObject(file) };
     },
 
     /**
@@ -228,11 +267,6 @@ export const useFilesStore = defineStore('files', {
       this.openedFolders = this.openedFolders.filter(
         (path) => path !== folderPath && !path.startsWith(prefix),
       );
-      if (this.searchResults) {
-        this.searchResults = this.searchResults.filter(
-          (file) => file.path !== folderPath && !file.path.startsWith(prefix),
-        );
-      }
     },
 
     /**
@@ -353,6 +387,9 @@ let listenersRegistered = false;
  * Apply workspace events to the files store. Remote events (another user's changes forwarded from
  * the WebSocket) are applied through the low-level mutators; local events already mutated the
  * store inside the action that emitted them.
+ *
+ * Search results are a separate snapshot no action maintains, so each handler syncs them first,
+ * above the `source` guard (i.e. for local and remote alike).
  */
 export function registerFilesEventListeners() {
   if (listenersRegistered) {
@@ -361,8 +398,10 @@ export function registerFilesEventListeners() {
   listenersRegistered = true;
 
   on(EVENTS.FILE_SAVED, (event) => {
+    const files = useFilesStore();
+    // Refresh the row's status; excerpt is left as-is (may go stale) to avoid re-searching per save.
+    files.syncSearchResultUpsert(event.file?.path, event.file);
     if (event.source === 'remote' && event.file) {
-      const files = useFilesStore();
       files.updateFile(event.file);
       files.syncAncestorFolders(event.file.path);
     }
@@ -375,10 +414,11 @@ export function registerFilesEventListeners() {
   });
 
   on(EVENTS.FILE_DELETED, (event) => {
+    const files = useFilesStore();
+    files.syncSearchResultDelete(event.path); // drop the file (or folder subtree) from results
     if (event.source !== 'remote') {
       return;
     }
-    const files = useFilesStore();
     if (event.file?.is_directory) {
       // A folder delete is one event with no per-file events for its contents, so mirror it by
       // removing the whole subtree locally.
@@ -391,10 +431,11 @@ export function registerFilesEventListeners() {
   });
 
   on(EVENTS.FILE_RENAMED, (event) => {
+    const files = useFilesStore();
+    files.syncSearchResultUpsert(event.old_path ?? event.path, event.file); // rename the row in place
     if (event.source !== 'remote') {
       return;
     }
-    const files = useFilesStore();
     files.deleteFileFromStore(event.old_path ?? event.path);
     if (event.file) {
       files.updateFile(event.file);
@@ -402,11 +443,12 @@ export function registerFilesEventListeners() {
   });
 
   on(EVENTS.FILE_REVERTED, (event) => {
+    const files = useFilesStore();
+    const oldPath = event.old_path ?? event.path;
+    files.syncSearchResultUpsert(oldPath, event.file); // restore the row to its reverted state
     if (event.source !== 'remote') {
       return;
     }
-    const files = useFilesStore();
-    const oldPath = event.old_path ?? event.path;
     if (event.file && event.file.path !== oldPath) {
       files.deleteFileFromStore(oldPath);
     }
