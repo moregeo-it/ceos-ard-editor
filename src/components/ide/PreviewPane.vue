@@ -51,6 +51,7 @@
       <div v-show="!isGenerating && previewHtml" class="fill-height">
         <iframe
           ref="iframe"
+          :key="previewGeneration"
           class="preview-iframe"
           frameborder="0"
           width="100%"
@@ -124,6 +125,9 @@ export default {
     previewHtml() {
       return this.previewStore.previewHtml;
     },
+    previewGeneration() {
+      return this.previewStore.previewGeneration;
+    },
     isGenerating() {
       return this.previewStore.isGenerating;
     },
@@ -145,7 +149,13 @@ export default {
     }
   },
   watch: {
-    previewHtml() {
+    // The iframe is keyed by previewGeneration so each regeneration gets a fresh
+    // document, forcing images to revalidate (304/404). Reusing the document via
+    // doc.write() would reuse already-loaded images ignoring HTTP caching,
+    // keeping deleted/changed images visible.
+    async previewGeneration() {
+      // Wait for the keyed iframe to be recreated
+      await this.$nextTick();
       this.updateIframeContent();
     },
   },
