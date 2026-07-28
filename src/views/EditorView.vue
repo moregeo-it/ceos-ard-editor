@@ -8,14 +8,8 @@
         <ShareModeChip
           v-if="!workspacesStore.isOwner && workspacesStore.viewerRole"
           :mode="workspacesStore.viewerRole"
-          color="white"
         />
-        <v-btn
-          v-if="workspacesStore.isOwner"
-          variant="outlined"
-          :prepend-icon="icons.share"
-          @click="openShareDialog"
-        >
+        <v-btn v-if="workspacesStore.isOwner" :prepend-icon="icons.share" @click="openShareDialog">
           Share
         </v-btn>
       </template>
