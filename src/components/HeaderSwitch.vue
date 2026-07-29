@@ -1,7 +1,14 @@
 <template>
   <v-btn-toggle mandatory v-model="view" color="primary">
     <v-btn value="editor" :prepend-icon="icons.edit" :ripple="false"> Editor </v-btn>
-    <v-btn value="propose" :prepend-icon="icons.propose" :ripple="false"> Propose </v-btn>
+    <v-btn
+      v-if="workspacesStore.isOwner"
+      value="propose"
+      :prepend-icon="icons.propose"
+      :ripple="false"
+    >
+      Propose
+    </v-btn>
     <v-btn value="workspaces" :prepend-icon="icons.close" :ripple="false"> Close </v-btn>
   </v-btn-toggle>
 </template>
@@ -11,8 +18,10 @@ import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
 import { usePreviewStore } from '@/stores/preview';
+import { useRealtimeStore } from '@/stores/realtime';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useProposalStore } from '@/stores/proposal';
+import { useShareStore } from '@/stores/share';
 import { mdiCheckCircle, mdiClose, mdiNotebookEdit } from '@mdi/js';
 
 export default {
@@ -44,11 +53,17 @@ export default {
     previewStore() {
       return usePreviewStore();
     },
+    realtimeStore() {
+      return useRealtimeStore();
+    },
     workspacesStore() {
       return useWorkspacesStore();
     },
     proposalStore() {
       return useProposalStore();
+    },
+    shareStore() {
+      return useShareStore();
     },
     view: {
       get() {
@@ -80,11 +95,13 @@ export default {
       }
     },
     forceCloseWorkspace() {
+      this.realtimeStore.reset();
       this.editorStore.reset();
       this.filesStore.reset();
       this.notificationsStore.reset();
       this.previewStore.reset();
       this.proposalStore.reset();
+      this.shareStore.reset();
       this.$router.push({ name: 'workspaces' });
     },
   },

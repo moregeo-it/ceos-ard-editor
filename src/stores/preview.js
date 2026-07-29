@@ -4,6 +4,8 @@ import previewService from '@/services/preview.service';
 import { useWorkspacesStore } from './workspaces';
 import { useNotificationsStore } from './notifications';
 
+import { EVENTS, on } from '@/services/events';
+
 const getDefaults = () => ({
   selectedPfs: null,
   oldSelectedPfs: null,
@@ -12,6 +14,7 @@ const getDefaults = () => ({
   // (e.g. only an asset was deleted). Watch this instead of previewHtml.
   previewGeneration: 0,
   isGenerating: false,
+  refreshQueued: false,
   scrollPosition: [0, 0], // x, y
 });
 
@@ -86,6 +89,22 @@ export const usePreviewStore = defineStore('preview', {
     },
 
     /**
+     * Regenerate the preview, coalescing concurrent requests: while a generation is running,
+     * further requests fold into a single follow-up run (e.g. saveAll of N files regenerates
+     * once or twice instead of N times).
+     */
+    async requestPreviewRefresh() {
+      if (this.isGenerating) {
+        this.refreshQueued = true;
+        return;
+      }
+      do {
+        this.refreshQueued = false;
+        await this.generatePreview();
+      } while (this.refreshQueued);
+    },
+
+    /**
      * Reset the store to defaults
      */
     reset() {
@@ -94,59 +113,27 @@ export const usePreviewStore = defineStore('preview', {
   },
 });
 
-export function filesPreviewSyncPlugin({ store }) {
-  if (store.$id !== 'files') {
+let listenersRegistered = false;
+
+/**
+ * Regenerate the preview when files change (locally or remotely) and after a reconnect resync.
+ * Fire-and-forget on purpose: generation can be slow and must not block the event queue;
+ * `requestPreviewRefresh` coalesces overlapping requests.
+ */
+export function registerPreviewEventListeners() {
+  if (listenersRegistered) {
     return;
   }
+  listenersRegistered = true;
 
-  store.$onAction(({ name, args, after }) => {
-    const preview = usePreviewStore();
-    after(async () => {
-      // Regenerate preview
-      switch (name) {
-        case 'createFile':
-        case 'renameFile':
-        case 'deleteFile':
-        case 'save':
-        case 'revertFile': {
-          try {
-            await preview.generatePreview();
-          } catch (error) {
-            useNotificationsStore().error(
-              'Updating preview after file operation failed: ' + error.message,
-            );
-          }
-          break;
-        }
-      }
+  on('file.*', (event) => {
+    if (event.type === EVENTS.FILE_COMMITTED) {
+      return; // Commits don't change file contents, so the preview is unaffected.
+    }
+    usePreviewStore().requestPreviewRefresh();
+  });
 
-      // Refresh preview options
-      switch (name) {
-        case 'createNewPfs':
-        case 'renameFile':
-        case 'deleteFile':
-        case 'revertFile': {
-          try {
-            if (name !== 'createNewPfs') {
-              const [filePath] = args;
-              if (filePath && !filePath.startsWith('/pfs/')) {
-                break; // Only refresh preview options if a pfs file was changed
-              }
-            }
-
-            const workspaces = useWorkspacesStore();
-            const workspaceId = workspaces.currentWorkspace?.id;
-            if (workspaceId) {
-              await workspaces.fetchPfs(workspaceId);
-            }
-          } catch (error) {
-            useNotificationsStore().error(
-              'Updating preview options after file operation failed: ' + error.message,
-            );
-          }
-          break;
-        }
-      }
-    });
+  on(EVENTS.REALTIME_RESYNCED, () => {
+    usePreviewStore().requestPreviewRefresh();
   });
 }

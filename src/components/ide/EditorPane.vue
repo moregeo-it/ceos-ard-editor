@@ -59,7 +59,7 @@
             @save="save(file.path)"
             @error="error(file.path, $event)"
             :file="file"
-            :readOnly="workspacesStore.isArchived"
+            :readOnly="workspacesStore.isReadOnly"
             class="fill-height"
           />
         </v-tabs-window-item>
@@ -83,7 +83,7 @@
           </ul>
         </v-toolbar-title>
 
-        <template v-slot:append v-if="!workspacesStore.isArchived">
+        <template v-slot:append v-if="!workspacesStore.isReadOnly">
           <v-btn
             :disabled="isActiveSaving || !hasActiveChanges"
             :loading="isActiveSaving"

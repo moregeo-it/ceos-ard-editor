@@ -85,7 +85,22 @@ export default {
     },
   },
 
-  created() {
+  async created() {
+    // The Propose view is owner-only - collaborators (any share mode) never see it, not even read-only.
+    try {
+      await this.workspacesStore.getWorkspace(this.workspaceId);
+    } catch (error) {
+      this.notificationsStore.error(`Failed to load workspace: ${error.message}`);
+      this.$router.push({ name: 'workspaces' });
+      return;
+    }
+
+    if (!this.workspacesStore.isOwner) {
+      this.notificationsStore.error('Only the workspace owner can propose changes.');
+      this.$router.push({ name: 'editor', params: { id: this.workspaceId } });
+      return;
+    }
+
     this.loadProposal();
     this.proposalStore.fetchDiffList(this.workspaceId).catch((error) => {
       this.notificationsStore.error(`Failed to load list of changes: ${error.message}`);

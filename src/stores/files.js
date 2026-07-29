@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 
 import { useWorkspacesStore } from './workspaces';
 
+import { EVENTS, emit, on } from '@/services/events';
 import fileService from '@/services/file.service';
 
 const getWorkspaceId = () => {
@@ -77,14 +78,6 @@ export const useFilesStore = defineStore('files', {
       };
       return getTree('/');
     },
-    /**
-     * Whether a path is a folder. Falls back to search results, since a searched folder can
-     * exist in searchResults but not yet in `all`.
-     */
-    isDirectory: (state) => (path) =>
-      state.all[path]?.is_directory ??
-      state.searchResults?.find((file) => file.path === path)?.is_directory ??
-      false,
   },
 
   actions: {
@@ -121,16 +114,44 @@ export const useFilesStore = defineStore('files', {
     },
 
     async updateFilesAfterCommit() {
-      const requests = [];
-      // After commit, we need to refresh the file tree to reflect any changes
-      for (const path in this.all) {
-        const data = this.all[path];
-        if (data.status !== null) {
-          // If file has a status, it means it was changed in the commit, so we need to reload its context
-          requests.push(this.loadFileContext(path, true));
+      // Refresh every file that had a pending status. Capture paths first — reloading clears them.
+      const changedPaths = Object.keys(this.all).filter((path) => this.all[path].status !== null);
+      const results = await Promise.all(
+        changedPaths.map((path) => this.loadFileContext(path, true)),
+      );
+      // Mirror the cleared status into any matching search rows.
+      changedPaths.forEach((path) => {
+        if (this.all[path]) {
+          this.syncSearchResultUpsert(path, this.all[path]);
+        }
+      });
+      return results;
+    },
+
+    /**
+     * Apply the change list of a `file.committed` event, avoiding the per-file refetch of
+     * `updateFilesAfterCommit`: committed deletes drop their entry, everything else just loses
+     * its pending status.
+     */
+    applyCommittedChanges(changes) {
+      for (const change of changes) {
+        // Change paths come from git and may lack the leading slash the store keys have.
+        const path = change.path.startsWith('/') ? change.path : '/' + change.path;
+        // Sync the row before the `!entry` guard: results can hold paths not loaded into `all`.
+        if (change.status === 'deleted') {
+          this.syncSearchResultDelete(path);
+        }
+        const entry = this.all[path];
+        if (!entry) {
+          continue;
+        }
+        if (change.status === 'deleted') {
+          this.deleteFileFromStore(path);
+        } else {
+          entry.status = null;
+          this.syncSearchResultUpsert(path, entry); // clear the row's now-committed status badge
         }
       }
-      return await Promise.all(requests);
     },
 
     resetPathLoading(path) {
@@ -166,6 +187,38 @@ export const useFilesStore = defineStore('files', {
 
     deleteFileFromStore(filePath) {
       delete this.all[filePath];
+    },
+
+    /**
+     * Drop a path (and its descendants, for a folder) from the active search results. No-op when
+     * not searching.
+     */
+    syncSearchResultDelete(path) {
+      if (!this.searchResults) {
+        return;
+      }
+      const prefix = path.endsWith('/') ? path : `${path}/`;
+      this.searchResults = this.searchResults.filter(
+        (file) => file.path !== path && !file.path.startsWith(prefix),
+      );
+    },
+
+    /**
+     * Refresh a search-result row in place (rename/revert/save): find it by `oldPath`, take live
+     * fields from `file`, keep the search-only ones (excerpt, line, column). No-op when not
+     * searching or the row isn't shown. File-only — rename/revert never span folders (delete does,
+     * via syncSearchResultDelete).
+     */
+    syncSearchResultUpsert(oldPath, file) {
+      if (!this.searchResults || !file) {
+        return;
+      }
+      const ix = this.searchResults.findIndex((result) => result.path === oldPath);
+      if (ix === -1) {
+        return;
+      }
+      // Snapshot fields overwrite; search-only fields survive. Index assignment is reactive in Vue 3.
+      this.searchResults[ix] = { ...this.searchResults[ix], ...toFileTreeObject(file) };
     },
 
     /**
@@ -214,10 +267,19 @@ export const useFilesStore = defineStore('files', {
       this.openedFolders = this.openedFolders.filter(
         (path) => path !== folderPath && !path.startsWith(prefix),
       );
-      if (this.searchResults) {
-        this.searchResults = this.searchResults.filter(
-          (file) => file.path !== folderPath && !file.path.startsWith(prefix),
-        );
+    },
+
+    /**
+     * Apply a folder deletion: prune the descendants (see deleteFolderDescendants), then keep the
+     * folder marked "deleted" if tracked/revertible, or remove it if untracked. Shared by the local
+     * action and the remote handler so owner and invitee converge.
+     */
+    deleteFolderFromStore(folderPath, { tracked = false, folderData = null } = {}) {
+      this.deleteFolderDescendants(folderPath);
+      if (tracked && folderData) {
+        this.updateFile(folderData);
+      } else {
+        this.deleteFileFromStore(folderPath);
       }
     },
 
@@ -227,6 +289,7 @@ export const useFilesStore = defineStore('files', {
     async createFile(path, name, type) {
       const fileData = await fileService.createFile(getWorkspaceId(), path, name, type);
       this.updateFile(fileData);
+      emit(EVENTS.FILE_CREATED, { path: fileData.path, file: fileData });
       return fileData;
     },
 
@@ -235,9 +298,8 @@ export const useFilesStore = defineStore('files', {
      */
     async createNewPfs(content) {
       const fileData = await fileService.createNewPFS(getWorkspaceId(), content);
-
       this.updateFile(fileData);
-
+      emit(EVENTS.FILE_CREATED, { path: fileData.path, file: fileData });
       return fileData;
     },
 
@@ -248,6 +310,7 @@ export const useFilesStore = defineStore('files', {
       const fileData = await fileService.renameFile(getWorkspaceId(), filePath, newName);
       this.deleteFileFromStore(filePath);
       this.updateFile(fileData);
+      emit(EVENTS.FILE_RENAMED, { path: filePath, old_path: filePath, file: fileData });
       return fileData;
     },
 
@@ -255,16 +318,21 @@ export const useFilesStore = defineStore('files', {
      * Delete file or folder
      */
     async deleteFile(filePath) {
-      const isDirectory = this.isDirectory(filePath);
+      // Snapshot before deleting: an untracked delete returns no body (204), so the subtree handling
+      // and event payload need it. Fall back to search results, where a folder may not be in `all`.
+      const existing =
+        this.all[filePath] ?? this.searchResults?.find((file) => file.path === filePath) ?? null;
       const fileData = await fileService.deleteFile(getWorkspaceId(), filePath);
-      if (isDirectory || fileData?.is_directory) {
-        this.deleteFolderDescendants(filePath);
-      }
-      if (fileData && fileData.path) {
+      const tracked = !!(fileData && fileData.path);
+      const file = tracked ? fileData : existing;
+      if (existing?.is_directory || fileData?.is_directory) {
+        this.deleteFolderFromStore(filePath, { tracked, folderData: file });
+      } else if (tracked) {
         this.updateFile(fileData);
       } else {
         this.deleteFileFromStore(filePath);
       }
+      emit(EVENTS.FILE_DELETED, { path: filePath, file, tracked });
       return fileData;
     },
 
@@ -279,6 +347,7 @@ export const useFilesStore = defineStore('files', {
       const fileData = await fileService.saveFile(getWorkspaceId(), filePath, content);
       this.updateFile(fileData);
       this.syncAncestorFolders(filePath);
+      emit(EVENTS.FILE_SAVED, { path: fileData.path, file: fileData });
     },
 
     /**
@@ -295,6 +364,11 @@ export const useFilesStore = defineStore('files', {
       if (wasDeleted) {
         this.syncAncestorFolders(fileData.path);
       }
+      emit(EVENTS.FILE_REVERTED, {
+        path: filePath,
+        old_path: filePath !== fileData.path ? filePath : undefined,
+        file: fileData,
+      });
       return fileData;
     },
 
@@ -306,3 +380,91 @@ export const useFilesStore = defineStore('files', {
     },
   },
 });
+
+let listenersRegistered = false;
+
+/**
+ * Apply workspace events to the files store. Remote events (another user's changes forwarded from
+ * the WebSocket) are applied through the low-level mutators; local events already mutated the
+ * store inside the action that emitted them.
+ *
+ * Search results are a separate snapshot no action maintains, so each handler syncs them first,
+ * above the `source` guard (i.e. for local and remote alike).
+ */
+export function registerFilesEventListeners() {
+  if (listenersRegistered) {
+    return;
+  }
+  listenersRegistered = true;
+
+  on(EVENTS.FILE_SAVED, (event) => {
+    const files = useFilesStore();
+    // Refresh the row's status; excerpt is left as-is (may go stale) to avoid re-searching per save.
+    files.syncSearchResultUpsert(event.file?.path, event.file);
+    if (event.source === 'remote' && event.file) {
+      files.updateFile(event.file);
+      files.syncAncestorFolders(event.file.path);
+    }
+  });
+
+  on(EVENTS.FILE_CREATED, (event) => {
+    if (event.source === 'remote' && event.file) {
+      useFilesStore().updateFile(event.file);
+    }
+  });
+
+  on(EVENTS.FILE_DELETED, (event) => {
+    const files = useFilesStore();
+    files.syncSearchResultDelete(event.path); // drop the file (or folder subtree) from results
+    if (event.source !== 'remote') {
+      return;
+    }
+    if (event.file?.is_directory) {
+      // A folder delete is one event with no per-file events for its contents, so mirror it by
+      // removing the whole subtree locally.
+      files.deleteFolderFromStore(event.path, { tracked: event.tracked, folderData: event.file });
+    } else if (event.tracked && event.file?.path) {
+      files.updateFile(event.file); // tracked delete keeps a "deleted" status in the tree
+    } else {
+      files.deleteFileFromStore(event.path);
+    }
+  });
+
+  on(EVENTS.FILE_RENAMED, (event) => {
+    const files = useFilesStore();
+    files.syncSearchResultUpsert(event.old_path ?? event.path, event.file); // rename the row in place
+    if (event.source !== 'remote') {
+      return;
+    }
+    files.deleteFileFromStore(event.old_path ?? event.path);
+    if (event.file) {
+      files.updateFile(event.file);
+    }
+  });
+
+  on(EVENTS.FILE_REVERTED, (event) => {
+    const files = useFilesStore();
+    const oldPath = event.old_path ?? event.path;
+    files.syncSearchResultUpsert(oldPath, event.file); // restore the row to its reverted state
+    if (event.source !== 'remote') {
+      return;
+    }
+    if (event.file && event.file.path !== oldPath) {
+      files.deleteFileFromStore(oldPath);
+    }
+    if (event.file) {
+      files.updateFile(event.file);
+      files.syncAncestorFolders(event.file.path);
+    }
+  });
+
+  // Both sources: local commits emit without a change list until the server exposes one.
+  on(EVENTS.FILE_COMMITTED, async (event) => {
+    const files = useFilesStore();
+    if (Array.isArray(event.changes) && event.changes.length > 0) {
+      files.applyCommittedChanges(event.changes);
+    } else {
+      await files.updateFilesAfterCommit();
+    }
+  });
+}

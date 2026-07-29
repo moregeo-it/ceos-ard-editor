@@ -4,6 +4,15 @@
       <template #central-actions>
         <HeaderSwitch />
       </template>
+      <template #actions>
+        <ShareModeChip
+          v-if="!workspacesStore.isOwner && workspacesStore.viewerRole"
+          :mode="workspacesStore.viewerRole"
+        />
+        <v-btn v-if="workspacesStore.isOwner" :prepend-icon="icons.share" @click="openShareDialog">
+          Share
+        </v-btn>
+      </template>
     </HeaderBar>
 
     <!-- Main Content Area -->
@@ -31,13 +40,15 @@
 
 <script>
 import { useNotificationsStore } from '@/stores/notifications';
+import { useRealtimeStore } from '@/stores/realtime';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import { mdiCheckCircle, mdiMenuDown, mdiNotebookEdit } from '@mdi/js';
+import { mdiCheckCircle, mdiMenuDown, mdiNotebookEdit, mdiShareVariant } from '@mdi/js';
 import HeaderBar from '@/components/HeaderBar.vue';
 import HeaderSwitch from '@/components/HeaderSwitch.vue';
 import EditorPane from '@/components/ide/EditorPane.vue';
 import FilesPane from '@/components/ide/FilesPane.vue';
 import PreviewPane from '@/components/ide/PreviewPane.vue';
+import ShareModeChip from '@/components/workspace/ShareModeChip.vue';
 import { Splitpanes, Pane } from 'splitpanes';
 
 export default {
@@ -49,6 +60,7 @@ export default {
     HeaderSwitch,
     Pane,
     PreviewPane,
+    ShareModeChip,
     Splitpanes,
   },
   data() {
@@ -62,6 +74,7 @@ export default {
         propose: mdiCheckCircle,
         menuDown: mdiMenuDown,
         title: mdiNotebookEdit,
+        share: mdiShareVariant,
       },
       panelSizeDefaults: panelSizeDefaults,
       panelSizes: {
@@ -88,17 +101,31 @@ export default {
     notificationsStore() {
       return useNotificationsStore();
     },
+    realtimeStore() {
+      return useRealtimeStore();
+    },
   },
 
   async created() {
     await this.loadWorkspace();
-    // Must be called after the workspace has loaded, otherwise isArchived is always false
-    if (this.workspacesStore.isArchived) {
+    // Subscribe to live changes once the workspace has loaded. Everyone connects (the owner's
+    // own events are echo-suppressed client-side); read-only viewers get the owner's changes live.
+    if (this.workspace) {
+      this.realtimeStore.connect(this.workspaceId);
+    }
+    // Must be called after the workspace has loaded, otherwise isArchived is always false.
+    // Only offer reactivation to the owner - collaborators can't reactivate a workspace anyway,
+    // they just see it read-only (enforced separately via workspacesStore.isReadOnly).
+    if (this.workspacesStore.isArchived && this.workspacesStore.isOwner) {
       this.$root.openDialog('ArchivedDialog', {
         workspace: this.workspace,
         onAcceptance: async () => await this.handleToggleStatus(),
       });
     }
+  },
+
+  beforeUnmount() {
+    this.realtimeStore.disconnect();
   },
 
   methods: {
@@ -117,6 +144,10 @@ export default {
         this.notificationsStore.error(`Failed to load workspace: ${error.message}`);
         this.$router.push({ name: 'workspaces' });
       }
+    },
+
+    openShareDialog() {
+      this.$root.openDialog('ShareDialog', { workspace: this.workspace });
     },
 
     async handleToggleStatus() {
