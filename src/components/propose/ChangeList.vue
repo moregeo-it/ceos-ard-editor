@@ -113,12 +113,33 @@ export default {
     async onCommitMessageSubmit() {
       try {
         const workspaceId = this.workspacesStore.currentWorkspace.id;
-        await this.proposalStore.commitChanges(workspaceId, this.proposalStore.commitMessage);
+        const commit = await this.proposalStore.commitChanges(
+          workspaceId,
+          this.proposalStore.commitMessage,
+        );
         this.proposalStore.commitMessage = '';
-        this.notificationsStore.success('Commit updated successfully.');
+        if (commit.merged_remote) {
+          this.notificationsStore.success(
+            'Commit sent to GitHub. New changes from GitHub were merged into your workspace.',
+          );
+          // The merge added commits beyond the one just made — refresh the full list
+          await this.proposalStore.fetchCommits(workspaceId);
+        } else {
+          this.notificationsStore.success('Commit updated successfully.');
+        }
         await this.filesStore.updateFilesAfterCommit();
       } catch (error) {
-        this.notificationsStore.error('Error updating commit: ' + error.message);
+        // The commit endpoint only returns 409 when remote changes conflict with the
+        // committed changes; the payload shape depends on the error handler wrapping
+        if (error.status === 409) {
+          const detail = error.details?.detail ?? error.details ?? {};
+          this.$root.openDialog('SyncConflictDialog', {
+            workspace: this.workspacesStore.currentWorkspace,
+            files: detail.conflicting_files ?? [],
+          });
+        } else {
+          this.notificationsStore.error('Error updating commit: ' + error.message);
+        }
       }
     },
   },

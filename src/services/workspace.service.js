@@ -30,6 +30,13 @@ export default {
   },
 
   /**
+   * Sync workspace with remote changes from the user's fork
+   */
+  async syncWorkspace(workspaceId) {
+    return api.post(`/workspaces/${workspaceId}/sync`);
+  },
+
+  /**
    * Toggle workspace status (active <-> archived)
    */
   async toggleWorkspaceStatus(workspaceId, newStatus) {

@@ -148,5 +148,9 @@ export const useWorkspacesStore = defineStore('workspaces', {
         this.isWorkspaceLoading[workspaceId] = false;
       }
     },
+
+    async syncWorkspace(workspaceId) {
+      return workspaceService.syncWorkspace(workspaceId);
+    },
   },
 });

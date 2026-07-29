@@ -8,7 +8,10 @@
 
     <!-- Main Content Area -->
     <v-main class="main-with-header">
-      <v-container v-if="loading" class="fill-height d-flex align-center justify-center">
+      <v-container
+        v-if="loading || !syncReady"
+        class="fill-height d-flex align-center justify-center"
+      >
         <v-progress-circular indeterminate color="primary" size="64" />
       </v-container>
       <splitpanes v-else @resized="storePaneSizes" :dbl-click-splitter="false">
@@ -69,6 +72,8 @@ export default {
         editor: localStorage.editorPanelSize ?? panelSizeDefaults.editor,
         preview: localStorage.previewPanelSize ?? panelSizeDefaults.preview,
       },
+      // Panes only mount after the remote sync, so the file tree reads the synced state
+      syncReady: false,
     };
   },
 
@@ -92,13 +97,17 @@ export default {
 
   async created() {
     await this.loadWorkspace();
+    if (!this.workspace) return; // loadWorkspace failed and navigated away
     // Must be called after the workspace has loaded, otherwise isArchived is always false
     if (this.workspacesStore.isArchived) {
       this.$root.openDialog('ArchivedDialog', {
         workspace: this.workspace,
         onAcceptance: async () => await this.handleToggleStatus(),
       });
+    } else {
+      await this.syncRemoteChanges();
     }
+    this.syncReady = true;
   },
 
   methods: {
@@ -121,7 +130,47 @@ export default {
 
     async handleToggleStatus() {
       await this.workspacesStore.toggleWorkspaceStatus(this.workspaceId);
+      await this.syncRemoteChanges();
       this.notificationsStore.success('Workspace activated successfully');
+    },
+
+    async syncRemoteChanges() {
+      try {
+        const result = await this.workspacesStore.syncWorkspace(this.workspaceId);
+        switch (result?.status) {
+          case 'updated':
+          case 'merged':
+            this.notificationsStore.success(
+              'Workspace updated with the latest changes from GitHub',
+            );
+            break;
+          case 'conflict':
+            this.$root.openDialog('SyncConflictDialog', {
+              workspace: this.workspace,
+              files: result.conflicting_files,
+            });
+            break;
+          case 'dirty':
+            if (result.behind_commits > 0) {
+              this.notificationsStore.warning(
+                'New changes exist on GitHub. They will be merged into your workspace ' +
+                  'automatically when you commit your local changes.',
+              );
+            }
+            break;
+          case 'remote_missing':
+            this.notificationsStore.warning(
+              'The GitHub branch for this workspace no longer exists on your fork. ' +
+                'It will be recreated with your next commit.',
+            );
+            break;
+        }
+      } catch (error) {
+        // Never block opening the workspace on a sync failure
+        this.notificationsStore.warning(
+          `Could not check GitHub for remote updates: ${error.message}`,
+        );
+      }
     },
   },
 };
