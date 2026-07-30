@@ -2,7 +2,14 @@
   <v-btn-toggle mandatory v-model="view" color="primary">
     <v-btn value="editor" :prepend-icon="icons.edit" :ripple="false"> Editor </v-btn>
     <v-btn value="propose" :prepend-icon="icons.propose" :ripple="false"> Propose </v-btn>
-    <v-btn value="workspaces" :prepend-icon="icons.close" :ripple="false"> Close </v-btn>
+    <v-btn
+      value="workspaces"
+      :prepend-icon="icons.close"
+      :ripple="false"
+      :loading="proposalStore.isDiffLoading"
+    >
+      Close
+    </v-btn>
   </v-btn-toggle>
 </template>
 
@@ -73,11 +80,43 @@ export default {
           title: 'Unsaved Changes',
           message: 'You have unsaved changes. Are you sure you want to close the workspace?',
           confirmButton: 'Discard Changes',
-          onAcceptance: this.forceCloseWorkspace,
+          onAcceptance: this.confirmUncommittedChanges,
         });
       } else {
-        this.forceCloseWorkspace();
+        this.confirmUncommittedChanges();
       }
+    },
+
+    // Warn before leaving changes behind that have not been sent to GitHub: the longer they
+    // stay uncommitted, the more likely they conflict with changes made on GitHub meanwhile
+    async confirmUncommittedChanges() {
+      const workspaceId = this.workspacesStore.currentWorkspace?.id;
+      if (!workspaceId || this.workspacesStore.isArchived) {
+        this.forceCloseWorkspace();
+        return;
+      }
+
+      try {
+        await this.proposalStore.fetchDiffList(workspaceId);
+      } catch {
+        // Without the change list there is nothing to warn about; never block closing
+        this.forceCloseWorkspace();
+        return;
+      }
+
+      const files = this.proposalStore.diffList;
+      if (!files.length) {
+        this.forceCloseWorkspace();
+        return;
+      }
+
+      this.$root.openDialog('UncommittedChangesDialog', {
+        files,
+        onAcceptance: this.forceCloseWorkspace,
+        // The change list is already on screen when closing from the propose view
+        onReview:
+          this.$route.name === 'propose' ? null : () => this.$router.push({ name: 'propose' }),
+      });
     },
     forceCloseWorkspace() {
       this.editorStore.reset();

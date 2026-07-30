@@ -31,6 +31,9 @@ const components = {
   SyncConflictDialog: defineAsyncComponent(
     () => import('@/components/dialogs/SyncConflictDialog.vue'),
   ),
+  UncommittedChangesDialog: defineAsyncComponent(
+    () => import('@/components/dialogs/UncommittedChangesDialog.vue'),
+  ),
   WorkspaceDialog: defineAsyncComponent(() => import('@/components/dialogs/WorkspaceDialog.vue')),
 };
 

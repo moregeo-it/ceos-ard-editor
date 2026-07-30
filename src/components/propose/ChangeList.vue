@@ -111,23 +111,14 @@ export default {
 
   methods: {
     async onCommitMessageSubmit() {
+      const workspaceId = this.workspacesStore.currentWorkspace.id;
+      let commit;
+
       try {
-        const workspaceId = this.workspacesStore.currentWorkspace.id;
-        const commit = await this.proposalStore.commitChanges(
+        commit = await this.proposalStore.commitChanges(
           workspaceId,
           this.proposalStore.commitMessage,
         );
-        this.proposalStore.commitMessage = '';
-        if (commit.merged_remote) {
-          this.notificationsStore.success(
-            'Commit sent to GitHub. New changes from GitHub were merged into your workspace.',
-          );
-          // The merge added commits beyond the one just made — refresh the full list
-          await this.proposalStore.fetchCommits(workspaceId);
-        } else {
-          this.notificationsStore.success('Commit updated successfully.');
-        }
-        await this.filesStore.updateFilesAfterCommit();
       } catch (error) {
         // The commit endpoint only returns 409 when remote changes conflict with the
         // committed changes; the payload shape depends on the error handler wrapping
@@ -140,6 +131,27 @@ export default {
         } else {
           this.notificationsStore.error('Error updating commit: ' + error.message);
         }
+        return;
+      }
+
+      this.proposalStore.commitMessage = '';
+      this.notificationsStore.success(
+        commit.merged_remote
+          ? 'Commit sent to GitHub. New changes from GitHub were merged into your workspace.'
+          : 'Commit updated successfully.',
+      );
+
+      // The commit is already sent: refresh failures must not be reported as commit failures
+      try {
+        // A merge added commits beyond the one just made
+        if (commit.merged_remote) {
+          await this.proposalStore.fetchCommits(workspaceId);
+        }
+        await this.filesStore.updateFilesAfterCommit();
+      } catch (error) {
+        this.notificationsStore.warning(
+          `The commit was sent, but the workspace view could not be refreshed: ${error.message}`,
+        );
       }
     },
   },

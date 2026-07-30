@@ -97,7 +97,6 @@ export default {
 
   async created() {
     await this.loadWorkspace();
-    if (!this.workspace) return; // loadWorkspace failed and navigated away
     // Must be called after the workspace has loaded, otherwise isArchived is always false
     if (this.workspacesStore.isArchived) {
       this.$root.openDialog('ArchivedDialog', {
