@@ -8,7 +8,10 @@
 
     <!-- Main Content Area -->
     <v-main class="main-with-header">
-      <splitpanes @resized="storePaneSizes" :dbl-click-splitter="false">
+      <v-container v-if="loading" class="fill-height d-flex align-center justify-center">
+        <v-progress-circular indeterminate color="primary" size="64" />
+      </v-container>
+      <splitpanes v-else @resized="storePaneSizes" :dbl-click-splitter="false">
         <pane class="changes" min-size="20" :size="panelSizes.changes">
           <ChangeList />
         </pane>
@@ -65,7 +68,8 @@ export default {
   computed: {
     loading() {
       return (
-        this.workspacesStore.isWorkspaceLoading[this.workspaceId] || this.proposalStore.isLoading
+        this.workspacesStore.isWorkspaceLoading[this.workspaceId] ||
+        this.proposalStore.isProposalLoading
       );
     },
     workspace() {
