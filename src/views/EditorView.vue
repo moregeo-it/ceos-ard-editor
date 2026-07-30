@@ -33,7 +33,10 @@
 </template>
 
 <script>
+import { useEditorStore } from '@/stores/editor';
+import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
+import { usePreviewStore } from '@/stores/preview';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { mdiCheckCircle, mdiMenuDown, mdiNotebookEdit } from '@mdi/js';
 import HeaderBar from '@/components/HeaderBar.vue';
@@ -93,6 +96,15 @@ export default {
     notificationsStore() {
       return useNotificationsStore();
     },
+    editorStore() {
+      return useEditorStore();
+    },
+    filesStore() {
+      return useFilesStore();
+    },
+    previewStore() {
+      return usePreviewStore();
+    },
   },
 
   async created() {
@@ -136,12 +148,14 @@ export default {
     async syncRemoteChanges() {
       try {
         const result = await this.workspacesStore.syncWorkspace(this.workspaceId);
+        console.log('Sync result:', result);
         switch (result?.status) {
           case 'updated':
           case 'merged':
             this.notificationsStore.success(
               'Workspace updated with the latest changes from GitHub',
             );
+            await this.refreshAfterRemoteUpdate();
             break;
           case 'conflict':
             this.$root.openDialog('SyncConflictDialog', {
@@ -168,6 +182,21 @@ export default {
         // Never block opening the workspace on a sync failure
         this.notificationsStore.warning(
           `Could not check GitHub for remote updates: ${error.message}`,
+        );
+      }
+    },
+
+    // The sync changed files on disk. Drop the cached file tree so the panes read the updated
+    // state, and reload what is already open in the editor.
+    async refreshAfterRemoteUpdate() {
+      this.filesStore.reset();
+      const skipped = await this.editorStore.resyncOpenFiles();
+      this.previewStore.generatePreview();
+
+      if (skipped.length) {
+        this.notificationsStore.warning(
+          'These open files keep your unsaved changes and were not updated with the changes ' +
+            `from GitHub: ${skipped.join(', ')}`,
         );
       }
     },
