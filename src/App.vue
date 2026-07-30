@@ -1,7 +1,6 @@
 <template>
   <v-app id="app">
-    <!-- Keyed by path so switching workspaces remounts the view and re-runs its data loading -->
-    <router-view :key="$route.path" />
+    <router-view />
 
     <!-- Global Snackbar -->
     <v-snackbar
