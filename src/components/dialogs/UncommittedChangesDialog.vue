@@ -8,13 +8,15 @@
           workspace, but for as long as they are not committed, changes made on GitHub in the
           meantime can end up conflicting with them.
         </div>
-        <div class="mt-4 font-weight-medium">Changes not sent to GitHub:</div>
-        <ul class="file-list mt-1">
-          <li v-for="file of files" :key="file.path" class="d-flex align-center mb-1">
-            <FileStatusBadge :status="file.status" class="mr-2" width="60px" />
-            <code>{{ file.path }}</code>
-          </li>
-        </ul>
+        <template v-if="files.length">
+          <div class="mt-4 font-weight-medium">Changes not sent to GitHub:</div>
+          <ul class="file-list mt-1">
+            <li v-for="file of files" :key="file.path" class="d-flex align-center mb-1">
+              <FileStatusBadge :status="file.status" class="mr-2" width="60px" />
+              <code>{{ file.path }}</code>
+            </li>
+          </ul>
+        </template>
       </v-card-text>
       <v-card-actions>
         <v-btn

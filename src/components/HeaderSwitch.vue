@@ -110,12 +110,14 @@ export default {
         return;
       }
 
+      // The propose view already lists the changes and is where they get committed, so neither
+      // the file list nor the review button is needed.
+      const inProposeView = this.$route.name === 'propose';
+
       this.$root.openDialog('UncommittedChangesDialog', {
-        files,
+        files: inProposeView ? [] : files,
         onAcceptance: this.forceCloseWorkspace,
-        // The change list is already on screen when closing from the propose view
-        onReview:
-          this.$route.name === 'propose' ? null : () => this.$router.push({ name: 'propose' }),
+        onReview: inProposeView ? null : () => this.$router.push({ name: 'propose' }),
       });
     },
     forceCloseWorkspace() {
