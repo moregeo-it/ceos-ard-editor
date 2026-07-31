@@ -178,8 +178,10 @@ export default {
     async handleWorkspaceSubmit(data, mode) {
       try {
         if (mode === 'create') {
-          await this.workspacesStore.createWorkspace(data);
-          this.notificationsStore.success('Workspace created successfully');
+          // Read before creating, which adds to the list
+          const isFirstWorkspace = this.workspacesStore.workspaces.length === 0;
+          const workspace = await this.workspacesStore.createWorkspace(data);
+          this.announceFork(workspace, isFirstWorkspace);
         } else {
           await this.workspacesStore.updateWorkspace(data.id, {
             title: data.title,
@@ -191,6 +193,30 @@ export default {
       } catch (error) {
         throw new Error(`Failed to ${mode} workspace: ${error.message}`);
       }
+    },
+
+    // Creating a workspace also creates a repository in the user's GitHub account, which the
+    // UI otherwise never mentions — so it gets tidied away, breaking every workspace at once.
+    //
+    // Only the first workspace actually creates the fork; the rest reuse it as another branch.
+    // So the dialog belongs there, and every later create just names the fork in the toast to
+    // keep it discoverable. A dialog every time would only train people to dismiss it.
+    announceFork(workspace, isFirstWorkspace) {
+      const forkName =
+        workspace?.fork_repo_owner && workspace?.fork_repo_name
+          ? `${workspace.fork_repo_owner}/${workspace.fork_repo_name}`
+          : null;
+
+      if (forkName && isFirstWorkspace) {
+        this.$root.openDialog('ForkCreatedDialog', { workspace });
+        return;
+      }
+
+      this.notificationsStore.success(
+        forkName
+          ? `Workspace created successfully in your fork ${forkName}`
+          : 'Workspace created successfully',
+      );
     },
 
     handleViewWorkspace(workspaceId) {

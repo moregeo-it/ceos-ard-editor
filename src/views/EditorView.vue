@@ -108,6 +108,9 @@ export default {
   },
 
   async created() {
+    // Must be read before loadWorkspace(), which sets currentWorkspace itself.
+    const isFreshOpening = this.workspacesStore.currentWorkspace?.id !== this.workspaceId;
+
     await this.loadWorkspace();
     // Must be called after the workspace has loaded, otherwise isArchived is always false
     if (this.workspacesStore.isArchived) {
@@ -115,7 +118,7 @@ export default {
         workspace: this.workspace,
         onAcceptance: async () => await this.handleToggleStatus(),
       });
-    } else {
+    } else if (isFreshOpening) {
       await this.syncRemoteChanges();
     }
     this.syncReady = true;
@@ -140,7 +143,14 @@ export default {
     },
 
     async handleToggleStatus() {
-      await this.workspacesStore.toggleWorkspaceStatus(this.workspaceId);
+      try {
+        await this.workspacesStore.toggleWorkspaceStatus(this.workspaceId);
+      } catch (error) {
+        // Reactivating is the way out of a workspace archived by mistake, so a silent failure
+        // here leaves the user with a button that appears to do nothing
+        this.notificationsStore.error(`Failed to activate workspace: ${error.message}`);
+        return;
+      }
       await this.syncRemoteChanges();
       this.notificationsStore.success('Workspace activated successfully');
     },
@@ -148,7 +158,16 @@ export default {
     async syncRemoteChanges() {
       try {
         const result = await this.workspacesStore.syncWorkspace(this.workspaceId);
-        console.log('Sync result:', result);
+
+        // The fork was recreated behind the scenes. Reported because a repository appearing
+        // in someone's GitHub account should never be silent, even when it is a restoration.
+        if (result?.repaired) {
+          this.notificationsStore.success(
+            'Your fork was missing on GitHub, so it was recreated and your work was pushed ' +
+              'back to it. No changes were lost.',
+          );
+        }
+
         switch (result?.status) {
           case 'updated':
           case 'merged':
@@ -171,11 +190,23 @@ export default {
               );
             }
             break;
+          // The branch is gone and was left alone, because the proposal is merged or closed
+          // and deleting the branch was probably deliberate
           case 'remote_missing':
             this.notificationsStore.warning(
               'The GitHub branch for this workspace no longer exists on your fork. ' +
                 'It will be recreated with your next commit.',
             );
+            break;
+          // The branch was gone and has been pushed back
+          case 'remote_restored':
+            // Silent when the fork was recreated too: the message above already covers it
+            if (!result.repaired) {
+              this.notificationsStore.info(
+                'The GitHub branch for this workspace was missing and has been restored ' +
+                  'from your local history.',
+              );
+            }
             break;
         }
       } catch (error) {

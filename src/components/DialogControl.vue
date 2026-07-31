@@ -24,6 +24,9 @@ const components = {
   CreatePfsDialog: defineAsyncComponent(() => import('@/components/dialogs/CreatePfsDialog.vue')),
   DeleteFileDialog: defineAsyncComponent(() => import('@/components/dialogs/DeleteFileDialog.vue')),
   DiffDialog: defineAsyncComponent(() => import('@/components/dialogs/DiffDialog.vue')),
+  ForkCreatedDialog: defineAsyncComponent(
+    () => import('@/components/dialogs/ForkCreatedDialog.vue'),
+  ),
   ReauthenticationDialog: defineAsyncComponent(
     () => import('@/components/dialogs/ReauthenticationDialog.vue'),
   ),

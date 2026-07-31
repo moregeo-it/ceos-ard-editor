@@ -126,6 +126,7 @@ export default {
       this.notificationsStore.reset();
       this.previewStore.reset();
       this.proposalStore.reset();
+      this.workspacesStore.resetCurrentWorkspace();
       this.$router.push({ name: 'workspaces' });
     },
   },
