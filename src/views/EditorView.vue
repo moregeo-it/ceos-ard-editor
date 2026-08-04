@@ -163,7 +163,7 @@ export default {
         // in someone's GitHub account should never be silent, even when it is a restoration.
         if (result?.repaired) {
           this.notificationsStore.success(
-            'Your fork was missing on GitHub, so it was recreated and your work was pushed ' +
+            'Your CEOS-ARD repository was missing on GitHub, so it was recreated and your work was pushed ' +
               'back to it. No changes were lost.',
           );
         }
@@ -194,7 +194,7 @@ export default {
           // and deleting the branch was probably deliberate
           case 'remote_missing':
             this.notificationsStore.warning(
-              'The GitHub branch for this workspace no longer exists on your fork. ' +
+              'The GitHub branch for this workspace no longer exists on your CEOS-ARD repository. ' +
                 'It will be recreated with your next commit.',
             );
             break;

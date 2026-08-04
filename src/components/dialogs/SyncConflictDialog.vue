@@ -6,7 +6,8 @@
         <div class="mt-2">
           The branch of this workspace on GitHub was changed in a way that overlaps with the changes
           made in this workspace, so the two versions cannot be combined automatically. You can keep
-          working, but new commits cannot be sent to GitHub until the conflict is resolved.
+          working, but new commits cannot be sent to GitHub until the conflict is resolved manually
+          on GitHub.
         </div>
         <template v-if="files.length">
           <div class="mt-4 font-weight-medium">Conflicting files:</div>

@@ -1,7 +1,7 @@
 <template>
   <v-dialog v-model="show" :max-width="sizes.medium" persistent>
     <v-card>
-      <v-card-title>A fork was created on your GitHub account</v-card-title>
+      <v-card-title>A CEOS-ARD repository was created on your GitHub account</v-card-title>
       <v-card-text>
         <p class="mb-3">
           Your work is stored in
@@ -11,8 +11,8 @@
         <v-alert type="warning" variant="tonal" density="compact" class="mb-3">
           <p class="mb-2 font-weight-bold">Please don't delete this repository on GitHub.</p>
           <p class="mb-0">
-            All of your workspaces share this one fork, so deleting it affects every one of them —
-            not just this workspace.
+            All of your workspaces depend on this repository, so deleting it affects every one of
+            them — not just this workspace.
           </p>
         </v-alert>
       </v-card-text>

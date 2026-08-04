@@ -214,7 +214,7 @@ export default {
 
       this.notificationsStore.success(
         forkName
-          ? `Workspace created successfully in your fork ${forkName}`
+          ? `Workspace created successfully in your CEOS-ARD repository ${forkName}`
           : 'Workspace created successfully',
       );
     },

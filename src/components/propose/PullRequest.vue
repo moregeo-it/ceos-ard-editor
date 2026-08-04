@@ -25,17 +25,19 @@
              be reopened, so it must not fall into the withdrawn/rejected branch below. -->
         <template v-if="isDetached">
           <p class="mb-2 font-weight-bold">
-            Your fork was deleted on GitHub, so GitHub closed Pull Request #{{ proposal.number }}.
+            Your CEOS-ARD repository was deleted on GitHub, so GitHub closed Pull Request #{{
+              proposal.number
+            }}.
           </p>
           <p class="mb-2">
-            None of your work is lost — every change is still in this workspace, and the fork is
-            recreated automatically the next time you sync or commit. The Pull Request itself cannot
-            be reopened, because GitHub permanently unlinks it from a deleted fork.
+            None of your work is lost — every change is still in this workspace, and the repository
+            is recreated automatically the next time you sync or commit. The Pull Request itself
+            cannot be reopened, because GitHub permanently unlinks it from a deleted repository.
           </p>
           <p class="mb-2">
             Proposing again will open a <strong>new</strong> Pull Request with your title and
             description, linked back to the old one so its review comments stay reachable. Any other
-            proposals you had open share the same fork and are affected in the same way.
+            proposals you had open share the same repository and are affected in the same way.
           </p>
 
           <v-btn
