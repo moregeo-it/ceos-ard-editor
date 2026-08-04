@@ -126,6 +126,48 @@ export const useEditorStore = defineStore('editor', {
       }
     },
 
+    /**
+     * Reload open files after the workspace content changed underneath the editor, e.g. because
+     * remote changes were merged in. Returns the paths that were left untouched because they
+     * have unsaved changes, so the caller can point the user at them.
+     */
+    async resyncOpenFiles() {
+      const files = useFilesStore();
+      const skipped = [];
+
+      for (const file of [...this.opened]) {
+        const path = file.path;
+        const hasUnsavedChanges = this.changed[path];
+        if (hasUnsavedChanges) {
+          skipped.push(path);
+        }
+
+        try {
+          // Never overwrite unsaved work with the updated content
+          if (!hasUnsavedChanges) {
+            await this.sync(path);
+          }
+          // Also repopulates the files store, which the tabs read their state from
+          const context = await files.loadFileContext(path, true);
+          const index = this.opened.findIndex((f) => f.path === path);
+          if (index !== -1) {
+            this.opened[index] = Object.assign({}, this.opened[index], context);
+            if (this.active?.path === path) {
+              this.active = this.opened[index];
+            }
+          }
+        } catch {
+          // The file is gone from the updated workspace. Keep tabs with unsaved changes open so
+          // the user decides what to do with them, as for a locally deleted file.
+          if (!hasUnsavedChanges) {
+            this.close(path);
+          }
+        }
+      }
+
+      return skipped;
+    },
+
     async onFileCreated(fileData) {
       // Show newly created files (not directories)
       if (fileData && !fileData.is_directory) {

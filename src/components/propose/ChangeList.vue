@@ -56,7 +56,9 @@
 </template>
 
 <script>
+import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
+import { usePreviewStore } from '@/stores/preview';
 import { useProposalStore } from '@/stores/proposal';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
@@ -82,8 +84,14 @@ export default {
   },
 
   computed: {
+    editorStore() {
+      return useEditorStore();
+    },
     filesStore() {
       return useFilesStore();
+    },
+    previewStore() {
+      return usePreviewStore();
     },
     workspacesStore() {
       return useWorkspacesStore();
@@ -111,14 +119,64 @@ export default {
 
   methods: {
     async onCommitMessageSubmit() {
+      const workspaceId = this.workspacesStore.currentWorkspace.id;
+      let commit;
+
       try {
-        const workspaceId = this.workspacesStore.currentWorkspace.id;
-        await this.proposalStore.commitChanges(workspaceId, this.proposalStore.commitMessage);
-        this.proposalStore.commitMessage = '';
-        this.notificationsStore.success('Commit updated successfully.');
-        await this.filesStore.updateFilesAfterCommit();
+        commit = await this.proposalStore.commitChanges(
+          workspaceId,
+          this.proposalStore.commitMessage,
+        );
       } catch (error) {
-        this.notificationsStore.error('Error updating commit: ' + error.message);
+        // The commit endpoint only returns 409 when remote changes conflict with the
+        // committed changes; the payload shape depends on the error handler wrapping
+        if (error.status === 409) {
+          const detail = error.details?.detail ?? error.details ?? {};
+          this.$root.openDialog('SyncConflictDialog', {
+            workspace: this.workspacesStore.currentWorkspace,
+            files: detail.conflicting_files ?? [],
+          });
+        } else {
+          this.notificationsStore.error('Error updating commit: ' + error.message);
+        }
+        return;
+      }
+
+      this.proposalStore.commitMessage = '';
+      this.notificationsStore.success(
+        commit.merged_remote
+          ? 'Commit sent to GitHub. New changes from GitHub were merged into your workspace.'
+          : 'Commit updated successfully.',
+      );
+
+      // The commit is already sent: refresh failures must not be reported as commit failures
+      try {
+        if (commit.merged_remote) {
+          await this.refreshAfterRemoteUpdate();
+          // The merge added commits beyond the one just made
+          await this.proposalStore.fetchCommits(workspaceId);
+        } else {
+          await this.filesStore.updateFilesAfterCommit();
+        }
+      } catch (error) {
+        this.notificationsStore.warning(
+          `The commit was sent, but the workspace view could not be refreshed: ${error.message}`,
+        );
+      }
+    },
+
+    // A merge can add, delete or rename files at any depth, so drop the cached file tree instead
+    // of patching single entries; the file pane refetches it when it is shown again
+    async refreshAfterRemoteUpdate() {
+      this.filesStore.reset();
+      const skipped = await this.editorStore.resyncOpenFiles();
+      this.previewStore.setPreviewHtml('');
+
+      if (skipped.length) {
+        this.notificationsStore.warning(
+          'These open files keep your unsaved changes and were not updated with the changes ' +
+            `from GitHub: ${skipped.join(', ')}`,
+        );
       }
     },
   },

@@ -24,10 +24,19 @@ const components = {
   CreatePfsDialog: defineAsyncComponent(() => import('@/components/dialogs/CreatePfsDialog.vue')),
   DeleteFileDialog: defineAsyncComponent(() => import('@/components/dialogs/DeleteFileDialog.vue')),
   DiffDialog: defineAsyncComponent(() => import('@/components/dialogs/DiffDialog.vue')),
+  ForkCreatedDialog: defineAsyncComponent(
+    () => import('@/components/dialogs/ForkCreatedDialog.vue'),
+  ),
   ReauthenticationDialog: defineAsyncComponent(
     () => import('@/components/dialogs/ReauthenticationDialog.vue'),
   ),
   RenameFileDialog: defineAsyncComponent(() => import('@/components/dialogs/RenameFileDialog.vue')),
+  SyncConflictDialog: defineAsyncComponent(
+    () => import('@/components/dialogs/SyncConflictDialog.vue'),
+  ),
+  UncommittedChangesDialog: defineAsyncComponent(
+    () => import('@/components/dialogs/UncommittedChangesDialog.vue'),
+  ),
   WorkspaceDialog: defineAsyncComponent(() => import('@/components/dialogs/WorkspaceDialog.vue')),
 };
 

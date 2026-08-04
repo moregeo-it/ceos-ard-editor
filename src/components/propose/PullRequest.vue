@@ -21,7 +21,36 @@
     </div>
     <template v-else-if="commits.length > 0">
       <v-alert :type="statusColor" :icon="alertIcon" class="mt-4 mb-6" variant="tonal" dense>
-        <template v-if="proposal && proposal.state === 'open'">
+        <!-- Must come first: a detached proposal also reports state 'closed', but it cannot
+             be reopened, so it must not fall into the withdrawn/rejected branch below. -->
+        <template v-if="isDetached">
+          <p class="mb-2 font-weight-bold">
+            Your CEOS-ARD repository was deleted on GitHub, so GitHub closed Pull Request #{{
+              proposal.number
+            }}.
+          </p>
+          <p class="mb-2">
+            None of your work is lost — every change is still in this workspace, and the repository
+            is recreated automatically the next time you sync or commit. The Pull Request itself
+            cannot be reopened, because GitHub permanently unlinks it from a deleted repository.
+          </p>
+          <p class="mb-2">
+            Proposing again will open a <strong>new</strong> Pull Request with your title and
+            description, linked back to the old one so its review comments stay reachable. Any other
+            proposals you had open share the same repository and are affected in the same way.
+          </p>
+
+          <v-btn
+            :href="proposal.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            color="primary"
+            class="ma-2"
+          >
+            View Pull Request #{{ proposal.number }} on GitHub
+          </v-btn>
+        </template>
+        <template v-else-if="proposal && proposal.state === 'open'">
           <p class="mb-2 font-weight-bold">
             A Pull Request has been created on GitHub for your proposed changes.
           </p>
@@ -135,7 +164,10 @@
           :disabled="formDisabled"
           :loading="isSubmitting"
         >
-          <template v-if="!proposal">Create</template>
+          <!-- "Update" would be a lie for a detached proposal: the old Pull Request is gone
+               for good and submitting opens a replacement. -->
+          <template v-if="isDetached">Create New</template>
+          <template v-else-if="!proposal">Create</template>
           <template v-else>Update</template>
           Proposal
         </v-btn>
@@ -187,7 +219,15 @@ export default {
       }
       return mdiInformation;
     },
+    // The fork this proposal was opened from has been deleted, so GitHub closed it and will
+    // never let it reopen. Proposing again creates a new Pull Request instead.
+    isDetached() {
+      return Boolean(this.proposal?.detached);
+    },
     statusColor() {
+      if (this.isDetached) {
+        return 'warning';
+      }
       if (this.proposal) {
         switch (this.proposal.state) {
           case 'open':
@@ -225,7 +265,9 @@ export default {
       return (
         this.isSubmitting ||
         this.isChangingState ||
-        (this.proposal && this.proposal.state === 'closed') ||
+        // A detached proposal is also 'closed', but submitting is the whole recovery path:
+        // it opens the replacement Pull Request. Disabling it would leave no way forward.
+        (this.proposal && this.proposal.state === 'closed' && !this.isDetached) ||
         this.workspacesStore.isArchived
       );
     },
