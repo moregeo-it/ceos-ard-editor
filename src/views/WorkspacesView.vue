@@ -17,7 +17,11 @@
             <v-btn value="all">
               All
               <v-chip size="x-small" class="ml-2">
-                {{ workspacesStore.workspaces.length }}
+                {{
+                  workspacesStore.activeWorkspaces.length +
+                  workspacesStore.archivedWorkspaces.length +
+                  workspacesStore.sharedWorkspaces.length
+                }}
               </v-chip>
             </v-btn>
             <v-btn value="active">
@@ -30,6 +34,12 @@
               Archived
               <v-chip size="x-small" class="ml-2" color="grey">
                 {{ workspacesStore.archivedWorkspaces.length }}
+              </v-chip>
+            </v-btn>
+            <v-btn value="shared">
+              Shared
+              <v-chip size="x-small" class="ml-2" color="primary">
+                {{ workspacesStore.sharedWorkspaces.length }}
               </v-chip>
             </v-btn>
           </v-btn-toggle>
@@ -83,6 +93,7 @@
             :workspace="workspace"
             @view="handleViewWorkspace"
             @edit="handleEditWorkspace"
+            @share="handleShareWorkspace"
             @toggle-status="handleToggleStatus"
             @delete="confirmDelete"
           />
@@ -116,7 +127,7 @@ export default {
         plus: mdiPlus,
         folderOff: mdiFolderOff,
       },
-      filter: 'active', // 'all', 'active', 'archived'
+      filter: 'active', // 'all', 'active', 'archived', 'shared'
     };
   },
 
@@ -145,8 +156,14 @@ export default {
           return store.activeWorkspaces;
         case 'archived':
           return store.archivedWorkspaces;
+        case 'shared':
+          return store.sharedWorkspaces;
         default:
-          return store.workspaces;
+          return [
+            ...store.activeWorkspaces,
+            ...store.archivedWorkspaces,
+            ...store.sharedWorkspaces,
+          ];
       }
     },
   },
@@ -178,8 +195,11 @@ export default {
     async handleWorkspaceSubmit(data, mode) {
       try {
         if (mode === 'create') {
-          // Read before creating, which adds to the list
-          const isFirstWorkspace = this.workspacesStore.workspaces.length === 0;
+          // Read before creating, which adds to the list. Only owned workspaces count: the list
+          // also holds workspaces shared with the user, which live in someone else's fork.
+          const isFirstWorkspace = !this.workspacesStore.workspaces.some(
+            (w) => w.viewer_role === 'owner',
+          );
           const workspace = await this.workspacesStore.createWorkspace(data);
           this.announceFork(workspace, isFirstWorkspace);
         } else {
@@ -235,6 +255,13 @@ export default {
           workspace,
           onAcceptance: async (data) => await this.handleWorkspaceSubmit(data, mode),
         });
+      }
+    },
+
+    handleShareWorkspace(workspaceId) {
+      const workspace = this.workspacesStore.workspaces.find((w) => w.id === workspaceId);
+      if (workspace) {
+        this.$root.openDialog('ShareDialog', { workspace });
       }
     },
 

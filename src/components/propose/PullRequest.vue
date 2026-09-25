@@ -268,7 +268,8 @@ export default {
         // A detached proposal is also 'closed', but submitting is the whole recovery path:
         // it opens the replacement Pull Request. Disabling it would leave no way forward.
         (this.proposal && this.proposal.state === 'closed' && !this.isDetached) ||
-        this.workspacesStore.isArchived
+        this.workspacesStore.isArchived ||
+        !this.workspacesStore.isOwner
       );
     },
     title: {

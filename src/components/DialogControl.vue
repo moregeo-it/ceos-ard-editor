@@ -31,6 +31,7 @@ const components = {
     () => import('@/components/dialogs/ReauthenticationDialog.vue'),
   ),
   RenameFileDialog: defineAsyncComponent(() => import('@/components/dialogs/RenameFileDialog.vue')),
+  ShareDialog: defineAsyncComponent(() => import('@/components/dialogs/ShareDialog.vue')),
   SyncConflictDialog: defineAsyncComponent(
     () => import('@/components/dialogs/SyncConflictDialog.vue'),
   ),

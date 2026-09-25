@@ -57,7 +57,6 @@
 
 <script>
 import { useEditorStore } from '@/stores/editor';
-import { useFilesStore } from '@/stores/files';
 import { usePreviewStore } from '@/stores/preview';
 import { useProposalStore } from '@/stores/proposal';
 import { useWorkspacesStore } from '@/stores/workspaces';
@@ -87,9 +86,6 @@ export default {
     editorStore() {
       return useEditorStore();
     },
-    filesStore() {
-      return useFilesStore();
-    },
     previewStore() {
       return usePreviewStore();
     },
@@ -112,7 +108,8 @@ export default {
       return (
         this.proposalStore.isCommitting ||
         this.proposalStore.proposal?.state === 'closed' ||
-        this.workspacesStore.isArchived
+        this.workspacesStore.isArchived ||
+        !this.workspacesStore.isOwner
       );
     },
   },
@@ -123,6 +120,7 @@ export default {
       let commit;
 
       try {
+        // The files store reacts to the file.committed event this emits.
         commit = await this.proposalStore.commitChanges(
           workspaceId,
           this.proposalStore.commitMessage,
@@ -149,33 +147,20 @@ export default {
           : 'Commit updated successfully.',
       );
 
-      // The commit is already sent: refresh failures must not be reported as commit failures
+      // The committed files are refreshed by the file.committed event above; a merge of remote
+      // changes touches files beyond the commit, so it needs a full refresh. The commit is
+      // already sent: refresh failures must not be reported as commit failures
       try {
         if (commit.merged_remote) {
-          await this.refreshAfterRemoteUpdate();
+          await this.editorStore.refreshAfterRemoteUpdate();
+          // No preview pane in this view; drop the stale one instead of regenerating it
+          this.previewStore.setPreviewHtml('');
           // The merge added commits beyond the one just made
           await this.proposalStore.fetchCommits(workspaceId);
-        } else {
-          await this.filesStore.updateFilesAfterCommit();
         }
       } catch (error) {
         this.notificationsStore.warning(
           `The commit was sent, but the workspace view could not be refreshed: ${error.message}`,
-        );
-      }
-    },
-
-    // A merge can add, delete or rename files at any depth, so drop the cached file tree instead
-    // of patching single entries; the file pane refetches it when it is shown again
-    async refreshAfterRemoteUpdate() {
-      this.filesStore.reset();
-      const skipped = await this.editorStore.resyncOpenFiles();
-      this.previewStore.setPreviewHtml('');
-
-      if (skipped.length) {
-        this.notificationsStore.warning(
-          'These open files keep your unsaved changes and were not updated with the changes ' +
-            `from GitHub: ${skipped.join(', ')}`,
         );
       }
     },
