@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 
 import { useFilesStore } from './files';
+import { useNotificationsStore } from './notifications';
 
 import { EVENTS, on } from '@/services/events';
 
@@ -110,6 +111,67 @@ export const useEditorStore = defineStore('editor', {
           this.active = this.opened[this.opened.length - 1];
         }
       }
+    },
+
+    /**
+     * The workspace content changed on disk beyond what single-file events describe (remote
+     * changes were fast-forwarded or merged in). A merge can add, delete or rename files at any
+     * depth, so drop the cached file tree instead of patching single entries (the file pane
+     * refetches it when shown again), reload the open tabs and warn about tabs left untouched
+     * because they hold unsaved changes. Returns the paths of those tabs.
+     */
+    async refreshAfterRemoteUpdate() {
+      useFilesStore().reset();
+      const skipped = await this.resyncOpenFiles();
+      if (skipped.length) {
+        useNotificationsStore().warning(
+          'These open files keep your unsaved changes and were not updated with the changes ' +
+            `from GitHub: ${skipped.join(', ')}`,
+        );
+      }
+      return skipped;
+    },
+
+    /**
+     * Reload open files after the workspace content changed underneath the editor, e.g. because
+     * remote changes were merged in. Returns the paths that were left untouched because they
+     * have unsaved changes, so the caller can point the user at them.
+     */
+    async resyncOpenFiles() {
+      const files = useFilesStore();
+      const skipped = [];
+
+      for (const file of [...this.opened]) {
+        const path = file.path;
+        const hasUnsavedChanges = this.changed[path];
+        if (hasUnsavedChanges) {
+          skipped.push(path);
+        }
+
+        try {
+          // Never overwrite unsaved work with the updated content
+          if (!hasUnsavedChanges) {
+            await this.sync(path);
+          }
+          // Also repopulates the files store, which the tabs read their state from
+          const context = await files.loadFileContext(path, true);
+          const index = this.opened.findIndex((f) => f.path === path);
+          if (index !== -1) {
+            this.opened[index] = Object.assign({}, this.opened[index], context);
+            if (this.active?.path === path) {
+              this.active = this.opened[index];
+            }
+          }
+        } catch {
+          // The file is gone from the updated workspace. Keep tabs with unsaved changes open so
+          // the user decides what to do with them, as for a locally deleted file.
+          if (!hasUnsavedChanges) {
+            this.close(path);
+          }
+        }
+      }
+
+      return skipped;
     },
 
     async onFileCreated(fileData) {

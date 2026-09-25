@@ -61,6 +61,18 @@ function parseErrorMessage(errorData, status) {
   if (typeof errorData.detail === 'string') {
     return errorData.detail;
   }
+  // Structured details, e.g. the sync conflict payload {message, conflicting_files}. Without
+  // this the message degrades to the generic status text and the useful part is lost; the
+  // full object stays available on err.details for callers that need the extra fields.
+  if (
+    errorData.detail &&
+    !Array.isArray(errorData.detail) &&
+    typeof errorData.detail === 'object'
+  ) {
+    if (typeof errorData.detail.message === 'string') {
+      return errorData.detail.message;
+    }
+  }
   if (Array.isArray(errorData.detail)) {
     return errorData.detail
       .map((detail) => {

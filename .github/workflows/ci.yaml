@@ -2,8 +2,9 @@ name: Deploy
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
 
 env:
   VITE_API_BASE_URL: 'https://api.ceos-ard.moregeo.it'

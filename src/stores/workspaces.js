@@ -64,6 +64,7 @@ export const useWorkspacesStore = defineStore('workspaces', {
   actions: {
     async fetchWorkspaces() {
       this.isLoading = true;
+      this.resetCurrentWorkspace();
 
       try {
         this.workspaces = await workspaceService.fetchWorkspaces();
@@ -112,7 +113,12 @@ export const useWorkspacesStore = defineStore('workspaces', {
       this.isWorkspaceLoading[workspaceId] = true;
 
       try {
-        const workspace = this.workspaces.find((w) => w.id === workspaceId);
+        // Fall back to currentWorkspace: `workspaces` is only populated by the list view, so
+        // on a reload or a deep link straight into the editor it is empty and this would
+        // throw before ever reaching the server.
+        const workspace =
+          this.workspaces.find((w) => w.id === workspaceId) ??
+          (this.currentWorkspace?.id === workspaceId ? this.currentWorkspace : null);
         if (!workspace) {
           throw new Error('Workspace not found');
         }
@@ -151,7 +157,7 @@ export const useWorkspacesStore = defineStore('workspaces', {
 
         // Clear currentWorkspace if it matches
         if (this.currentWorkspace?.id === workspaceId) {
-          this.currentWorkspace = null;
+          this.resetCurrentWorkspace();
         }
       } finally {
         this.isWorkspaceLoading[workspaceId] = false;
@@ -176,6 +182,14 @@ export const useWorkspacesStore = defineStore('workspaces', {
       } finally {
         this.isWorkspaceLoading[workspaceId] = false;
       }
+    },
+
+    async syncWorkspace(workspaceId) {
+      return workspaceService.syncWorkspace(workspaceId);
+    },
+
+    resetCurrentWorkspace() {
+      this.currentWorkspace = null;
     },
   },
 });
@@ -222,6 +236,15 @@ export function registerWorkspacesEventListeners() {
     if (workspaceId) {
       await workspaces.getWorkspace(workspaceId);
     }
+  });
+
+  // The owner synced the workspace with GitHub and files changed on disk beyond what the
+  // single-file events describe. The owner's own client refreshes inline (EditorView,
+  // ChangeList) and never receives its own events, so this only runs for collaborators.
+  on(EVENTS.WORKSPACE_SYNCED, async () => {
+    useNotificationsStore().info('The workspace was updated with the latest changes from GitHub.');
+    await useEditorStore().refreshAfterRemoteUpdate();
+    usePreviewStore().requestPreviewRefresh();
   });
 
   // Access is gone (terminal events - the server closes the socket after delivering them):

@@ -51,6 +51,8 @@
  *   `file.committed` only.
  * @property {Array<{path: string, status: string, source?: string}>} [changes]
  *   `file.committed` only: the changes included in the commit.
+ * @property {'updated'|'merged'} [status] `workspace.synced` only: whether the workspace was
+ *   fast-forwarded or merged with the changes from GitHub. Files may have changed at any depth.
  * @property {number} [seq] Present iff the event was published by the server broker.
  * @property {string} [target_user_id] `share.revoked` only.
  */
@@ -66,6 +68,7 @@ export const EVENTS = Object.freeze({
   SHARE_REVOKED: 'share.revoked',
   WORKSPACE_ARCHIVED: 'workspace.archived',
   WORKSPACE_DELETED: 'workspace.deleted',
+  WORKSPACE_SYNCED: 'workspace.synced',
   // Client-only events — never sent over the wire.
   REALTIME_RESYNCED: 'realtime.resynced',
 });

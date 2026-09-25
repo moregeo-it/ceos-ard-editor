@@ -56,6 +56,8 @@
 </template>
 
 <script>
+import { useEditorStore } from '@/stores/editor';
+import { usePreviewStore } from '@/stores/preview';
 import { useProposalStore } from '@/stores/proposal';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
@@ -81,6 +83,12 @@ export default {
   },
 
   computed: {
+    editorStore() {
+      return useEditorStore();
+    },
+    previewStore() {
+      return usePreviewStore();
+    },
     workspacesStore() {
       return useWorkspacesStore();
     },
@@ -108,14 +116,52 @@ export default {
 
   methods: {
     async onCommitMessageSubmit() {
+      const workspaceId = this.workspacesStore.currentWorkspace.id;
+      let commit;
+
       try {
-        const workspaceId = this.workspacesStore.currentWorkspace.id;
         // The files store reacts to the file.committed event this emits.
-        await this.proposalStore.commitChanges(workspaceId, this.proposalStore.commitMessage);
-        this.proposalStore.commitMessage = '';
-        this.notificationsStore.success('Commit updated successfully.');
+        commit = await this.proposalStore.commitChanges(
+          workspaceId,
+          this.proposalStore.commitMessage,
+        );
       } catch (error) {
-        this.notificationsStore.error('Error updating commit: ' + error.message);
+        // The commit endpoint only returns 409 when remote changes conflict with the
+        // committed changes; the payload shape depends on the error handler wrapping
+        if (error.status === 409) {
+          const detail = error.details?.detail ?? error.details ?? {};
+          this.$root.openDialog('SyncConflictDialog', {
+            workspace: this.workspacesStore.currentWorkspace,
+            files: detail.conflicting_files ?? [],
+          });
+        } else {
+          this.notificationsStore.error('Error updating commit: ' + error.message);
+        }
+        return;
+      }
+
+      this.proposalStore.commitMessage = '';
+      this.notificationsStore.success(
+        commit.merged_remote
+          ? 'Commit sent to GitHub. New changes from GitHub were merged into your workspace.'
+          : 'Commit updated successfully.',
+      );
+
+      // The committed files are refreshed by the file.committed event above; a merge of remote
+      // changes touches files beyond the commit, so it needs a full refresh. The commit is
+      // already sent: refresh failures must not be reported as commit failures
+      try {
+        if (commit.merged_remote) {
+          await this.editorStore.refreshAfterRemoteUpdate();
+          // No preview pane in this view; drop the stale one instead of regenerating it
+          this.previewStore.setPreviewHtml('');
+          // The merge added commits beyond the one just made
+          await this.proposalStore.fetchCommits(workspaceId);
+        }
+      } catch (error) {
+        this.notificationsStore.warning(
+          `The commit was sent, but the workspace view could not be refreshed: ${error.message}`,
+        );
       }
     },
   },
