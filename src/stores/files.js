@@ -113,6 +113,46 @@ export const useFilesStore = defineStore('files', {
       }
     },
 
+    /**
+     * Reload the tree after it changed at any depth (remote merge, reconnect). Refetches every
+     * loaded folder and swaps the result in at once, so a mounted file pane never goes empty
+     * (reset() would: the pane only fetches on creation). Expansion and selection are kept,
+     * minus paths that no longer exist.
+     */
+    async reloadTree() {
+      const workspaceId = getWorkspaceId();
+      const next = {};
+      const complete = {};
+      const fetchInto = async (path) => {
+        const files = await fileService.fetchFileTree(workspaceId, path);
+        files.forEach((file) => (next[file.path] = file));
+        complete[path] = true;
+      };
+      // Parents first, so a vanished folder is skipped together with its subtree
+      const loadedFolders = Object.keys(this.isFolderComplete).sort((a, b) => a.length - b.length);
+
+      this.isPathLoading.push('/');
+      try {
+        await fetchInto('/');
+        for (const path of loadedFolders) {
+          if (path !== '/' && next[path]?.is_directory) {
+            await fetchInto(path);
+          }
+        }
+      } finally {
+        this.resetPathLoading('/');
+      }
+
+      this.all = next;
+      this.isFolderComplete = complete;
+      this.openedFolders = this.openedFolders.filter((path) => next[path]?.is_directory);
+      this.activatedItems = this.activatedItems.filter((path) => next[path]);
+      // Rerun an active search so its rows reflect the new state
+      if (this.searchResults) {
+        await this.searchFiles(this.searchQuery);
+      }
+    },
+
     async updateFilesAfterCommit() {
       // Refresh every file that had a pending status. Capture paths first — reloading clears them.
       const changedPaths = Object.keys(this.all).filter((path) => this.all[path].status !== null);

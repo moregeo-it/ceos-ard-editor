@@ -114,14 +114,12 @@ export const useEditorStore = defineStore('editor', {
     },
 
     /**
-     * The workspace content changed on disk beyond what single-file events describe (remote
-     * changes were fast-forwarded or merged in). A merge can add, delete or rename files at any
-     * depth, so drop the cached file tree instead of patching single entries (the file pane
-     * refetches it when shown again), reload the open tabs and warn about tabs left untouched
-     * because they hold unsaved changes. Returns the paths of those tabs.
+     * Remote changes were merged in, so files may have changed at any depth: reload the file
+     * tree in place and the open tabs. Tabs with unsaved changes are left untouched, warned
+     * about, and their paths returned.
      */
     async refreshAfterRemoteUpdate() {
-      useFilesStore().reset();
+      await useFilesStore().reloadTree();
       const skipped = await this.resyncOpenFiles();
       if (skipped.length) {
         useNotificationsStore().warning(

@@ -159,7 +159,9 @@ export const useRealtimeStore = defineStore('realtime', {
       const files = useFilesStore();
       const editor = useEditorStore();
       try {
-        await files.loadFiles('/', true);
+        // Refetches every loaded folder and drops entries that are gone, which a forced root
+        // reload alone would leave behind
+        await files.reloadTree();
         await Promise.all(editor.opened.map((file) => editor.sync(file.path)));
         emit(EVENTS.REALTIME_RESYNCED, { workspaceId: this.workspaceId });
       } catch (error) {
