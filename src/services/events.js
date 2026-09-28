@@ -8,18 +8,17 @@
  * Client-only additions that never appear on the wire:
  * - `source: 'local' | 'remote'` on every event — `'local'` (the default) for events emitted by
  *   this client's own store actions, `'remote'` for events forwarded from the WebSocket by the
- *   realtime store (the only place that sets it). It is not for deduplication (echo suppression
- *   happens in the realtime store before the bus); it discriminates behavior where local and
- *   remote genuinely differ, e.g. remote events still need to be applied to the files store,
+ *   realtime store (the only place that sets it). It is not for deduplication (the server never
+ *   sends a tab its own changes, filtered by client id); it discriminates behavior where local
+ *   and remote genuinely differ, e.g. remote events still need to be applied to the files store,
  *   while local events already mutated it inside the emitting action.
  * - The `realtime.*` namespace (e.g. `realtime.resynced`).
  *
  * Usage:
  * - Stores subscribe in an exported `register*EventListeners()` function colocated with the
- *   store, called once from main.js. These subscriptions live for the app's lifetime.
- * - Components use the EventListenerMixin (`this.onEvent(pattern, handler)`), which
- *   unsubscribes automatically on unmount. (This module deliberately has no Vue/Pinia imports
- *   so it stays usable anywhere, including Node scripts.)
+ *   store, called once from main.js. These subscriptions live for the app's lifetime. (This
+ *   module deliberately has no Vue/Pinia imports so it stays usable anywhere, including Node
+ *   scripts.)
  * - Only user-initiated store actions emit; low-level mutators never do (loop prevention).
  * - Handlers must be SELF-CONTAINED: depend only on the event payload and the handler's own
  *   store, never on the effects of other listeners. Handler execution order within one event is
@@ -83,8 +82,8 @@ export const EVENTS = Object.freeze({
 
 const handlers = new Map(); // pattern -> Set<handler>
 
-// Serializes all dispatches: one event is fully handled before the next starts. This extends the
-// ordering guarantee the realtime store previously kept for WebSocket events to local events too.
+// Serializes all dispatches: one event is fully handled before the next starts, for WebSocket and
+// local events alike.
 let queue = Promise.resolve();
 
 let onError = (error, type) => console.error(`Event handler failed for ${type}:`, error);

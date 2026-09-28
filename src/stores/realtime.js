@@ -5,14 +5,13 @@ import { openWorkspaceConnection } from '@/services/collab.service';
 import { CLIENT_ID } from '@/services/client-id';
 import { useAuthStore } from './auth';
 import { useEditorStore } from './editor';
-import { useFilesStore } from './files';
 import { useNotificationsStore } from './notifications';
 
 const RECONNECT_MIN_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 
 // Close codes the server sends on purpose (documented in ceos-ard-server/openapi.yaml).
-export const WS_CLOSE = Object.freeze({
+const WS_CLOSE = Object.freeze({
   SESSION_EXPIRED: 4001, // re-login, then reconnect
   ACCESS_REVOKED: 4003, // stop
   RESYNC: 4009, // reconnect now and resync
@@ -24,9 +23,8 @@ export const WS_CLOSE = Object.freeze({
 let client = null;
 let reconnectTimer = null;
 let backoff = 0;
-let closing = false;
 let hasConnected = false; // true once the first open succeeds, so a re-open triggers a resync
-let wakeHandler = null; // cuts a pending backoff short on 'online' / tab visible
+let wakeListening = false;
 
 function clearReconnectTimer() {
   if (reconnectTimer) {
@@ -42,18 +40,14 @@ function closeClient() {
   }
 }
 
-const getDefaults = () => ({
-  workspaceId: null,
-  status: 'idle', // 'idle' | 'connecting' | 'open' | 'reconnecting'
-});
-
 /**
  * Manages the realtime WebSocket stream and forwards its events onto the central event bus
  * (see `@/services/events`) with `source: 'remote'`. The store listeners registered in main.js
  * apply them - the same handlers that react to local operations.
  */
 export const useRealtimeStore = defineStore('realtime', {
-  state: () => getDefaults(),
+  // Null while no stream is wanted (disconnected); every reconnect path checks it
+  state: () => ({ workspaceId: null }),
 
   actions: {
     /**
@@ -71,7 +65,6 @@ export const useRealtimeStore = defineStore('realtime', {
       }
 
       this.disconnect();
-      closing = false;
       hasConnected = false;
       this.workspaceId = workspaceId;
       this._listenForWake();
@@ -82,19 +75,15 @@ export const useRealtimeStore = defineStore('realtime', {
      * Tear down the connection and stop any pending reconnect.
      */
     disconnect() {
-      closing = true;
       clearReconnectTimer();
       closeClient();
-      this.status = 'idle';
       this.workspaceId = null;
     },
 
     reset() {
       this.disconnect();
-      this._stopListeningForWake();
       backoff = 0;
       hasConnected = false;
-      Object.assign(this, getDefaults());
     },
 
     /**
@@ -104,31 +93,29 @@ export const useRealtimeStore = defineStore('realtime', {
      */
     resumeIfStalled() {
       const auth = useAuthStore();
-      if (this.workspaceId && !client && !closing && auth.accessToken && !auth.isTokenExpired) {
+      if (this.workspaceId && !client && auth.accessToken && !auth.isTokenExpired) {
         this._open();
       }
     },
 
     _open() {
-      const auth = useAuthStore();
       const workspaceId = this.workspaceId;
       if (!workspaceId) {
         return;
       }
-      this.status = 'connecting';
       client = openWorkspaceConnection({
         workspaceId,
-        token: auth.accessToken,
+        token: useAuthStore().accessToken,
         clientId: CLIENT_ID,
         onOpen: () => this._onOpen(),
         onClose: (info) => this._onClose(info),
-        onEvent: (event) => this._handleEvent(event),
+        // The server already filters this tab's own changes; the user's other tabs count as remote.
+        onEvent: (event) => emit(event.type, { ...event, source: 'remote' }),
       });
     },
 
     _onOpen() {
       backoff = 0;
-      this.status = 'open';
       if (hasConnected) {
         // Reconnected after a drop - reconcile anything missed while offline. Runs on the bus
         // queue so it stays ahead of live events that arrive during reconciliation.
@@ -143,13 +130,12 @@ export const useRealtimeStore = defineStore('realtime', {
      */
     _onClose({ code } = {}) {
       closeClient();
-      if (closing) {
+      if (!this.workspaceId) {
         return;
       }
       switch (code) {
         case WS_CLOSE.SESSION_EXPIRED:
           // Ask for a new login; App.vue calls resumeIfStalled() afterwards.
-          this.status = 'reconnecting';
           useAuthStore().setPendingReauth();
           return;
         case WS_CLOSE.ACCESS_REVOKED:
@@ -164,11 +150,9 @@ export const useRealtimeStore = defineStore('realtime', {
         case WS_CLOSE.RESYNC:
           // Reconnect now; the re-open resyncs.
           backoff = 0;
-          this.status = 'reconnecting';
           this._open();
           return;
         default:
-          this.status = 'reconnecting';
           this._scheduleReconnect();
       }
     },
@@ -183,7 +167,7 @@ export const useRealtimeStore = defineStore('realtime', {
 
     _reconnect() {
       clearReconnectTimer();
-      if (closing || client) {
+      if (!this.workspaceId || client) {
         return;
       }
       const auth = useAuthStore();
@@ -195,57 +179,39 @@ export const useRealtimeStore = defineStore('realtime', {
     },
 
     /**
-     * Network back or tab visible again: skip the rest of a pending backoff.
+     * Network back or tab visible again: skip the rest of a pending backoff. Registered once for
+     * the app's lifetime; without a pending reconnect the handler does nothing.
      */
     _listenForWake() {
-      if (wakeHandler) {
+      if (wakeListening) {
         return;
       }
-      wakeHandler = () => {
-        if (document.visibilityState === 'hidden' || !reconnectTimer || closing) {
+      wakeListening = true;
+      const wake = () => {
+        if (document.visibilityState === 'hidden' || !reconnectTimer) {
           return;
         }
         backoff = 0;
         this._reconnect();
       };
-      window.addEventListener('online', wakeHandler);
-      document.addEventListener('visibilitychange', wakeHandler);
-    },
-
-    _stopListeningForWake() {
-      if (!wakeHandler) {
-        return;
-      }
-      window.removeEventListener('online', wakeHandler);
-      document.removeEventListener('visibilitychange', wakeHandler);
-      wakeHandler = null;
+      window.addEventListener('online', wake);
+      document.addEventListener('visibilitychange', wake);
     },
 
     /**
-     * Full reconciliation on reconnect: reload the tree, re-sync open files, then announce it via
-     * a single `realtime.resynced` event (no per-file event storm). Cheaper than server-side
-     * event replay and always converges.
+     * Full reconciliation on reconnect: reload the tree and the open files (unsaved edits are
+     * kept), then announce it via a single `realtime.resynced` event (no per-file event storm).
+     * Cheaper than server-side event replay and always converges.
      */
     async resync() {
-      const files = useFilesStore();
-      const editor = useEditorStore();
       try {
-        // Refetches every loaded folder and drops entries that are gone, which a forced root
-        // reload alone would leave behind
-        await files.reloadTree();
-        await Promise.all(editor.opened.map((file) => editor.sync(file.path)));
+        await useEditorStore().refreshAfterRemoteUpdate({
+          source: 'the changes made while disconnected',
+        });
         emit(EVENTS.REALTIME_RESYNCED, { workspaceId: this.workspaceId });
       } catch (error) {
         useNotificationsStore().error('Failed to resync workspace: ' + error.message);
       }
-    },
-
-    /**
-     * Forward a WebSocket event onto the central event bus, which applies events in arrival order.
-     * The server already filters this tab's own changes; the user's other tabs count as remote.
-     */
-    _handleEvent(event) {
-      return emit(event.type, { ...event, source: 'remote' });
     },
   },
 });

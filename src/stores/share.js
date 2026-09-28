@@ -12,6 +12,15 @@ const getDefaults = () => ({
   activeWorkspaceId: null,
 });
 
+/** Replace the entry with `id` in place; false when the list has none. */
+function replaceById(list, id, item) {
+  const index = list.findIndex((entry) => entry.id === id);
+  if (index !== -1) {
+    list[index] = item;
+  }
+  return index !== -1;
+}
+
 export const useShareStore = defineStore('share', {
   state: () => getDefaults(),
 
@@ -40,89 +49,72 @@ export const useShareStore = defineStore('share', {
       }
     },
 
-    async createShares(workspaceId, githubUsernames, mode) {
+    /** Run a change with `isMutating` set, which disables the dialog's controls meanwhile. */
+    async _mutate(fn) {
       this.isMutating = true;
       try {
-        const response = await shareService.createShares(workspaceId, githubUsernames, mode);
-        const newShares = response || [];
-        // Merge: replace any existing shares with the same id, append the rest
+        return await fn();
+      } finally {
+        this.isMutating = false;
+      }
+    },
+
+    createShares(workspaceId, githubUsernames, mode) {
+      return this._mutate(async () => {
+        const newShares =
+          (await shareService.createShares(workspaceId, githubUsernames, mode)) || [];
+        // Merge: replace any existing shares with the same id, prepend the rest
         for (const share of newShares) {
-          const index = this.shares.findIndex((s) => s.id === share.id);
-          if (index !== -1) {
-            this.shares[index] = share;
-          } else {
+          if (!replaceById(this.shares, share.id, share)) {
             this.shares.unshift(share);
           }
         }
         return newShares;
-      } finally {
-        this.isMutating = false;
-      }
+      });
     },
 
-    async updateShare(workspaceId, shareId, mode) {
-      this.isMutating = true;
-      try {
+    updateShare(workspaceId, shareId, mode) {
+      return this._mutate(async () => {
         const updated = await shareService.updateShare(workspaceId, shareId, mode);
-        const index = this.shares.findIndex((s) => s.id === shareId);
-        if (index !== -1) {
-          this.shares[index] = updated;
-        }
+        replaceById(this.shares, shareId, updated);
         return updated;
-      } finally {
-        this.isMutating = false;
-      }
+      });
     },
 
-    async revokeShare(workspaceId, shareId) {
-      this.isMutating = true;
-      try {
+    revokeShare(workspaceId, shareId) {
+      return this._mutate(async () => {
         await shareService.revokeShare(workspaceId, shareId);
         // Revoke returns 204 (no body). A revoked invitee isn't dropped from the list - it stays,
         // shown greyed-out as "revoked" (that's what a reload returns and what the dialog renders),
         // so flip the row's status in place instead of removing it.
-        const index = this.shares.findIndex((s) => s.id === shareId);
-        if (index !== -1) {
-          this.shares[index] = { ...this.shares[index], status: 'revoked' };
+        const share = this.shares.find((s) => s.id === shareId);
+        if (share) {
+          replaceById(this.shares, shareId, { ...share, status: 'revoked' });
         }
-      } finally {
-        this.isMutating = false;
-      }
+      });
     },
 
-    async createShareLink(workspaceId, mode, expiresAt = null) {
-      this.isMutating = true;
-      try {
+    createShareLink(workspaceId, mode, expiresAt = null) {
+      return this._mutate(async () => {
         const link = await shareService.createShareLink(workspaceId, mode, expiresAt);
         this.shareLinks.unshift(link);
         return link;
-      } finally {
-        this.isMutating = false;
-      }
+      });
     },
 
-    async updateShareLink(workspaceId, linkId, updates) {
-      this.isMutating = true;
-      try {
+    updateShareLink(workspaceId, linkId, updates) {
+      return this._mutate(async () => {
         const updated = await shareService.updateShareLink(workspaceId, linkId, updates);
-        const index = this.shareLinks.findIndex((l) => l.id === linkId);
-        if (index !== -1) {
-          this.shareLinks[index] = updated;
-        }
+        replaceById(this.shareLinks, linkId, updated);
         return updated;
-      } finally {
-        this.isMutating = false;
-      }
+      });
     },
 
-    async deleteShareLink(workspaceId, linkId) {
-      this.isMutating = true;
-      try {
+    deleteShareLink(workspaceId, linkId) {
+      return this._mutate(async () => {
         await shareService.deleteShareLink(workspaceId, linkId);
         this.shareLinks = this.shareLinks.filter((l) => l.id !== linkId);
-      } finally {
-        this.isMutating = false;
-      }
+      });
     },
 
     async redeemShareLink(token) {

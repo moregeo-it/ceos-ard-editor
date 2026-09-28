@@ -81,6 +81,10 @@ import PfsSelect from '@/components/PfsSelect.vue';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
+function sameList(a, b) {
+  return a.length === b.length && a.every((item, i) => item === b[i]);
+}
+
 export default {
   name: 'PreviewPane',
   components: {
@@ -93,6 +97,8 @@ export default {
         docx: false,
       },
       pfsMenuOpen: false,
+      // The owner's edits while the menu is open; null shows the workspace's saved list
+      draftPfs: null,
       icons: {
         download: mdiDownload,
       },
@@ -120,12 +126,13 @@ export default {
     pfsOptions() {
       return this.workspacesStore?.workspacePfsOptions || [];
     },
+    // The workspace's PFS list is the preview selection (saved by the owner, followed by everyone)
     selectedPfs: {
       get() {
-        return this.previewStore.selectedPfs;
+        return this.draftPfs ?? this.currentWorkspace?.pfs ?? [];
       },
       set(value) {
-        this.previewStore.setSelectedPfs(value);
+        this.draftPfs = value;
       },
     },
     previewHtml() {
@@ -139,9 +146,6 @@ export default {
     },
   },
   async created() {
-    if (this.selectedPfs === null) {
-      this.selectedPfs = this.currentWorkspace.pfs || [];
-    }
     if (this.workspaceId) {
       await this.workspacesStore.fetchPfs(this.workspaceId);
     }
@@ -281,26 +285,28 @@ export default {
         }
       });
     },
-    // Regenerate once the menu closes, not on every toggled item of the multi-select
+    // Save and regenerate once the menu closes, not on every toggled item of the multi-select
     async handleMenuToggle(open) {
       this.pfsMenuOpen = open;
       if (open) {
-        this.previewStore.storeOldSelection();
+        this.draftPfs = [...this.selectedPfs];
         return;
       }
-      const before = this.previewStore.oldSelectedPfs ?? [];
-      const after = this.previewStore.selectedPfs ?? [];
-      this.previewStore.clearOldSelection();
-      if (before.length === after.length && before.every((pfs, i) => pfs === after[i])) {
+      const before = this.currentWorkspace?.pfs ?? [];
+      const after = this.draftPfs ?? before;
+      if (sameList(before, after)) {
+        this.draftPfs = null;
         return;
       }
-      // Saved on the workspace so viewers and the owner's other tabs show the same preview
+      // Saved on the workspace so viewers and the owner's other tabs show the same preview; on
+      // failure the chips fall back to the saved list
       try {
         await this.workspacesStore.updateWorkspacePfs(this.workspaceId, after);
       } catch (error) {
-        this.selectedPfs = before;
         useNotificationsStore().error(`Failed to save the PFS selection: ${error.message}`);
         return;
+      } finally {
+        this.draftPfs = null;
       }
       await this.previewStore.requestPreviewRefresh();
     },

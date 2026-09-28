@@ -5,7 +5,9 @@ import { useEditorStore } from './editor';
 import { useFilesStore } from './files';
 import { useNotificationsStore } from './notifications';
 import { usePreviewStore } from './preview';
+import { useProposalStore } from './proposal';
 import { useRealtimeStore } from './realtime';
+import { useShareStore } from './share';
 
 import { EVENTS, on } from '@/services/events';
 import workspaceService from '@/services/workspace.service';
@@ -56,10 +58,6 @@ export const useWorkspacesStore = defineStore('workspaces', {
     sharedWorkspaces: (state) => {
       return state.workspaces.filter((w) => w.viewer_role && w.viewer_role !== 'owner');
     },
-
-    getWorkspaceById: (state) => (id) => {
-      return state.workspaces.find((w) => w.id === id);
-    },
   },
 
   actions: {
@@ -99,7 +97,8 @@ export const useWorkspacesStore = defineStore('workspaces', {
       }
     },
 
-    // The loading flag unmounts the editor panes, so the in-editor updates below don't set it.
+    // The loading flag unmounts the editor panes, so the in-editor updates below don't set it
+    // (toggleWorkspaceStatus is the exception: reactivating via the ArchivedDialog remounts).
 
     /** Save the owner's preview selection as the workspace's PFS list; viewers follow it. */
     async updateWorkspacePfs(workspaceId, pfs) {
@@ -147,18 +146,7 @@ export const useWorkspacesStore = defineStore('workspaces', {
           workspaceId,
           newStatus,
         );
-
-        // Update local state
-        const index = this.workspaces.findIndex((w) => w.id === workspaceId);
-        if (index !== -1) {
-          this.workspaces[index] = updatedWorkspace;
-        }
-
-        // Update currentWorkspace if it matches
-        if (this.currentWorkspace?.id === workspaceId) {
-          this.currentWorkspace = updatedWorkspace;
-        }
-
+        this.applyWorkspace(updatedWorkspace);
         return updatedWorkspace;
       } finally {
         this.isWorkspaceLoading[workspaceId] = false;
@@ -210,6 +198,19 @@ export const useWorkspacesStore = defineStore('workspaces', {
     resetCurrentWorkspace() {
       this.currentWorkspace = null;
     },
+
+    /** Drop every per-workspace store and return to the workspace list. */
+    leaveWorkspace() {
+      useRealtimeStore().reset();
+      useEditorStore().reset();
+      useFilesStore().reset();
+      useNotificationsStore().reset();
+      usePreviewStore().reset();
+      useProposalStore().reset();
+      useShareStore().reset();
+      this.resetCurrentWorkspace();
+      router.push({ name: 'workspaces' }).catch(() => {});
+    },
   },
 });
 
@@ -229,8 +230,8 @@ function affectsPfs(event) {
 let listenersRegistered = false;
 
 /**
- * React to workspace events: refresh the PFS options when files under /pfs/ change, reload the
- * workspace when it is archived, and leave the workspace when access is lost.
+ * React to workspace events: refresh the PFS options when files under /pfs/ change, refetch the
+ * workspace when the owner changed it, and leave the workspace when access is lost.
  */
 export function registerWorkspacesEventListeners() {
   if (listenersRegistered) {
@@ -250,11 +251,7 @@ export function registerWorkspacesEventListeners() {
   });
 
   on(EVENTS.WORKSPACE_ARCHIVED, async () => {
-    const workspaces = useWorkspacesStore();
-    const workspaceId = workspaces.currentWorkspace?.id || useRealtimeStore().workspaceId;
-    if (workspaceId) {
-      await workspaces.getWorkspace(workspaceId);
-    }
+    await useWorkspacesStore().refreshCurrentWorkspace();
   });
 
   // Title, description, PFS list or status changed by the owner; a changed PFS list is the
@@ -262,29 +259,25 @@ export function registerWorkspacesEventListeners() {
   on(EVENTS.WORKSPACE_UPDATED, async (event) => {
     const workspace = await useWorkspacesStore().refreshCurrentWorkspace();
     if (workspace && event.fields?.includes('pfs')) {
-      await usePreviewStore().followWorkspacePfs(workspace.pfs);
+      usePreviewStore().requestPreviewRefresh({ fetchOnly: true });
     }
   });
 
   // Files changed on disk beyond the single-file events. The tab that triggered the sync refreshes
-  // inline and is filtered by the server; every other client refreshes here.
+  // inline and is filtered by the server; every other client refreshes here. The preview is
+  // untouched by a sync; the owner's rebuild arrives as preview.generated.
   on(EVENTS.WORKSPACE_SYNCED, async () => {
     useNotificationsStore().info('The workspace was updated with the latest changes from GitHub.');
     await useEditorStore().refreshAfterRemoteUpdate();
-    usePreviewStore().requestPreviewRefresh({ fetchOnly: true });
   });
 
-  // Access is gone (terminal event, or a handshake refused with 4003): tear down the stream, clear
-  // workspace state, leave.
+  // Access is gone (terminal event, or a handshake refused with 4003): leave, then warn (leaving
+  // clears the notifications).
   const handleAccessLost = () => {
+    useWorkspacesStore().leaveWorkspace();
     useNotificationsStore().warning(
       'Your access to this workspace has changed. Returning to your workspaces.',
     );
-    useRealtimeStore().disconnect();
-    useEditorStore().reset();
-    useFilesStore().reset();
-    usePreviewStore().reset();
-    router.push({ name: 'workspaces' }).catch(() => {});
   };
   on(EVENTS.SHARE_REVOKED, handleAccessLost);
   on(EVENTS.WORKSPACE_DELETED, handleAccessLost);

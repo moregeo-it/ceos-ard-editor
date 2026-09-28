@@ -4,11 +4,10 @@ export default {
   /**
    * Generate the preview for the given PFS list (owner only; publishes `preview.generated`)
    */
-  async generatePreview(workspaceId, pfs = null) {
-    let url = `/workspaces/${workspaceId}/previews`;
+  async generatePreview(workspaceId, pfs) {
     const query = new URLSearchParams();
     pfs.forEach((p) => query.append('pfs', p));
-    return api.get(`${url}?${query}`);
+    return api.get(`/workspaces/${workspaceId}/previews?${query}`);
   },
 
   /**
@@ -16,11 +15,6 @@ export default {
    */
   async fetchCurrentPreview(workspaceId) {
     return api.getText(`/workspaces/${workspaceId}/previews/current`);
-  },
-
-  async getPreviewStaticFile(workspaceId, filePath) {
-    const url = `/workspaces/${workspaceId}/previews/${encodeURIComponent(filePath)}`;
-    return api.get(url);
   },
 
   async downloadPreviewFile(workspaceId, pfs, documentType) {

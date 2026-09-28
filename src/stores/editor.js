@@ -116,15 +116,15 @@ export const useEditorStore = defineStore('editor', {
     /**
      * Remote changes were merged in, so files may have changed at any depth: reload the file
      * tree in place and the open tabs. Tabs with unsaved changes are left untouched, warned
-     * about, and their paths returned.
+     * about (naming `source` as what they missed), and their paths returned.
      */
-    async refreshAfterRemoteUpdate() {
+    async refreshAfterRemoteUpdate({ source = 'the changes from GitHub' } = {}) {
       await useFilesStore().reloadTree();
       const skipped = await this.resyncOpenFiles();
       if (skipped.length) {
         useNotificationsStore().warning(
-          'These open files keep your unsaved changes and were not updated with the changes ' +
-            `from GitHub: ${skipped.join(', ')}`,
+          `These open files keep your unsaved changes and were not updated with ${source}: ` +
+            skipped.join(', '),
         );
       }
       return skipped;

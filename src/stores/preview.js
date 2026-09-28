@@ -6,16 +6,15 @@ import { useNotificationsStore } from './notifications';
 
 import { EVENTS, on } from '@/services/events';
 
+// A refresh requested while one is running; a queued build wins over queued fetches
+let queued = null; // 'build' | 'fetch' | null
+
 const getDefaults = () => ({
-  selectedPfs: null,
-  oldSelectedPfs: null,
   previewHtml: '',
   // Increments on every regeneration, even when the HTML is unchanged
   // (e.g. only an asset was deleted). Watch this instead of previewHtml.
   previewGeneration: 0,
   isGenerating: false,
-  refreshQueued: false,
-  queuedBuild: false,
   scrollPosition: [0, 0], // x, y
 });
 
@@ -24,7 +23,8 @@ export const usePreviewStore = defineStore('preview', {
 
   getters: {
     hasPreview: (state) => !!state.previewHtml,
-    hasSelectedPfs: (state) => Array.isArray(state.selectedPfs) && state.selectedPfs.length > 0,
+    // The workspace's PFS list is the preview selection: the owner saves it, everyone follows it
+    hasSelectedPfs: () => (useWorkspacesStore().currentWorkspace?.pfs?.length ?? 0) > 0,
   },
 
   actions: {
@@ -32,45 +32,6 @@ export const usePreviewStore = defineStore('preview', {
       this.scrollPosition = [x, y];
     },
 
-    /**
-     * Set the selected PFS
-     * @param {Array} pfs - Array of PFS identifiers
-     */
-    setSelectedPfs(pfs) {
-      this.selectedPfs = pfs;
-    },
-
-    /**
-     * Show the same preview as the owner after the workspace's PFS list changed.
-     */
-    async followWorkspacePfs(pfs) {
-      const next = pfs || [];
-      const current = this.selectedPfs || [];
-      if (next.length === current.length && next.every((id, i) => id === current[i])) {
-        return;
-      }
-      this.setSelectedPfs([...next]);
-      await this.requestPreviewRefresh({ fetchOnly: true });
-    },
-
-    /**
-     * Store old selected PFS before selection change
-     */
-    storeOldSelection() {
-      this.oldSelectedPfs = this.selectedPfs;
-    },
-
-    /**
-     * Clear old selection reference
-     */
-    clearOldSelection() {
-      this.oldSelectedPfs = null;
-    },
-
-    /**
-     * Generate preview for the selected PFS
-     * @returns {Promise<string>} The generated HTML
-     */
     setPreviewHtml(html) {
       this.previewHtml = html;
       this.previewGeneration++;
@@ -89,23 +50,24 @@ export const usePreviewStore = defineStore('preview', {
 
       const workspacesStore = useWorkspacesStore();
       const notifications = useNotificationsStore();
-      const workspaceId = workspacesStore.currentWorkspace?.id;
+      const workspace = workspacesStore.currentWorkspace;
 
-      if (!workspaceId) {
+      if (!workspace?.id) {
         notifications.error('No workspace selected');
         return;
       }
 
+      const shouldBuild = build && workspacesStore.isOwner;
       this.isGenerating = true;
       try {
         this.setPreviewHtml(
-          build && workspacesStore.isOwner
-            ? await previewService.generatePreview(workspaceId, this.selectedPfs)
-            : await previewService.fetchCurrentPreview(workspaceId),
+          shouldBuild
+            ? await previewService.generatePreview(workspace.id, workspace.pfs)
+            : await previewService.fetchCurrentPreview(workspace.id),
         );
       } catch (error) {
         // No build for this list yet: the owner's next build arrives as preview.generated
-        if (error.status !== 404 || workspacesStore.isOwner) {
+        if (error.status !== 404 || shouldBuild) {
           notifications.error(`Failed to generate preview: ${error.message}`);
         }
         this.setPreviewHtml('');
@@ -117,28 +79,24 @@ export const usePreviewStore = defineStore('preview', {
     /**
      * Regenerate the preview, coalescing concurrent requests: while a generation is running,
      * further requests fold into a single follow-up run (e.g. saveAll of N files regenerates
-     * once or twice instead of N times). A queued build wins over queued fetches.
+     * once or twice instead of N times).
      * @param {{fetchOnly?: boolean}} [options] fetch the owner's last build instead of building
      */
     async requestPreviewRefresh({ fetchOnly = false } = {}) {
       if (this.isGenerating) {
-        this.refreshQueued = true;
-        this.queuedBuild = this.queuedBuild || !fetchOnly;
+        queued = queued === 'build' || !fetchOnly ? 'build' : 'fetch';
         return;
       }
       let build = !fetchOnly;
       do {
-        this.refreshQueued = false;
-        this.queuedBuild = false;
+        queued = null;
         await this.generatePreview({ build });
-        build = this.queuedBuild;
-      } while (this.refreshQueued);
+        build = queued === 'build';
+      } while (queued);
     },
 
-    /**
-     * Reset the store to defaults
-     */
     reset() {
+      queued = null;
       Object.assign(this, getDefaults());
     },
   },

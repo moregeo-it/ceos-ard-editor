@@ -26,12 +26,9 @@ export async function fetchWithAuth(endpoint, options = {}) {
     'Content-Type': 'application/json',
     ...options.headers,
     Authorization: authStore.authorizationHeader,
+    // Realtime echo filter: this tab's own changes are left out of its socket
+    [CLIENT_ID_HEADER]: CLIENT_ID,
   };
-  // Realtime echo filter: this tab's own changes are left out of its socket
-  const method = (options.method || 'GET').toUpperCase();
-  if (method !== 'GET' && method !== 'HEAD') {
-    headers[CLIENT_ID_HEADER] = CLIENT_ID;
-  }
 
   const response = await fetch(url, { ...options, headers });
 

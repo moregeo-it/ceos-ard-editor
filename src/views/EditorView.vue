@@ -47,7 +47,7 @@ import { useNotificationsStore } from '@/stores/notifications';
 import { usePreviewStore } from '@/stores/preview';
 import { useRealtimeStore } from '@/stores/realtime';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import { mdiCheckCircle, mdiMenuDown, mdiNotebookEdit, mdiShareVariant } from '@mdi/js';
+import { mdiNotebookEdit, mdiShareVariant } from '@mdi/js';
 import HeaderBar from '@/components/HeaderBar.vue';
 import HeaderSwitch from '@/components/HeaderSwitch.vue';
 import EditorPane from '@/components/ide/EditorPane.vue';
@@ -76,8 +76,6 @@ export default {
     };
     return {
       icons: {
-        propose: mdiCheckCircle,
-        menuDown: mdiMenuDown,
         title: mdiNotebookEdit,
         share: mdiShareVariant,
       },
@@ -124,14 +122,13 @@ export default {
     const isFreshOpening = this.workspacesStore.currentWorkspace?.id !== this.workspaceId;
 
     await this.loadWorkspace();
-    // Subscribe to live changes once the workspace has loaded. Everyone connects (the owner's
-    // own events are echo-suppressed client-side); read-only viewers get the owner's changes live.
+    // Subscribe to live changes once the workspace has loaded. Everyone connects (the server
+    // withholds a tab's own changes); read-only viewers get the owner's changes live.
     if (this.workspace) {
       this.realtimeStore.connect(this.workspaceId);
     }
     // Must be called after the workspace has loaded, otherwise isArchived is always false.
-    // Only offer reactivation to the owner - collaborators can't reactivate a workspace anyway,
-    // they just see it read-only (enforced separately via workspacesStore.isReadOnly).
+    // Only offer reactivation to the owner.
     if (this.workspacesStore.isArchived && this.workspacesStore.isOwner) {
       this.$root.openDialog('ArchivedDialog', {
         workspace: this.workspace,

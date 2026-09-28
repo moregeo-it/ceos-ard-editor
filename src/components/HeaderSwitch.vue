@@ -22,13 +22,8 @@
 
 <script>
 import { useEditorStore } from '@/stores/editor';
-import { useFilesStore } from '@/stores/files';
-import { useNotificationsStore } from '@/stores/notifications';
-import { usePreviewStore } from '@/stores/preview';
-import { useRealtimeStore } from '@/stores/realtime';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useProposalStore } from '@/stores/proposal';
-import { useShareStore } from '@/stores/share';
 import { mdiCheckCircle, mdiClose, mdiNotebookEdit } from '@mdi/js';
 
 export default {
@@ -43,34 +38,14 @@ export default {
     };
   },
   computed: {
-    loading() {
-      const workspaceId = this.workspacesStore.currentWorkspace?.id;
-      if (!workspaceId) return false;
-      return this.workspacesStore.isWorkspaceLoading[workspaceId];
-    },
     editorStore() {
       return useEditorStore();
-    },
-    filesStore() {
-      return useFilesStore();
-    },
-    notificationsStore() {
-      return useNotificationsStore();
-    },
-    previewStore() {
-      return usePreviewStore();
-    },
-    realtimeStore() {
-      return useRealtimeStore();
     },
     workspacesStore() {
       return useWorkspacesStore();
     },
     proposalStore() {
       return useProposalStore();
-    },
-    shareStore() {
-      return useShareStore();
     },
     view: {
       get() {
@@ -86,9 +61,6 @@ export default {
     },
   },
   methods: {
-    proposeChanges() {
-      this.$router.push({ name: 'propose' });
-    },
     closeWorkspace() {
       if (this.editorStore.hasUnsavedChanges) {
         this.$root.openDialog('ConfirmDialog', {
@@ -108,8 +80,8 @@ export default {
       const workspaceId = this.workspacesStore.currentWorkspace?.id;
       // Only the owner can commit, and the change list is owner-only on the server: for
       // read-only collaborators there is nothing to warn about.
-      if (!workspaceId || this.workspacesStore.isArchived || !this.workspacesStore.isOwner) {
-        this.forceCloseWorkspace();
+      if (!workspaceId || this.workspacesStore.isReadOnly) {
+        this.workspacesStore.leaveWorkspace();
         return;
       }
 
@@ -117,13 +89,13 @@ export default {
         await this.proposalStore.fetchDiffList(workspaceId);
       } catch {
         // Without the change list there is nothing to warn about; never block closing
-        this.forceCloseWorkspace();
+        this.workspacesStore.leaveWorkspace();
         return;
       }
 
       const files = this.proposalStore.diffList;
       if (!files.length) {
-        this.forceCloseWorkspace();
+        this.workspacesStore.leaveWorkspace();
         return;
       }
 
@@ -133,20 +105,9 @@ export default {
 
       this.$root.openDialog('UncommittedChangesDialog', {
         files: inProposeView ? [] : files,
-        onAcceptance: this.forceCloseWorkspace,
+        onAcceptance: () => this.workspacesStore.leaveWorkspace(),
         onReview: inProposeView ? null : () => this.$router.push({ name: 'propose' }),
       });
-    },
-    forceCloseWorkspace() {
-      this.realtimeStore.reset();
-      this.editorStore.reset();
-      this.filesStore.reset();
-      this.notificationsStore.reset();
-      this.previewStore.reset();
-      this.proposalStore.reset();
-      this.shareStore.reset();
-      this.workspacesStore.resetCurrentWorkspace();
-      this.$router.push({ name: 'workspaces' });
     },
   },
 };

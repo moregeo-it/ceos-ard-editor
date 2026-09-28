@@ -140,7 +140,6 @@
 <script>
 import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
-import { usePreviewStore } from '@/stores/preview';
 import { useNotificationsStore } from '@/stores/notifications';
 import {
   mdiFileCompare,
@@ -186,9 +185,6 @@ export default {
     },
     filesStore() {
       return useFilesStore();
-    },
-    previewStore() {
-      return usePreviewStore();
     },
     notificationsStore() {
       return useNotificationsStore();
@@ -262,16 +258,10 @@ export default {
       return parts[1];
     },
 
+    // Part of the workspace's PFS list, i.e. the preview selection
     isSelectedPfsFolder(path) {
       const pfsId = this.getPfsFolderId(path);
-      if (!pfsId) {
-        return false;
-      }
-
-      return (
-        Array.isArray(this.previewStore.selectedPfs) &&
-        this.previewStore.selectedPfs.includes(pfsId)
-      );
+      return !!pfsId && (this.workspacesStore.currentWorkspace?.pfs ?? []).includes(pfsId);
     },
 
     openFile(path, forceSourceCodeEditor = false) {
