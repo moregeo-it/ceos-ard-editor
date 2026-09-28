@@ -37,10 +37,11 @@ export const useWorkspacesStore = defineStore('workspaces', {
       return state.currentWorkspace?.viewer_role === 'owner';
     },
 
-    // True for readonly collaborators, or for anyone browsing an archived workspace
-    // (mirrors the pre-existing archived-browsing behavior owners already relied on).
+    // True for readonly collaborators, for anyone browsing an archived workspace (mirrors the
+    // pre-existing archived-browsing behavior owners already relied on), and while the role is
+    // still unknown, so nothing ever renders as editable before the workspace has loaded.
     isReadOnly() {
-      if (!this.viewerRole) return false;
+      if (!this.viewerRole) return true;
       return this.viewerRole === 'readonly' || this.isArchived;
     },
 
@@ -91,21 +92,39 @@ export const useWorkspacesStore = defineStore('workspaces', {
 
       try {
         const updatedWorkspace = await workspaceService.updateWorkspace(workspaceId, workspaceData);
-
-        // Update local state
-        const index = this.workspaces.findIndex((w) => w.id === workspaceId);
-        if (index !== -1) {
-          this.workspaces[index] = updatedWorkspace;
-        }
-
-        // Update currentWorkspace if it matches
-        if (this.currentWorkspace?.id === workspaceId) {
-          this.currentWorkspace = updatedWorkspace;
-        }
-
+        this.applyWorkspace(updatedWorkspace);
         return updatedWorkspace;
       } finally {
         this.isWorkspaceLoading[workspaceId] = false;
+      }
+    },
+
+    // The loading flag unmounts the editor panes, so the in-editor updates below don't set it.
+
+    /** Save the owner's preview selection as the workspace's PFS list; viewers follow it. */
+    async updateWorkspacePfs(workspaceId, pfs) {
+      const updatedWorkspace = await workspaceService.updateWorkspace(workspaceId, { pfs });
+      this.applyWorkspace(updatedWorkspace);
+      return updatedWorkspace;
+    },
+
+    async refreshCurrentWorkspace() {
+      const workspaceId = this.currentWorkspace?.id;
+      if (!workspaceId) {
+        return null;
+      }
+      const workspace = await workspaceService.getWorkspace(workspaceId);
+      this.applyWorkspace(workspace);
+      return workspace;
+    },
+
+    applyWorkspace(workspace) {
+      const index = this.workspaces.findIndex((w) => w.id === workspace.id);
+      if (index !== -1) {
+        this.workspaces[index] = workspace;
+      }
+      if (this.currentWorkspace?.id === workspace.id) {
+        this.currentWorkspace = workspace;
       }
     },
 
@@ -238,17 +257,25 @@ export function registerWorkspacesEventListeners() {
     }
   });
 
-  // The owner synced the workspace with GitHub and files changed on disk beyond what the
-  // single-file events describe. The owner's own client refreshes inline (EditorView,
-  // ChangeList) and never receives its own events, so this only runs for collaborators.
+  // Title, description, PFS list or status changed by the owner; a changed PFS list is the
+  // owner's preview selection, which every viewer (and the owner's other tabs) follows.
+  on(EVENTS.WORKSPACE_UPDATED, async (event) => {
+    const workspace = await useWorkspacesStore().refreshCurrentWorkspace();
+    if (workspace && event.fields?.includes('pfs')) {
+      await usePreviewStore().followWorkspacePfs(workspace.pfs);
+    }
+  });
+
+  // Files changed on disk beyond the single-file events. The tab that triggered the sync refreshes
+  // inline and is filtered by the server; every other client refreshes here.
   on(EVENTS.WORKSPACE_SYNCED, async () => {
     useNotificationsStore().info('The workspace was updated with the latest changes from GitHub.');
     await useEditorStore().refreshAfterRemoteUpdate();
-    usePreviewStore().requestPreviewRefresh();
+    usePreviewStore().requestPreviewRefresh({ fetchOnly: true });
   });
 
-  // Access is gone (terminal events - the server closes the socket after delivering them):
-  // tear down the realtime stream, clear workspace-scoped state, and leave.
+  // Access is gone (terminal event, or a handshake refused with 4003): tear down the stream, clear
+  // workspace state, leave.
   const handleAccessLost = () => {
     useNotificationsStore().warning(
       'Your access to this workspace has changed. Returning to your workspaces.',
@@ -261,4 +288,5 @@ export function registerWorkspacesEventListeners() {
   };
   on(EVENTS.SHARE_REVOKED, handleAccessLost);
   on(EVENTS.WORKSPACE_DELETED, handleAccessLost);
+  on(EVENTS.REALTIME_ACCESS_LOST, handleAccessLost);
 }

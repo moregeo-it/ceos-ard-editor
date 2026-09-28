@@ -308,9 +308,18 @@ export function registerEditorEventListeners() {
 
   on(EVENTS.FILE_SAVED, async (event) => {
     // A local save already holds the content; only remote saves need a re-sync of the open tab.
-    if (event.source === 'remote') {
-      await useEditorStore().sync(event.path); // no-op if the file isn't open
+    if (event.source !== 'remote') {
+      return;
     }
+    const editor = useEditorStore();
+    if (editor.changed[event.path]) {
+      // Saved elsewhere by this user while this tab has unsaved edits: keep them.
+      useNotificationsStore().warning(
+        `${event.path} was saved elsewhere; this tab keeps its unsaved changes.`,
+      );
+      return;
+    }
+    await editor.sync(event.path); // no-op if the file isn't open
   });
 
   on(EVENTS.FILE_DELETED, async (event) => {

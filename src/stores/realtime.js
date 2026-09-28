@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 
 import { EVENTS, emit, enqueue } from '@/services/events';
 import { openWorkspaceConnection } from '@/services/collab.service';
+import { CLIENT_ID } from '@/services/client-id';
 import { useAuthStore } from './auth';
 import { useEditorStore } from './editor';
 import { useFilesStore } from './files';
@@ -10,6 +11,14 @@ import { useNotificationsStore } from './notifications';
 const RECONNECT_MIN_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 
+// Close codes the server sends on purpose (documented in ceos-ard-server/openapi.yaml).
+export const WS_CLOSE = Object.freeze({
+  SESSION_EXPIRED: 4001, // re-login, then reconnect
+  ACCESS_REVOKED: 4003, // stop
+  RESYNC: 4009, // reconnect now and resync
+  POLICY_VIOLATION: 1008, // bad origin or we sent data: stop
+});
+
 // Kept in module scope (not Pinia state) so the non-serializable WebSocket + timers aren't
 // wrapped in a reactive proxy.
 let client = null;
@@ -17,6 +26,7 @@ let reconnectTimer = null;
 let backoff = 0;
 let closing = false;
 let hasConnected = false; // true once the first open succeeds, so a re-open triggers a resync
+let wakeHandler = null; // cuts a pending backoff short on 'online' / tab visible
 
 function clearReconnectTimer() {
   if (reconnectTimer) {
@@ -64,6 +74,7 @@ export const useRealtimeStore = defineStore('realtime', {
       closing = false;
       hasConnected = false;
       this.workspaceId = workspaceId;
+      this._listenForWake();
       this._open();
     },
 
@@ -80,15 +91,16 @@ export const useRealtimeStore = defineStore('realtime', {
 
     reset() {
       this.disconnect();
+      this._stopListeningForWake();
       backoff = 0;
       hasConnected = false;
       Object.assign(this, getDefaults());
     },
 
     /**
-     * Re-open a stream that stalled waiting for reauth (see `_scheduleReconnect`). No-ops unless a
-     * workspace stream is stalled with a now-valid token, so it can't create a duplicate or
-     * unauthenticated connection - e.g. when reauth is cancelled via logout and the token cleared.
+     * Re-open a stream that stalled waiting for reauth (see `_onClose` / `_reconnect`). No-ops
+     * unless a workspace stream is stalled with a now-valid token, so it can't create a duplicate
+     * or unauthenticated connection - e.g. when reauth is cancelled via logout and the token cleared.
      */
     resumeIfStalled() {
       const auth = useAuthStore();
@@ -107,8 +119,9 @@ export const useRealtimeStore = defineStore('realtime', {
       client = openWorkspaceConnection({
         workspaceId,
         token: auth.accessToken,
+        clientId: CLIENT_ID,
         onOpen: () => this._onOpen(),
-        onError: () => this._onError(),
+        onClose: (info) => this._onClose(info),
         onEvent: (event) => this._handleEvent(event),
       });
     },
@@ -124,30 +137,88 @@ export const useRealtimeStore = defineStore('realtime', {
       hasConnected = true;
     },
 
-    _onError() {
-      // Manage reconnection ourselves (backoff + token refresh), so close the source first.
+    /**
+     * Closed without us asking: the server's code says what to do; anything else is a transient
+     * drop and gets a backoff.
+     */
+    _onClose({ code } = {}) {
       closeClient();
       if (closing) {
         return;
       }
-      this.status = 'reconnecting';
-      this._scheduleReconnect();
+      switch (code) {
+        case WS_CLOSE.SESSION_EXPIRED:
+          // Ask for a new login; App.vue calls resumeIfStalled() afterwards.
+          this.status = 'reconnecting';
+          useAuthStore().setPendingReauth();
+          return;
+        case WS_CLOSE.ACCESS_REVOKED:
+        case WS_CLOSE.POLICY_VIOLATION: {
+          // Terminal. A terminal event already ran disconnect() and never gets here; a rejected
+          // handshake has no event, so announce the loss here.
+          const workspaceId = this.workspaceId;
+          this.disconnect();
+          emit(EVENTS.REALTIME_ACCESS_LOST, { workspaceId });
+          return;
+        }
+        case WS_CLOSE.RESYNC:
+          // Reconnect now; the re-open resyncs.
+          backoff = 0;
+          this.status = 'reconnecting';
+          this._open();
+          return;
+        default:
+          this.status = 'reconnecting';
+          this._scheduleReconnect();
+      }
     },
 
     _scheduleReconnect() {
       clearReconnectTimer();
       backoff = backoff ? Math.min(backoff * 2, RECONNECT_MAX_MS) : RECONNECT_MIN_MS;
-      reconnectTimer = setTimeout(() => {
-        if (closing) {
+      // 50-100% jitter so tabs dropped together don't reconnect in lockstep
+      const delay = Math.round(backoff * (0.5 + Math.random() * 0.5));
+      reconnectTimer = setTimeout(() => this._reconnect(), delay);
+    },
+
+    _reconnect() {
+      clearReconnectTimer();
+      if (closing || client) {
+        return;
+      }
+      const auth = useAuthStore();
+      if (!auth.accessToken || auth.isTokenExpired) {
+        auth.setPendingReauth();
+        return;
+      }
+      this._open();
+    },
+
+    /**
+     * Network back or tab visible again: skip the rest of a pending backoff.
+     */
+    _listenForWake() {
+      if (wakeHandler) {
+        return;
+      }
+      wakeHandler = () => {
+        if (document.visibilityState === 'hidden' || !reconnectTimer || closing) {
           return;
         }
-        const auth = useAuthStore();
-        if (!auth.accessToken || auth.isTokenExpired) {
-          auth.setPendingReauth();
-          return;
-        }
-        this._open();
-      }, backoff);
+        backoff = 0;
+        this._reconnect();
+      };
+      window.addEventListener('online', wakeHandler);
+      document.addEventListener('visibilitychange', wakeHandler);
+    },
+
+    _stopListeningForWake() {
+      if (!wakeHandler) {
+        return;
+      }
+      window.removeEventListener('online', wakeHandler);
+      document.removeEventListener('visibilitychange', wakeHandler);
+      wakeHandler = null;
     },
 
     /**
@@ -170,16 +241,10 @@ export const useRealtimeStore = defineStore('realtime', {
     },
 
     /**
-     * Forward a WebSocket event onto the central event bus. The bus serializes dispatches, so
-     * events are applied in the order they arrive.
+     * Forward a WebSocket event onto the central event bus, which applies events in arrival order.
+     * The server already filters this tab's own changes; the user's other tabs count as remote.
      */
     _handleEvent(event) {
-      const auth = useAuthStore();
-      // Echo suppression: ignore events caused by this user (e.g. the owner's own actions) -
-      // the local action already emitted the equivalent event with `source: 'local'`.
-      if (event.actor_user_id && event.actor_user_id === auth.userId) {
-        return;
-      }
       return emit(event.type, { ...event, source: 'remote' });
     },
   },

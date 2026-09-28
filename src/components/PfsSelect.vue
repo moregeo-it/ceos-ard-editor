@@ -7,6 +7,7 @@
     :chips="chips"
     :clearable="clearable"
     :loading="loading"
+    :readonly="readonly"
     :hint="hint"
     :persistent-hint="persistentHint"
     :prepend-inner-icon="icon"
@@ -15,7 +16,7 @@
     variant="outlined"
     density="compact"
     @update:model-value="handleModelUpdate"
-    @update:focused="$emit('update:focused', $event)"
+    @update:menu="$emit('update:menu', $event)"
   >
     <template v-slot:item="{ props: itemProps, item }">
       <v-list-item v-bind="itemProps" :title="null">
@@ -71,6 +72,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    readonly: {
+      type: Boolean,
+      default: false,
+    },
     hint: {
       type: String,
       default: '',
@@ -85,7 +90,7 @@ export default {
       icon: mdiFileDocumentOutline,
     };
   },
-  emits: ['update:modelValue', 'update:focused'],
+  emits: ['update:modelValue', 'update:menu'],
   methods: {
     formatItemDisplay(item) {
       if (!item) return '';

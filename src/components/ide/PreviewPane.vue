@@ -4,12 +4,13 @@
       <PfsSelect
         v-model="selectedPfs"
         :items="pfsOptions"
+        :readonly="!workspacesStore.isOwner"
         label="Select PFS for Preview"
         multiple
         chips
         hide-details
         class="preview-select mr-2 flex-grow-1"
-        @update:focused="handleSelect"
+        @update:menu="handleMenuToggle"
       />
       <v-btn
         color="primary"
@@ -41,7 +42,10 @@
       </div>
 
       <v-alert v-else-if="!previewHtml" type="info" variant="tonal" class="ma-4">
-        <template v-if="!previewStore.hasSelectedPfs">
+        <template v-if="!workspacesStore.isOwner"
+          >The owner has not generated a preview yet.</template
+        >
+        <template v-else-if="!previewStore.hasSelectedPfs">
           Select at least one PFS from the list above to create a preview.
         </template>
         <template v-else>No preview generated. Please try again.</template>
@@ -53,6 +57,7 @@
           ref="iframe"
           :key="previewGeneration"
           class="preview-iframe"
+          :style="pfsMenuOpen ? { pointerEvents: 'none' } : null"
           frameborder="0"
           width="100%"
           height="100%"
@@ -87,6 +92,7 @@ export default {
         pdf: false,
         docx: false,
       },
+      pfsMenuOpen: false,
       icons: {
         download: mdiDownload,
       },
@@ -275,24 +281,35 @@ export default {
         }
       });
     },
-    async handleSelect(focus) {
-      if (focus) {
+    // Regenerate once the menu closes, not on every toggled item of the multi-select
+    async handleMenuToggle(open) {
+      this.pfsMenuOpen = open;
+      if (open) {
         this.previewStore.storeOldSelection();
         return;
       }
-      if (this.previewStore.oldSelectedPfs === this.previewStore.selectedPfs) {
+      const before = this.previewStore.oldSelectedPfs ?? [];
+      const after = this.previewStore.selectedPfs ?? [];
+      this.previewStore.clearOldSelection();
+      if (before.length === after.length && before.every((pfs, i) => pfs === after[i])) {
         return;
       }
-      await this.previewStore.generatePreview();
-      this.previewStore.clearOldSelection();
+      // Saved on the workspace so viewers and the owner's other tabs show the same preview
+      try {
+        await this.workspacesStore.updateWorkspacePfs(this.workspaceId, after);
+      } catch (error) {
+        this.selectedPfs = before;
+        useNotificationsStore().error(`Failed to save the PFS selection: ${error.message}`);
+        return;
+      }
+      await this.previewStore.requestPreviewRefresh();
     },
 
     async downloadPreview(documentType) {
-      this.isDownloading[documentType] = true;
-
       if (!this.selectedPfs || this.selectedPfs.length === 0) {
         return;
       }
+      this.isDownloading[documentType] = true;
       try {
         const response = await previewService.downloadPreviewFile(
           this.workspaceId,

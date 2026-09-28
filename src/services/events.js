@@ -38,8 +38,8 @@
  *   only the realtime store overrides it when forwarding WebSocket events.
  * @property {string} ts ISO timestamp; server publish time for remote events.
  * @property {string|null} [actor_user_id] Who caused the change. Only present on remote events;
- *   local events omit it (the actor is always the current user). Echo suppression happens in the
- *   realtime store before the bus, so handlers never need to check it.
+ *   local events omit it. The server filters this tab's own changes, so the current user as actor
+ *   means one of their other tabs or devices.
  * @property {string|null} [path] Affected path. On `file.renamed`/`file.reverted` this is the
  *   pre-change path (legacy semantics); prefer `old_path` where present.
  * @property {FileItem|null} [file] Snapshot of the affected file/folder after the operation.
@@ -53,6 +53,10 @@
  *   `file.committed` only: the changes included in the commit.
  * @property {'updated'|'merged'} [status] `workspace.synced` only: whether the workspace was
  *   fast-forwarded or merged with the changes from GitHub. Files may have changed at any depth.
+ * @property {Array<'title'|'description'|'pfs'|'status'>} [fields] `workspace.updated` only: the
+ *   changed workspace fields; refetch the workspace.
+ * @property {string[]} [pfs] `preview.generated` only: the PFS list the owner built the preview
+ *   for; fetch the current preview instead of building.
  * @property {number} [seq] Present iff the event was published by the server broker.
  * @property {string} [target_user_id] `share.revoked` only.
  */
@@ -69,8 +73,12 @@ export const EVENTS = Object.freeze({
   WORKSPACE_ARCHIVED: 'workspace.archived',
   WORKSPACE_DELETED: 'workspace.deleted',
   WORKSPACE_SYNCED: 'workspace.synced',
+  WORKSPACE_UPDATED: 'workspace.updated',
+  PREVIEW_GENERATED: 'preview.generated',
   // Client-only events — never sent over the wire.
   REALTIME_RESYNCED: 'realtime.resynced',
+  // The server refused or ended the stream (close 4003/1008) without a terminal event.
+  REALTIME_ACCESS_LOST: 'realtime.access_lost',
 });
 
 const handlers = new Map(); // pattern -> Set<handler>
