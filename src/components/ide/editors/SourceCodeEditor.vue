@@ -8,6 +8,8 @@ import CodeMirror from 'vue-codemirror6';
 import { keymap } from '@codemirror/view';
 import { defaultKeymap, historyKeymap } from '@codemirror/commands';
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
+import { syntaxHighlighting } from '@codemirror/language';
+import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
 import { linter, lintGutter } from '@codemirror/lint';
 import { markdown } from '@codemirror/lang-markdown';
 import { yaml } from '@codemirror/lang-yaml';
@@ -67,6 +69,7 @@ export default {
         return this.parseDiagnostics(this.languageExtension, view);
       });
 
+      const dark = this.$vuetify.theme.name === 'dark';
       const extensions = [
         keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, this.saveKeymap]),
         highlightSelectionMatches(),
@@ -74,6 +77,10 @@ export default {
         lintGutter(),
         lintExtension,
       ];
+      if (dark) {
+        // Apply the One Dark theme for syntax highlighting in dark mode.
+        extensions.push(syntaxHighlighting(oneDarkHighlightStyle));
+      }
       if (this.languageExtension) {
         extensions.push(this.languageExtension);
       }
@@ -81,7 +88,7 @@ export default {
         basic: true,
         wrap: true,
         readonly: this.readOnly,
-        dark: this.$vuetify.theme.name === 'dark',
+        dark,
         tabSize: 2,
         extensions,
       };
