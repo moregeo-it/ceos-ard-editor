@@ -38,10 +38,11 @@
 
 <script>
 import { useAuthStore } from '@/stores/auth';
-import authService from '@/services/auth.service';
 
 import { useNotificationsStore } from '@/stores/notifications';
 import { useShareStore } from '@/stores/share';
+
+const API_HOST = new URL(import.meta.env.VITE_API_BASE_URL).hostname;
 
 export default {
   name: 'AuthCallbackView',
@@ -87,20 +88,15 @@ export default {
       }
 
       try {
-        // If opened in popup, send auth data to parent instead of storing locally
+        // The callback set the session cookie; the URL carries no token
+        const session = await authStore.completeLogin();
+
         if (this.isPopup()) {
-          const authData = authService.parseAuthCallback(searchParams);
-          this.sendMessageToParent({
-            type: 'auth_success',
-            data: authData,
-          });
+          this.sendMessageToParent({ type: 'auth_success', data: session });
           // Wait for parent confirmation before closing
           this.waitForParentConfirmation();
           return;
         }
-
-        // Normal flow - store auth and navigate
-        authStore.handleAuthCallback(searchParams);
 
         const shareStore = useShareStore();
         const pendingShareToken = shareStore.consumePendingShareToken();
@@ -110,20 +106,27 @@ export default {
           this.$router.push({ name: 'workspaces' });
         }
       } catch (error) {
-        const notifications = useNotificationsStore();
-        notifications.error(`Authentication failed. Please try again. Error: ${error.message}`);
+        // 401 right after the login: the browser did not send the session cookie back
+        const message =
+          error.status === 401
+            ? `Your browser blocked the login cookie. Please allow cookies for ${API_HOST} and try again.`
+            : `Authentication failed. Please try again. Error: ${error.message}`;
+        this.error = message;
 
         // If in popup, send error to parent
         if (this.isPopup()) {
           this.sendMessageToParent({
             type: 'auth_error',
-            error: error.message,
+            error: message,
           });
           this.waitForParentConfirmation();
           return;
         }
 
-        this.$router.push({ name: 'landing' });
+        useNotificationsStore().error(message);
+        setTimeout(() => {
+          this.$router.push({ name: 'landing' });
+        }, 5000);
       }
     },
 

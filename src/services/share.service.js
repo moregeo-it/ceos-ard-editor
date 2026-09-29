@@ -1,5 +1,5 @@
 import { api } from '@/utils/api';
-import { useAuthStore } from '@/stores/auth';
+import { CLIENT_ID, CLIENT_ID_HEADER } from '@/services/client-id';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -72,17 +72,13 @@ export default {
    * Throws for 403 (access revoked) and 404 (invalid/expired link).
    */
   async redeemShareLink(token) {
-    const authStore = useAuthStore();
-    const headers = { 'Content-Type': 'application/json' };
-    if (authStore.isAuthenticated && !authStore.isTokenExpired) {
-      headers.Authorization = authStore.authorizationHeader;
-    }
-
+    // The session cookie, if any, decides whether the caller counts as logged in
     const response = await fetch(
       `${API_BASE_URL}/share-links/${encodeURIComponent(token)}/redeem`,
       {
         method: 'POST',
-        headers,
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', [CLIENT_ID_HEADER]: CLIENT_ID },
       },
     );
 

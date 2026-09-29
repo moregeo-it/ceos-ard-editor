@@ -1,46 +1,29 @@
 import { defineStore } from 'pinia';
 import router from '@/router';
 import authService from '@/services/auth.service';
-import tokenService from '@/services/token.service';
+import sessionService from '@/services/session.service';
+
+const getDefaults = () => ({
+  userId: null,
+  username: null,
+  provider: null,
+  expiresAt: null,
+  isAuthenticated: false,
+  isLoading: false,
+  isPendingReauth: false,
+});
+
+let listeningForOtherTabs = false;
 
 export const useAuthStore = defineStore('auth', {
-  state: () => ({
-    accessToken: null,
-    tokenType: 'Bearer',
-    userId: null,
-    username: null,
-    provider: null,
-    expiresAt: null,
-    isAuthenticated: false,
-    isLoading: false,
-    isPendingReauth: false,
-  }),
+  state: () => getDefaults(),
 
   getters: {
-    /**
-     * Get username for display
-     */
     getUsername: (state) => state.username || 'Guest',
 
-    /**
-     * Check if token is expired
-     */
-    isTokenExpired: (state) => {
-      if (!state.expiresAt) return true;
-      return Date.now() >= state.expiresAt;
-    },
+    // The session cookie expires with the JWT, so after this the server refuses every request
+    isSessionExpired: (state) => !state.expiresAt || Date.now() >= state.expiresAt,
 
-    /**
-     * Get Authorization header value
-     */
-    authorizationHeader: (state) => {
-      if (!state.accessToken) return null;
-      return `${state.tokenType} ${state.accessToken}`;
-    },
-
-    /**
-     * Get user info object
-     */
     userInfo: (state) => ({
       id: state.userId,
       username: state.username,
@@ -49,38 +32,28 @@ export const useAuthStore = defineStore('auth', {
   },
 
   actions: {
-    /**
-     * Initiate GitHub login
-     */
     loginWithGitHub() {
       authService.loginWithGitHub();
     },
 
-    /**
-     * Initiate Google login
-     */
     loginWithGoogle() {
       authService.loginWithGoogle();
     },
 
     /**
-     * Handle OAuth callback after successful authentication
+     * After the OAuth callback set the session cookie: learn who is logged in and until when.
+     * Rejects with `status` 401 when the browser didn't send the cookie back.
      */
-    handleAuthCallback(searchParams) {
-      // Parse authentication data from URL
-      const authData = authService.parseAuthCallback(searchParams);
+    async completeLogin() {
+      const session = await authService.fetchSession();
+      this.applySession(session);
+      return session;
+    },
 
-      // Save to localStorage
-      tokenService.saveAuth(authData);
-
-      // Update store state
-      this.accessToken = authData.accessToken;
-      this.tokenType = authData.tokenType;
-      this.userId = authData.userId;
-      this.username = authData.username;
-      this.provider = authData.provider;
-      this.expiresAt = Date.now() + authData.expiresIn * 1000;
-      this.isAuthenticated = true;
+    /** Take over a session (this tab's login or a popup reauthentication) and share it with other tabs. */
+    applySession(session) {
+      sessionService.save(session);
+      this._setSession(session);
     },
 
     /**
@@ -88,91 +61,79 @@ export const useAuthStore = defineStore('auth', {
      */
     async restoreSession() {
       this.isLoading = true;
-
       try {
-        const authData = tokenService.getAuth();
-
-        if (!authData || !authData.accessToken) {
-          return false;
-        }
-
-        // Check if token is expired
-        if (tokenService.isTokenExpired()) {
-          // Token expired, clear and return false
+        const session = sessionService.load();
+        if (!session || Date.now() >= session.expiresAt) {
           this.clearAuth();
           return false;
         }
-
-        // Restore state from localStorage
-        this.accessToken = authData.accessToken;
-        this.tokenType = authData.tokenType;
-        this.userId = authData.userId;
-        this.username = authData.username;
-        this.provider = authData.provider;
-        this.expiresAt = authData.expiresAt;
-        this.isAuthenticated = true;
-
+        this._setSession(session);
         return true;
-        // eslint-disable-next-line no-unused-vars
-      } catch (error) {
-        this.clearAuth();
-        return false;
       } finally {
         this.isLoading = false;
       }
     },
 
-    /**
-     * Logout user
-     */
     async logout() {
       try {
-        if (this.accessToken) {
-          await authService.logout(this.accessToken);
-        }
+        await authService.logout();
       } finally {
         this.clearAuth();
         router.push({ name: 'landing' });
       }
     },
 
-    /**
-     * Clear authentication state
-     */
+    /** Forget the session here and in every other tab. */
     clearAuth() {
-      this.accessToken = null;
-      this.tokenType = 'Bearer';
-      this.userId = null;
-      this.username = null;
-      this.provider = null;
-      this.expiresAt = null;
-      this.isAuthenticated = false;
-      this.isPendingReauth = false;
-      tokenService.clearAuth();
+      Object.assign(this, getDefaults());
+      sessionService.clear();
     },
 
-    /**
-     * Set pending reauthentication state
-     */
     setPendingReauth() {
-      this.isPendingReauth = true;
+      // Nothing to renew once logged out, e.g. when another tab's logout closes this tab's socket
+      if (this.isAuthenticated) {
+        this.isPendingReauth = true;
+      }
+    },
+
+    updateAuthAfterReauth(session) {
+      this.applySession(session);
     },
 
     /**
-     * Update authentication after successful reauthentication
+     * Follow logins and logouts of other tabs. A login (or reauthentication) there renews the
+     * shared cookie, so this tab takes over the new session, which also closes its login dialog.
      */
-    updateAuthAfterReauth(authData) {
-      this.accessToken = authData.accessToken;
-      this.tokenType = authData.tokenType;
-      this.userId = authData.userId;
-      this.username = authData.username;
-      this.provider = authData.provider;
-      this.expiresAt = Date.now() + authData.expiresIn * 1000;
+    listenForOtherTabs() {
+      if (listeningForOtherTabs) {
+        return;
+      }
+      listeningForOtherTabs = true;
+      window.addEventListener('storage', (event) => {
+        // key is null when the whole storage was cleared
+        if (event.key !== sessionService.KEY && event.key !== null) {
+          return;
+        }
+        const session = sessionService.parse(event.newValue);
+        if (session && this.isAuthenticated && session.userId !== this.userId) {
+          // Another account now owns the cookie: nothing loaded in this tab is valid for it
+          window.location.reload();
+        } else if (session) {
+          this._setSession(session);
+        } else if (this.isAuthenticated) {
+          Object.assign(this, getDefaults());
+          router.push({ name: 'landing' });
+        }
+      });
+    },
+
+    _setSession(session) {
+      this.userId = session.userId;
+      this.username = session.username;
+      this.provider = session.provider;
+      this.expiresAt = session.expiresAt;
       this.isAuthenticated = true;
       this.isPendingReauth = false;
-
-      // Save to localStorage
-      tokenService.saveAuth(authData);
     },
   },
 });
