@@ -48,6 +48,7 @@ import { useNotificationsStore } from '@/stores/notifications';
 import { usePreviewStore } from '@/stores/preview';
 import { useRealtimeStore } from '@/stores/realtime';
 import { useWorkspacesStore } from '@/stores/workspaces';
+import { discardQueuedEvents } from '@/services/events';
 import { mdiNotebookEdit, mdiShareVariant } from '@mdi/js';
 import HeaderBar from '@/components/HeaderBar.vue';
 import HeaderSwitch from '@/components/HeaderSwitch.vue';
@@ -122,8 +123,9 @@ export default {
     // Must be read before loadWorkspace(), which sets currentWorkspace itself.
     const isFreshOpening = this.workspacesStore.currentWorkspace?.id !== this.workspaceId;
     if (isFreshOpening) {
-      // Another workspace may have been open before (browser back, then a card): drop its tabs,
-      // tree and preview, and let their in-flight requests expire
+      // Another workspace may have been open before (browser back, then a card): drop its queued
+      // events, tabs, tree and preview, and let its in-flight requests expire
+      discardQueuedEvents();
       this.editorStore.reset();
       useFilesStore().reset();
       this.previewStore.reset();

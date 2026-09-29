@@ -85,6 +85,8 @@ const handlers = new Map(); // pattern -> Set<handler>
 // Serializes all dispatches: one event is fully handled before the next starts, for WebSocket and
 // local events alike.
 let queue = Promise.resolve();
+// Bumped by discardQueuedEvents(): dispatches queued before it are skipped
+let epoch = 0;
 
 let onError = (error, type) => console.error(`Event handler failed for ${type}:`, error);
 
@@ -122,8 +124,18 @@ export function on(pattern, handler) {
  * Used by the realtime store so a reconnect resync stays ordered ahead of live events.
  */
 export function enqueue(task) {
-  queue = queue.then(task).catch(() => {});
+  const queuedIn = epoch;
+  queue = queue.then(() => (queuedIn === epoch ? task() : undefined)).catch(() => {});
   return queue;
+}
+
+/**
+ * Skip every dispatch still waiting in the queue. Called when a workspace is left or another one
+ * is opened, so events of the old workspace never reach the next one's freshly reset stores. A
+ * handler already running is not interrupted; the stores discard its late writes themselves.
+ */
+export function discardQueuedEvents() {
+  epoch++;
 }
 
 /**

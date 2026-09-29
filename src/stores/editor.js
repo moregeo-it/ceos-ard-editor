@@ -5,6 +5,9 @@ import { useNotificationsStore } from './notifications';
 
 import { EVENTS, on } from '@/services/events';
 
+// Bumped by reset(): a request started before it must not write into the next workspace
+let resetCount = 0;
+
 const getDefaults = () => ({
   opened: [], // Opened files
   original: {}, // Original data per file path
@@ -33,8 +36,9 @@ export const useEditorStore = defineStore('editor', {
         console.warn('File path should start with /. Prepending it automatically.');
         path = '/' + path;
       }
+      const started = resetCount;
       let file = await files.loadFileContext(path);
-      if (!file || file.is_directory || file.status === 'deleted') {
+      if (started !== resetCount || !file || file.is_directory || file.status === 'deleted') {
         return;
       }
       if (!this.opened.find((f) => f.path === path)) {
@@ -53,16 +57,15 @@ export const useEditorStore = defineStore('editor', {
       if (!this.opened.find((f) => f.path === path)) {
         return;
       }
-      const files = useFilesStore();
-      const data = await files.load(path);
-      if (data.type.startsWith('image/') || data.type === 'application/pdf') {
-        this.original[path] = data;
-        this.data[path] = data;
-      } else {
-        const text = await data.text();
-        this.original[path] = text;
-        this.data[path] = text;
+      const started = resetCount;
+      const data = await useFilesStore().load(path);
+      const isBinary = data.type.startsWith('image/') || data.type === 'application/pdf';
+      const content = isBinary ? data : await data.text();
+      if (started !== resetCount) {
+        return;
       }
+      this.original[path] = content;
+      this.data[path] = content;
       this.changed[path] = false;
       this.saving[path] = false;
     },
@@ -74,19 +77,23 @@ export const useEditorStore = defineStore('editor', {
       if (!this.changed[path]) {
         return false;
       }
+      const started = resetCount;
       this.saving[path] = true;
       try {
         const data = this.data[path];
-        const files = useFilesStore();
         // Preview regeneration happens via the `file.saved` event files.save() emits.
-        await files.save(path, data);
-        this.original[path] = data;
-        this.changed[path] = false;
+        await useFilesStore().save(path, data);
+        if (started === resetCount) {
+          this.original[path] = data;
+          this.changed[path] = false;
+        }
         return true;
       } catch (error) {
         return error;
       } finally {
-        this.saving[path] = false;
+        if (started === resetCount) {
+          this.saving[path] = false;
+        }
       }
     },
     async saveAll() {
@@ -119,9 +126,10 @@ export const useEditorStore = defineStore('editor', {
      * about (naming `source` as what they missed), and their paths returned.
      */
     async refreshAfterRemoteUpdate({ source = 'the changes from GitHub' } = {}) {
+      const started = resetCount;
       await useFilesStore().reloadTree();
       const skipped = await this.resyncOpenFiles();
-      if (skipped.length) {
+      if (skipped.length && started === resetCount) {
         useNotificationsStore().warning(
           `These open files keep your unsaved changes and were not updated with ${source}: ` +
             skipped.join(', '),
@@ -137,6 +145,7 @@ export const useEditorStore = defineStore('editor', {
      */
     async resyncOpenFiles() {
       const files = useFilesStore();
+      const started = resetCount;
       const skipped = [];
 
       for (const file of [...this.opened]) {
@@ -153,6 +162,9 @@ export const useEditorStore = defineStore('editor', {
           }
           // Also repopulates the files store, which the tabs read their state from
           const context = await files.loadFileContext(path, true);
+          if (started !== resetCount) {
+            return skipped; // The workspace was left meanwhile
+          }
           const index = this.opened.findIndex((f) => f.path === path);
           if (index !== -1) {
             this.opened[index] = Object.assign({}, this.opened[index], context);
@@ -163,7 +175,7 @@ export const useEditorStore = defineStore('editor', {
         } catch {
           // The file is gone from the updated workspace. Keep tabs with unsaved changes open so
           // the user decides what to do with them, as for a locally deleted file.
-          if (!hasUnsavedChanges) {
+          if (!hasUnsavedChanges && started === resetCount) {
             this.close(path);
           }
         }
@@ -282,6 +294,7 @@ export const useEditorStore = defineStore('editor', {
     },
 
     reset() {
+      resetCount++;
       Object.assign(this, getDefaults());
     },
   },

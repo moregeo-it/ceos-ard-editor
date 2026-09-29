@@ -9,7 +9,7 @@ import { useProposalStore } from './proposal';
 import { useRealtimeStore } from './realtime';
 import { useShareStore } from './share';
 
-import { EVENTS, on } from '@/services/events';
+import { EVENTS, discardQueuedEvents, on } from '@/services/events';
 import workspaceService from '@/services/workspace.service';
 
 export const useWorkspacesStore = defineStore('workspaces', {
@@ -201,6 +201,7 @@ export const useWorkspacesStore = defineStore('workspaces', {
 
     /** Drop every per-workspace store and return to the workspace list. */
     leaveWorkspace() {
+      discardQueuedEvents();
       useRealtimeStore().reset();
       useEditorStore().reset();
       useFilesStore().reset();
