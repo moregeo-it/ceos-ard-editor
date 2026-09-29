@@ -5,17 +5,12 @@
     :label="label"
     :multiple="multiple"
     :chips="chips"
-    :clearable="clearable"
-    :loading="loading"
-    :hint="hint"
-    :persistent-hint="persistentHint"
     :prepend-inner-icon="icon"
     item-title="title"
     item-value="id"
     variant="outlined"
     density="compact"
     @update:model-value="handleModelUpdate"
-    @update:focused="$emit('update:focused', $event)"
   >
     <template v-slot:item="{ props: itemProps, item }">
       <v-list-item v-bind="itemProps" :title="null">
@@ -40,6 +35,7 @@
 <script>
 import { mdiFileDocumentOutline } from '@mdi/js';
 
+// Other v-select props and events (readonly, clearable, hint, update:menu, ...) fall through
 export default {
   name: 'PfsSelect',
   props: {
@@ -63,35 +59,14 @@ export default {
       type: Boolean,
       default: false,
     },
-    clearable: {
-      type: Boolean,
-      default: false,
-    },
-    loading: {
-      type: Boolean,
-      default: false,
-    },
-    hint: {
-      type: String,
-      default: '',
-    },
-    persistentHint: {
-      type: Boolean,
-      default: false,
-    },
   },
   data() {
     return {
       icon: mdiFileDocumentOutline,
     };
   },
-  emits: ['update:modelValue', 'update:focused'],
+  emits: ['update:modelValue'],
   methods: {
-    formatItemDisplay(item) {
-      if (!item) return '';
-      const { id, title } = item;
-      return title ? `${id}: ${title}` : id;
-    },
     handleModelUpdate(value) {
       // Deduplicate if array of strings
       let result = value;

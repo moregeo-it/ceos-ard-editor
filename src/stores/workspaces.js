@@ -1,4 +1,12 @@
 import { defineStore } from 'pinia';
+import router from '@/router';
+
+import { useEditorStore } from './editor';
+import { useFilesStore } from './files';
+import { useNotificationsStore } from './notifications';
+import { usePreviewStore } from './preview';
+import { useProposalStore } from './proposal';
+
 import workspaceService from '@/services/workspace.service';
 
 export const useWorkspacesStore = defineStore('workspaces', {
@@ -25,10 +33,6 @@ export const useWorkspacesStore = defineStore('workspaces', {
 
     archivedWorkspaces: (state) => {
       return state.workspaces.filter((w) => w.status === 'archived');
-    },
-
-    getWorkspaceById: (state) => (id) => {
-      return state.workspaces.find((w) => w.id === id);
     },
   },
 
@@ -62,21 +66,20 @@ export const useWorkspacesStore = defineStore('workspaces', {
 
       try {
         const updatedWorkspace = await workspaceService.updateWorkspace(workspaceId, workspaceData);
-
-        // Update local state
-        const index = this.workspaces.findIndex((w) => w.id === workspaceId);
-        if (index !== -1) {
-          this.workspaces[index] = updatedWorkspace;
-        }
-
-        // Update currentWorkspace if it matches
-        if (this.currentWorkspace?.id === workspaceId) {
-          this.currentWorkspace = updatedWorkspace;
-        }
-
+        this.applyWorkspace(updatedWorkspace);
         return updatedWorkspace;
       } finally {
         this.isWorkspaceLoading[workspaceId] = false;
+      }
+    },
+
+    applyWorkspace(workspace) {
+      const index = this.workspaces.findIndex((w) => w.id === workspace.id);
+      if (index !== -1) {
+        this.workspaces[index] = workspace;
+      }
+      if (this.currentWorkspace?.id === workspace.id) {
+        this.currentWorkspace = workspace;
       }
     },
 
@@ -99,18 +102,7 @@ export const useWorkspacesStore = defineStore('workspaces', {
           workspaceId,
           newStatus,
         );
-
-        // Update local state
-        const index = this.workspaces.findIndex((w) => w.id === workspaceId);
-        if (index !== -1) {
-          this.workspaces[index] = updatedWorkspace;
-        }
-
-        // Update currentWorkspace if it matches
-        if (this.currentWorkspace?.id === workspaceId) {
-          this.currentWorkspace = updatedWorkspace;
-        }
-
+        this.applyWorkspace(updatedWorkspace);
         return updatedWorkspace;
       } finally {
         this.isWorkspaceLoading[workspaceId] = false;
@@ -161,6 +153,17 @@ export const useWorkspacesStore = defineStore('workspaces', {
 
     resetCurrentWorkspace() {
       this.currentWorkspace = null;
+    },
+
+    /** Drop every per-workspace store and return to the workspace list. */
+    leaveWorkspace() {
+      useEditorStore().reset();
+      useFilesStore().reset();
+      useNotificationsStore().reset();
+      usePreviewStore().reset();
+      useProposalStore().reset();
+      this.resetCurrentWorkspace();
+      router.push({ name: 'workspaces' }).catch(() => {});
     },
   },
 });

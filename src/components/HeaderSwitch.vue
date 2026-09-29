@@ -15,9 +15,6 @@
 
 <script>
 import { useEditorStore } from '@/stores/editor';
-import { useFilesStore } from '@/stores/files';
-import { useNotificationsStore } from '@/stores/notifications';
-import { usePreviewStore } from '@/stores/preview';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useProposalStore } from '@/stores/proposal';
 import { mdiCheckCircle, mdiClose, mdiNotebookEdit } from '@mdi/js';
@@ -34,22 +31,8 @@ export default {
     };
   },
   computed: {
-    loading() {
-      const workspaceId = this.workspacesStore.currentWorkspace?.id;
-      if (!workspaceId) return false;
-      return this.workspacesStore.isWorkspaceLoading[workspaceId];
-    },
     editorStore() {
       return useEditorStore();
-    },
-    filesStore() {
-      return useFilesStore();
-    },
-    notificationsStore() {
-      return useNotificationsStore();
-    },
-    previewStore() {
-      return usePreviewStore();
     },
     workspacesStore() {
       return useWorkspacesStore();
@@ -71,9 +54,6 @@ export default {
     },
   },
   methods: {
-    proposeChanges() {
-      this.$router.push({ name: 'propose' });
-    },
     closeWorkspace() {
       if (this.editorStore.hasUnsavedChanges) {
         this.$root.openDialog('ConfirmDialog', {
@@ -92,7 +72,7 @@ export default {
     async confirmUncommittedChanges() {
       const workspaceId = this.workspacesStore.currentWorkspace?.id;
       if (!workspaceId || this.workspacesStore.isArchived) {
-        this.forceCloseWorkspace();
+        this.workspacesStore.leaveWorkspace();
         return;
       }
 
@@ -100,13 +80,13 @@ export default {
         await this.proposalStore.fetchDiffList(workspaceId);
       } catch {
         // Without the change list there is nothing to warn about; never block closing
-        this.forceCloseWorkspace();
+        this.workspacesStore.leaveWorkspace();
         return;
       }
 
       const files = this.proposalStore.diffList;
       if (!files.length) {
-        this.forceCloseWorkspace();
+        this.workspacesStore.leaveWorkspace();
         return;
       }
 
@@ -116,18 +96,9 @@ export default {
 
       this.$root.openDialog('UncommittedChangesDialog', {
         files: inProposeView ? [] : files,
-        onAcceptance: this.forceCloseWorkspace,
+        onAcceptance: () => this.workspacesStore.leaveWorkspace(),
         onReview: inProposeView ? null : () => this.$router.push({ name: 'propose' }),
       });
-    },
-    forceCloseWorkspace() {
-      this.editorStore.reset();
-      this.filesStore.reset();
-      this.notificationsStore.reset();
-      this.previewStore.reset();
-      this.proposalStore.reset();
-      this.workspacesStore.resetCurrentWorkspace();
-      this.$router.push({ name: 'workspaces' });
     },
   },
 };

@@ -129,12 +129,11 @@ export default {
         );
       } catch (error) {
         // The commit endpoint only returns 409 when remote changes conflict with the
-        // committed changes; the payload shape depends on the error handler wrapping
+        // committed changes
         if (error.status === 409) {
-          const detail = error.details?.detail ?? error.details ?? {};
           this.$root.openDialog('SyncConflictDialog', {
             workspace: this.workspacesStore.currentWorkspace,
-            files: detail.conflicting_files ?? [],
+            files: error.details?.detail?.conflicting_files ?? [],
           });
         } else {
           this.notificationsStore.error('Error updating commit: ' + error.message);

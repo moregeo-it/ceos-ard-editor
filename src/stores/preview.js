@@ -6,7 +6,6 @@ import { useNotificationsStore } from './notifications';
 
 const getDefaults = () => ({
   selectedPfs: null,
-  oldSelectedPfs: null,
   previewHtml: '',
   // Increments on every regeneration, even when the HTML is unchanged
   // (e.g. only an asset was deleted). Watch this instead of previewHtml.
@@ -34,20 +33,6 @@ export const usePreviewStore = defineStore('preview', {
      */
     setSelectedPfs(pfs) {
       this.selectedPfs = pfs;
-    },
-
-    /**
-     * Store old selected PFS before selection change
-     */
-    storeOldSelection() {
-      this.oldSelectedPfs = this.selectedPfs;
-    },
-
-    /**
-     * Clear old selection reference
-     */
-    clearOldSelection() {
-      this.oldSelectedPfs = null;
     },
 
     /**
