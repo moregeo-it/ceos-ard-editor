@@ -43,6 +43,7 @@
 
 <script>
 import { useEditorStore } from '@/stores/editor';
+import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
 import { usePreviewStore } from '@/stores/preview';
 import { useRealtimeStore } from '@/stores/realtime';
@@ -120,6 +121,13 @@ export default {
   async created() {
     // Must be read before loadWorkspace(), which sets currentWorkspace itself.
     const isFreshOpening = this.workspacesStore.currentWorkspace?.id !== this.workspaceId;
+    if (isFreshOpening) {
+      // Another workspace may have been open before (browser back, then a card): drop its tabs,
+      // tree and preview, and let their in-flight requests expire
+      this.editorStore.reset();
+      useFilesStore().reset();
+      this.previewStore.reset();
+    }
 
     await this.loadWorkspace();
     // Subscribe to live changes once the workspace has loaded. Everyone connects (the server

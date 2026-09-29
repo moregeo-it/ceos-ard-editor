@@ -10,6 +10,9 @@ const getWorkspaceId = () => {
   return workspaces.currentWorkspace?.id;
 };
 
+// Bumped by reset(): a fetch started before it must not write its result into the next workspace
+let resetCount = 0;
+
 const getDefaults = () => ({
   all: {},
   searchResults: null, // Search results
@@ -87,10 +90,13 @@ export const useFilesStore = defineStore('files', {
       if (Array.isArray(this.all[path]) && typeof this.all[path].usage !== 'undefined' && !force) {
         return this.all[path]; // Already loaded
       }
+      const started = resetCount;
       this.isPathLoading.push(path);
       try {
         const context = await fileService.loadFileContext(getWorkspaceId(), path);
-        this.all[path] = context;
+        if (started === resetCount) {
+          this.all[path] = context;
+        }
         return context;
       } finally {
         this.resetPathLoading(path);
@@ -103,9 +109,13 @@ export const useFilesStore = defineStore('files', {
       if (this.isFolderComplete[path] && !force) {
         return; // Already loaded
       }
+      const started = resetCount;
       this.isPathLoading.push(path);
       try {
         const files = await fileService.fetchFileTree(getWorkspaceId(), path);
+        if (started !== resetCount) {
+          return;
+        }
         files.forEach((file) => (this.all[file.path] = file));
         this.isFolderComplete[path] = true;
       } finally {
@@ -121,6 +131,7 @@ export const useFilesStore = defineStore('files', {
      */
     async reloadTree() {
       const workspaceId = getWorkspaceId();
+      const started = resetCount;
       const next = {};
       const complete = {};
       const fetchInto = async (path) => {
@@ -141,6 +152,9 @@ export const useFilesStore = defineStore('files', {
         }
       } finally {
         this.resetPathLoading('/');
+      }
+      if (started !== resetCount) {
+        return; // The workspace was left meanwhile; the tree now belongs to the next one
       }
 
       this.all = next;
@@ -212,12 +226,17 @@ export const useFilesStore = defineStore('files', {
         return;
       }
 
+      const started = resetCount;
       this.isSearchLoading = true;
       try {
         const files = await fileService.searchFiles(getWorkspaceId(), query);
-        this.searchResults = files.map(toFileTreeObject);
+        if (started === resetCount) {
+          this.searchResults = files.map(toFileTreeObject);
+        }
       } finally {
-        this.isSearchLoading = false;
+        if (started === resetCount) {
+          this.isSearchLoading = false;
+        }
       }
     },
 
@@ -416,6 +435,7 @@ export const useFilesStore = defineStore('files', {
      * Clear all state
      */
     reset() {
+      resetCount++;
       Object.assign(this, getDefaults());
     },
   },

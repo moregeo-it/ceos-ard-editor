@@ -15,7 +15,7 @@ const WS_CLOSE = Object.freeze({
   SESSION_EXPIRED: 4001, // re-login, then reconnect
   ACCESS_REVOKED: 4003, // stop
   RESYNC: 4009, // reconnect now and resync
-  POLICY_VIOLATION: 1008, // bad origin or we sent data: stop
+  POLICY_VIOLATION: 1008, // we sent data: stop
 });
 
 // Kept in module scope (not Pinia state) so the non-serializable WebSocket + timers aren't
@@ -54,16 +54,13 @@ export const useRealtimeStore = defineStore('realtime', {
      * Open (or re-open) the realtime stream for a workspace. Safe to call repeatedly.
      */
     connect(workspaceId) {
-      const auth = useAuthStore();
-      if (!auth.accessToken || auth.isTokenExpired) {
-        auth.setPendingReauth();
-        return;
-      }
       // Already connected to this workspace - nothing to do.
       if (client && this.workspaceId === workspaceId) {
         return;
       }
 
+      // The target is recorded before the token check in _open, so a stream stalled on an expired
+      // token still knows what to resume after the login.
       this.disconnect();
       hasConnected = false;
       this.workspaceId = workspaceId;
@@ -103,9 +100,15 @@ export const useRealtimeStore = defineStore('realtime', {
       if (!workspaceId) {
         return;
       }
+      const auth = useAuthStore();
+      if (!auth.accessToken || auth.isTokenExpired) {
+        // Ask for a new login; App.vue calls resumeIfStalled() afterwards.
+        auth.setPendingReauth();
+        return;
+      }
       client = openWorkspaceConnection({
         workspaceId,
-        token: useAuthStore().accessToken,
+        token: auth.accessToken,
         clientId: CLIENT_ID,
         onOpen: () => this._onOpen(),
         onClose: (info) => this._onClose(info),
@@ -168,11 +171,6 @@ export const useRealtimeStore = defineStore('realtime', {
     _reconnect() {
       clearReconnectTimer();
       if (!this.workspaceId || client) {
-        return;
-      }
-      const auth = useAuthStore();
-      if (!auth.accessToken || auth.isTokenExpired) {
-        auth.setPendingReauth();
         return;
       }
       this._open();

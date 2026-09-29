@@ -8,6 +8,8 @@ import { EVENTS, on } from '@/services/events';
 
 // A refresh requested while one is running; a queued build wins over queued fetches
 let queued = null; // 'build' | 'fetch' | null
+// Bumped by reset(): a request started before it must not write its result into the next workspace
+let resetCount = 0;
 
 const getDefaults = () => ({
   previewHtml: '',
@@ -58,21 +60,28 @@ export const usePreviewStore = defineStore('preview', {
       }
 
       const shouldBuild = build && workspacesStore.isOwner;
+      const started = resetCount;
       this.isGenerating = true;
       try {
-        this.setPreviewHtml(
-          shouldBuild
-            ? await previewService.generatePreview(workspace.id, workspace.pfs)
-            : await previewService.fetchCurrentPreview(workspace.id),
-        );
+        const html = shouldBuild
+          ? await previewService.generatePreview(workspace.id, workspace.pfs)
+          : await previewService.fetchCurrentPreview(workspace.id);
+        if (started === resetCount) {
+          this.setPreviewHtml(html);
+        }
       } catch (error) {
+        if (started !== resetCount) {
+          return;
+        }
         // No build for this list yet: the owner's next build arrives as preview.generated
         if (error.status !== 404 || shouldBuild) {
           notifications.error(`Failed to generate preview: ${error.message}`);
         }
         this.setPreviewHtml('');
       } finally {
-        this.isGenerating = false;
+        if (started === resetCount) {
+          this.isGenerating = false;
+        }
       }
     },
 
@@ -97,6 +106,7 @@ export const usePreviewStore = defineStore('preview', {
 
     reset() {
       queued = null;
+      resetCount++;
       Object.assign(this, getDefaults());
     },
   },

@@ -21,6 +21,9 @@ function replaceById(list, id, item) {
   return index !== -1;
 }
 
+// Requests in flight; `isMutating` clears only when the last one settles
+let pendingMutations = 0;
+
 export const useShareStore = defineStore('share', {
   state: () => getDefaults(),
 
@@ -49,72 +52,88 @@ export const useShareStore = defineStore('share', {
       }
     },
 
-    /** Run a change with `isMutating` set, which disables the dialog's controls meanwhile. */
-    async _mutate(fn) {
+    /**
+     * Send a change with `isMutating` set (the dialog disables its controls meanwhile) and apply
+     * the response to the lists, unless the dialog has since moved to another workspace.
+     */
+    async _mutate(workspaceId, request, apply) {
+      pendingMutations++;
       this.isMutating = true;
       try {
-        return await fn();
+        const response = await request();
+        if (workspaceId === this.activeWorkspaceId) {
+          apply(response);
+        }
+        return response;
       } finally {
-        this.isMutating = false;
+        pendingMutations--;
+        this.isMutating = pendingMutations > 0;
       }
     },
 
     createShares(workspaceId, githubUsernames, mode) {
-      return this._mutate(async () => {
-        const newShares =
-          (await shareService.createShares(workspaceId, githubUsernames, mode)) || [];
-        // Merge: replace any existing shares with the same id, prepend the rest
-        for (const share of newShares) {
-          if (!replaceById(this.shares, share.id, share)) {
-            this.shares.unshift(share);
+      return this._mutate(
+        workspaceId,
+        () => shareService.createShares(workspaceId, githubUsernames, mode),
+        (newShares) => {
+          // Merge: replace any existing shares with the same id, prepend the rest
+          for (const share of newShares || []) {
+            if (!replaceById(this.shares, share.id, share)) {
+              this.shares.unshift(share);
+            }
           }
-        }
-        return newShares;
-      });
+        },
+      );
     },
 
     updateShare(workspaceId, shareId, mode) {
-      return this._mutate(async () => {
-        const updated = await shareService.updateShare(workspaceId, shareId, mode);
-        replaceById(this.shares, shareId, updated);
-        return updated;
-      });
+      return this._mutate(
+        workspaceId,
+        () => shareService.updateShare(workspaceId, shareId, mode),
+        (updated) => replaceById(this.shares, shareId, updated),
+      );
     },
 
     revokeShare(workspaceId, shareId) {
-      return this._mutate(async () => {
-        await shareService.revokeShare(workspaceId, shareId);
-        // Revoke returns 204 (no body). A revoked invitee isn't dropped from the list - it stays,
-        // shown greyed-out as "revoked" (that's what a reload returns and what the dialog renders),
-        // so flip the row's status in place instead of removing it.
-        const share = this.shares.find((s) => s.id === shareId);
-        if (share) {
-          replaceById(this.shares, shareId, { ...share, status: 'revoked' });
-        }
-      });
+      return this._mutate(
+        workspaceId,
+        () => shareService.revokeShare(workspaceId, shareId),
+        () => {
+          // Revoke returns 204 (no body). A revoked invitee isn't dropped from the list - it stays,
+          // shown greyed-out as "revoked" (that's what a reload returns and what the dialog renders),
+          // so flip the row's status in place instead of removing it.
+          const share = this.shares.find((s) => s.id === shareId);
+          if (share) {
+            replaceById(this.shares, shareId, { ...share, status: 'revoked' });
+          }
+        },
+      );
     },
 
     createShareLink(workspaceId, mode, expiresAt = null) {
-      return this._mutate(async () => {
-        const link = await shareService.createShareLink(workspaceId, mode, expiresAt);
-        this.shareLinks.unshift(link);
-        return link;
-      });
+      return this._mutate(
+        workspaceId,
+        () => shareService.createShareLink(workspaceId, mode, expiresAt),
+        (link) => this.shareLinks.unshift(link),
+      );
     },
 
     updateShareLink(workspaceId, linkId, updates) {
-      return this._mutate(async () => {
-        const updated = await shareService.updateShareLink(workspaceId, linkId, updates);
-        replaceById(this.shareLinks, linkId, updated);
-        return updated;
-      });
+      return this._mutate(
+        workspaceId,
+        () => shareService.updateShareLink(workspaceId, linkId, updates),
+        (updated) => replaceById(this.shareLinks, linkId, updated),
+      );
     },
 
     deleteShareLink(workspaceId, linkId) {
-      return this._mutate(async () => {
-        await shareService.deleteShareLink(workspaceId, linkId);
-        this.shareLinks = this.shareLinks.filter((l) => l.id !== linkId);
-      });
+      return this._mutate(
+        workspaceId,
+        () => shareService.deleteShareLink(workspaceId, linkId),
+        () => {
+          this.shareLinks = this.shareLinks.filter((l) => l.id !== linkId);
+        },
+      );
     },
 
     async redeemShareLink(token) {
