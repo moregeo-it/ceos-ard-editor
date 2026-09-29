@@ -38,7 +38,7 @@ import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
 import { usePreviewStore } from '@/stores/preview';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import { mdiCheckCircle, mdiMenuDown, mdiNotebookEdit } from '@mdi/js';
+import { mdiNotebookEdit } from '@mdi/js';
 import HeaderBar from '@/components/HeaderBar.vue';
 import HeaderSwitch from '@/components/HeaderSwitch.vue';
 import EditorPane from '@/components/ide/EditorPane.vue';
@@ -65,8 +65,6 @@ export default {
     };
     return {
       icons: {
-        propose: mdiCheckCircle,
-        menuDown: mdiMenuDown,
         title: mdiNotebookEdit,
       },
       panelSizeDefaults: panelSizeDefaults,

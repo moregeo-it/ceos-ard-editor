@@ -94,7 +94,6 @@
 </template>
 
 <script>
-import { useAuthStore } from '@/stores/auth';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
 import HeaderBar from '@/components/HeaderBar.vue';
@@ -121,20 +120,12 @@ export default {
   },
 
   computed: {
-    authStore() {
-      return useAuthStore();
-    },
-
     workspacesStore() {
       return useWorkspacesStore();
     },
 
     notificationsStore() {
       return useNotificationsStore();
-    },
-
-    username() {
-      return this.authStore.getUsername;
     },
 
     filteredWorkspaces() {
@@ -195,12 +186,8 @@ export default {
       }
     },
 
-    // Creating a workspace also creates a repository in the user's GitHub account, which the
-    // UI otherwise never mentions — so it gets tidied away, breaking every workspace at once.
-    //
-    // Only the first workspace actually creates the fork; the rest reuse it as another branch.
-    // So the dialog belongs there, and every later create just names the fork in the toast to
-    // keep it discoverable. A dialog every time would only train people to dismiss it.
+    // Point out the GitHub fork so nobody deletes it and breaks every workspace. Only the first
+    // workspace creates it, so it gets the dialog; later ones just name it in the toast.
     announceFork(workspace, isFirstWorkspace) {
       const forkName =
         workspace?.fork_repo_owner && workspace?.fork_repo_name

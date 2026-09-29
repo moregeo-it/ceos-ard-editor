@@ -9,7 +9,7 @@
         chips
         hide-details
         class="preview-select mr-2 flex-grow-1"
-        @update:focused="handleSelect"
+        @update:menu="handleMenuToggle"
       />
       <v-btn
         color="primary"
@@ -53,6 +53,7 @@
           ref="iframe"
           :key="previewGeneration"
           class="preview-iframe"
+          :style="pfsMenuOpen ? { pointerEvents: 'none' } : null"
           frameborder="0"
           width="100%"
           height="100%"
@@ -76,6 +77,10 @@ import PfsSelect from '@/components/PfsSelect.vue';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
+function sameList(a, b) {
+  return a.length === b.length && a.every((item, i) => item === b[i]);
+}
+
 export default {
   name: 'PreviewPane',
   components: {
@@ -87,6 +92,9 @@ export default {
         pdf: false,
         docx: false,
       },
+      pfsMenuOpen: false,
+      // The selection when the menu opened, to regenerate only if it changed
+      selectionBeforeMenu: null,
       icons: {
         download: mdiDownload,
       },
@@ -275,24 +283,26 @@ export default {
         }
       });
     },
-    async handleSelect(focus) {
-      if (focus) {
-        this.previewStore.storeOldSelection();
+    // Regenerate once the menu closes, not on every toggled item of the multi-select
+    async handleMenuToggle(open) {
+      this.pfsMenuOpen = open;
+      if (open) {
+        this.selectionBeforeMenu = [...(this.selectedPfs ?? [])];
         return;
       }
-      if (this.previewStore.oldSelectedPfs === this.previewStore.selectedPfs) {
+      const before = this.selectionBeforeMenu;
+      this.selectionBeforeMenu = null;
+      if (before && sameList(before, this.selectedPfs ?? [])) {
         return;
       }
       await this.previewStore.generatePreview();
-      this.previewStore.clearOldSelection();
     },
 
     async downloadPreview(documentType) {
-      this.isDownloading[documentType] = true;
-
       if (!this.selectedPfs || this.selectedPfs.length === 0) {
         return;
       }
+      this.isDownloading[documentType] = true;
       try {
         const response = await previewService.downloadPreviewFile(
           this.workspaceId,

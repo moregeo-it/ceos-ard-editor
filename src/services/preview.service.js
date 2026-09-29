@@ -11,11 +11,6 @@ export default {
     return api.get(`${url}?${query}`);
   },
 
-  async getPreviewStaticFile(workspaceId, filePath) {
-    const url = `/workspaces/${workspaceId}/previews/${encodeURIComponent(filePath)}`;
-    return api.get(url);
-  },
-
   async downloadPreviewFile(workspaceId, pfs, documentType) {
     const query = new URLSearchParams();
     query.append('format', documentType);
