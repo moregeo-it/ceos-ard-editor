@@ -68,9 +68,34 @@ export const useAuthStore = defineStore('auth', {
           return false;
         }
         this._setSession(session);
+        this._confirmSession();
         return true;
       } finally {
         this.isLoading = false;
+      }
+    },
+
+    /**
+     * The stored session is only what this browser last knew; check it against the cookie without
+     * holding up startup. A dead cookie signs out, another account's cookie reloads, and a network
+     * error keeps the stored session (the next request's 401 still asks for a new login).
+     */
+    async _confirmSession() {
+      try {
+        const session = await authService.fetchSession();
+        const otherUser = session.userId !== this.userId;
+        this.applySession(session);
+        if (otherUser) {
+          window.location.reload();
+        }
+      } catch (error) {
+        if (error.status === 401) {
+          this.clearAuth();
+          // Public routes say so; the start route, before the first navigation settles, doesn't
+          if (router.currentRoute.value.meta.requiresAuth !== false) {
+            router.push({ name: 'landing' });
+          }
+        }
       }
     },
 

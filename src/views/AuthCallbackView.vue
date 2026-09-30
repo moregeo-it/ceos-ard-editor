@@ -106,10 +106,10 @@ export default {
           this.$router.push({ name: 'workspaces' });
         }
       } catch (error) {
-        // 401 right after the login: the browser did not send the session cookie back
+        // 401: no session cookie, because the browser blocked it or this page was opened without a login
         const message =
           error.status === 401
-            ? `Your browser blocked the login cookie. Please allow cookies for ${API_HOST} and try again.`
+            ? `Login failed. If this keeps happening, allow cookies for ${API_HOST}.`
             : `Authentication failed. Please try again. Error: ${error.message}`;
         this.error = message;
 
