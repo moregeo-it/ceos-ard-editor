@@ -81,21 +81,33 @@ export const useAuthStore = defineStore('auth', {
      * error keeps the stored session (the next request's 401 still asks for a new login).
      */
     async _confirmSession() {
+      const checked = this.expiresAt;
       try {
-        const session = await authService.fetchSession();
-        const otherUser = session.userId !== this.userId;
-        this.applySession(session);
-        if (otherUser) {
-          window.location.reload();
-        }
+        this._takeOver(await authService.fetchSession());
       } catch (error) {
-        if (error.status === 401) {
-          this.clearAuth();
-          // Public routes say so; the start route, before the first navigation settles, doesn't
-          if (router.currentRoute.value.meta.requiresAuth !== false) {
-            router.push({ name: 'landing' });
-          }
+        if (error.status !== 401) {
+          return;
         }
+        // Another tab may have logged in while this request, sent with the old cookie, was in flight
+        const stored = sessionService.load();
+        if (stored && stored.expiresAt !== checked) {
+          this._takeOver(stored);
+          return;
+        }
+        this.clearAuth();
+        // Wait for the first navigation (lazy routes), so a share link isn't mistaken for a protected page
+        await router.isReady().catch(() => {});
+        if (router.currentRoute.value.meta.requiresAuth) {
+          router.push({ name: 'landing' });
+        }
+      }
+    },
+
+    _takeOver(session) {
+      const otherUser = session.userId !== this.userId;
+      this.applySession(session);
+      if (otherUser) {
+        window.location.reload();
       }
     },
 
