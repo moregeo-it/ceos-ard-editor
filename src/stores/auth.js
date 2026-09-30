@@ -69,6 +69,10 @@ export const useAuthStore = defineStore('auth', {
         }
         this._setSession(session);
         return true;
+      } catch {
+        // Storage disabled (SecurityError): signed out. clearAuth would touch the storage again.
+        Object.assign(this, getDefaults());
+        return false;
       } finally {
         this.isLoading = false;
       }
@@ -101,8 +105,8 @@ export const useAuthStore = defineStore('auth', {
     },
 
     /**
-     * Follow logins and logouts of other tabs. A login (or reauthentication) there renews the
-     * shared cookie, so this tab takes over the new session, which also closes its login dialog.
+     * Follow logins and logouts of other tabs. A reauthentication there renews the shared cookie,
+     * so this tab takes over the new session, which also closes its login dialog.
      */
     listenForOtherTabs() {
       if (listeningForOtherTabs) {
@@ -115,8 +119,9 @@ export const useAuthStore = defineStore('auth', {
           return;
         }
         const session = sessionService.parse(event.newValue);
-        if (session && this.isAuthenticated && session.userId !== this.userId) {
-          // Another account now owns the cookie: nothing loaded in this tab is valid for it
+        if (session && (!this.isAuthenticated || session.userId !== this.userId)) {
+          // A new login: rerun what this tab showed for the previous (or no) account, e.g. the
+          // landing page's login button or a share link's redemption
           window.location.reload();
         } else if (session) {
           this._setSession(session);
