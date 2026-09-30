@@ -78,13 +78,11 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
+    /** Stays logged in when the server couldn't end the session, since its cookie would stay valid. */
     async logout() {
-      try {
-        await authService.logout();
-      } finally {
-        this.clearAuth();
-        router.push({ name: 'landing' });
-      }
+      await authService.logout();
+      this.clearAuth();
+      router.push({ name: 'landing' });
     },
 
     /** Forget the session here and in every other tab. */

@@ -40,17 +40,17 @@ export default {
   },
 
   /**
-   * Revoke the session on the backend; best effort, the local state is cleared either way
+   * End the session on the backend, which clears the session cookie. Rejects when that failed;
+   * a 401 means the session had already ended.
    */
   async logout() {
-    try {
-      await fetch(`${API_BASE_URL}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { [CLIENT_ID_HEADER]: CLIENT_ID },
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
+    const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { [CLIENT_ID_HEADER]: CLIENT_ID },
+    });
+    if (!response.ok && response.status !== 401) {
+      throw new Error(`Logout failed (status ${response.status})`);
     }
   },
 
