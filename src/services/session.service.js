@@ -30,22 +30,34 @@ function parse(value) {
   }
 }
 
+// Storage can be disabled (SecurityError). The session then lives only in this tab's memory:
+// no restore on reload and no sharing with other tabs, but login and logout still work.
+function withStorage(action) {
+  try {
+    return action(localStorage);
+  } catch {
+    return null;
+  }
+}
+
 export default {
   KEY: SESSION_KEY,
   parse,
 
   /** @param {Session} session */
   save(session) {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    withStorage((storage) => storage.setItem(SESSION_KEY, JSON.stringify(session)));
   },
 
   /** @returns {Session|null} */
   load() {
-    LEGACY_KEYS.forEach((key) => localStorage.removeItem(key));
-    return parse(localStorage.getItem(SESSION_KEY));
+    return withStorage((storage) => {
+      LEGACY_KEYS.forEach((key) => storage.removeItem(key));
+      return parse(storage.getItem(SESSION_KEY));
+    });
   },
 
   clear() {
-    localStorage.removeItem(SESSION_KEY);
+    withStorage((storage) => storage.removeItem(SESSION_KEY));
   },
 };

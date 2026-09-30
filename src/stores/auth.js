@@ -69,10 +69,6 @@ export const useAuthStore = defineStore('auth', {
         }
         this._setSession(session);
         return true;
-      } catch {
-        // Storage disabled (SecurityError): signed out. clearAuth would touch the storage again.
-        Object.assign(this, getDefaults());
-        return false;
       } finally {
         this.isLoading = false;
       }
