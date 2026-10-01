@@ -118,14 +118,6 @@ export const useShareStore = defineStore('share', {
       );
     },
 
-    updateShareLink(workspaceId, linkId, updates) {
-      return this._mutate(
-        workspaceId,
-        () => shareService.updateShareLink(workspaceId, linkId, updates),
-        (updated) => replaceById(this.shareLinks, linkId, updated),
-      );
-    },
-
     deleteShareLink(workspaceId, linkId) {
       return this._mutate(
         workspaceId,
@@ -134,6 +126,10 @@ export const useShareStore = defineStore('share', {
           this.shareLinks = this.shareLinks.filter((l) => l.id !== linkId);
         },
       );
+    },
+
+    async fetchShareLinkPreview(token) {
+      return shareService.getShareLinkPreview(token);
     },
 
     async redeemShareLink(token) {

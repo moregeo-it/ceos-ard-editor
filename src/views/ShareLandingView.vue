@@ -18,13 +18,7 @@
               <p class="text-body-1 text-medium-emphasis mb-1">
                 Shared by {{ preview.ownerDisplayName }}
               </p>
-              <div v-if="!preview.isActive" class="mb-4">
-                <v-alert type="warning" variant="tonal">
-                  This share link is no longer active.
-                </v-alert>
-              </div>
               <v-btn
-                v-else
                 color="primary"
                 size="large"
                 :prepend-icon="icons.github"
@@ -84,7 +78,7 @@ export default {
   },
 
   async created() {
-    await this.redeem();
+    await this.open();
   },
 
   methods: {
@@ -92,21 +86,26 @@ export default {
       return shareModeLabel(mode);
     },
 
-    async redeem() {
+    /** Redeem the link and enter the workspace. Not logged in: show what the link leads to. */
+    async open() {
       this.loading = true;
       try {
-        const result = await this.shareStore.redeemShareLink(this.token);
-
-        if (result.authenticated) {
-          if (!this.authStore.isAuthenticated) {
-            // The cookie outlived this browser's session info (e.g. cleared site storage)
-            await this.authStore.completeLogin();
+        // The server knows whether there is a session: a 401 means there is none
+        const redeemed = await this.shareStore.redeemShareLink(this.token).catch((err) => {
+          if (err.status === 401) {
+            return null;
           }
-          this.$router.replace({ name: 'editor', params: { id: result.workspace.id } });
+          throw err;
+        });
+        if (!redeemed) {
+          this.preview = await this.shareStore.fetchShareLinkPreview(this.token);
           return;
         }
-
-        this.preview = result.preview;
+        // The cookie may be valid without local session info (cleared or disabled storage)
+        if (!this.authStore.isAuthenticated) {
+          await this.authStore.completeLogin();
+        }
+        this.$router.replace({ name: 'editor', params: { id: redeemed.workspace.id } });
       } catch (err) {
         if (err.status === 403) {
           this.error = {
