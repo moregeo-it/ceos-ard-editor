@@ -1,4 +1,6 @@
 // src/services/auth.service.js
+import { CLIENT_ID, CLIENT_ID_HEADER } from '@/utils/client-id';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export default {
@@ -17,47 +19,38 @@ export default {
   },
 
   /**
-   * Parse authentication callback URL parameters
+   * Read the session the login cookie belongs to. Rejects with `status` 401 when the browser sent
+   * no cookie, e.g. because it blocks cookies for the API host.
+   * @returns {Promise<import('./session.service').Session>}
    */
-  parseAuthCallback(searchParams) {
-    const accessToken = searchParams.get('access_token');
-    const tokenType = searchParams.get('token_type');
-    const expiresIn = searchParams.get('expires_in');
-    const userId = searchParams.get('user_id');
-    const username = searchParams.get('username');
-    const provider = searchParams.get('provider');
-
-    // Validate required parameters
-    if (!accessToken) {
-      throw new Error('Missing access_token in callback');
+  async fetchSession() {
+    const response = await fetch(`${API_BASE_URL}/auth/user`, { credentials: 'include' });
+    if (!response.ok) {
+      const error = new Error(`Failed to read the session (status ${response.status})`);
+      error.status = response.status;
+      throw error;
     }
-    if (!userId || !username) {
-      throw new Error('Missing user information in callback');
-    }
-
+    const user = await response.json();
     return {
-      accessToken,
-      tokenType: tokenType || 'Bearer',
-      expiresIn: expiresIn ? parseInt(expiresIn) : 3600, // Default 1 hour
-      userId,
-      username,
-      provider: provider || 'unknown',
+      userId: user.id,
+      username: user.username,
+      provider: user.identity_provider,
+      expiresAt: Date.parse(user.expires_at),
     };
   },
 
   /**
-   * Logout - revoke token on backend
+   * End the session on the backend, which clears the session cookie. Rejects when that failed;
+   * a 401 means the session had already ended.
    */
-  async logout(accessToken) {
-    try {
-      await fetch(`${API_BASE_URL}/auth/logout`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
+  async logout() {
+    const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { [CLIENT_ID_HEADER]: CLIENT_ID },
+    });
+    if (!response.ok && response.status !== 401) {
+      throw new Error(`Logout failed (status ${response.status})`);
     }
   },
 

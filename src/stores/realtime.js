@@ -59,8 +59,8 @@ export const useRealtimeStore = defineStore('realtime', {
         return;
       }
 
-      // The target is recorded before the token check in _open, so a stream stalled on an expired
-      // token still knows what to resume after the login.
+      // The target is recorded before the session check in _open, so a stream stalled on an expired
+      // session still knows what to resume after the login.
       this.disconnect();
       hasConnected = false;
       this.workspaceId = workspaceId;
@@ -85,12 +85,12 @@ export const useRealtimeStore = defineStore('realtime', {
 
     /**
      * Re-open a stream that stalled waiting for reauth (see `_onClose` / `_reconnect`). No-ops
-     * unless a workspace stream is stalled with a now-valid token, so it can't create a duplicate
-     * or unauthenticated connection - e.g. when reauth is cancelled via logout and the token cleared.
+     * unless a workspace stream is stalled with a now-valid session, so it can't create a duplicate
+     * or unauthenticated connection - e.g. when reauth is cancelled via logout.
      */
     resumeIfStalled() {
       const auth = useAuthStore();
-      if (this.workspaceId && !client && auth.accessToken && !auth.isTokenExpired) {
+      if (this.workspaceId && !client && auth.isAuthenticated && !auth.isSessionExpired) {
         this._open();
       }
     },
@@ -101,14 +101,13 @@ export const useRealtimeStore = defineStore('realtime', {
         return;
       }
       const auth = useAuthStore();
-      if (!auth.accessToken || auth.isTokenExpired) {
+      if (!auth.isAuthenticated || auth.isSessionExpired) {
         // Ask for a new login; App.vue calls resumeIfStalled() afterwards.
         auth.setPendingReauth();
         return;
       }
       client = openWorkspaceConnection({
         workspaceId,
-        token: auth.accessToken,
         clientId: CLIENT_ID,
         onOpen: () => this._onOpen(),
         onClose: (info) => this._onClose(info),
