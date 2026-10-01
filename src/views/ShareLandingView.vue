@@ -86,30 +86,26 @@ export default {
       return shareModeLabel(mode);
     },
 
-    /** Logged in: redeem and enter the workspace. Otherwise show what the link leads to. */
+    /** Redeem the link and enter the workspace. Not logged in: show what the link leads to. */
     async open() {
       this.loading = true;
       try {
-        // The cookie may still be valid without local session info (cleared or disabled storage)
-        const loggedIn =
-          this.authStore.isAuthenticated ||
-          (await this.authStore.completeLogin().then(
-            () => true,
-            () => false,
-          ));
-        if (loggedIn) {
-          try {
-            const { workspace } = await this.shareStore.redeemShareLink(this.token);
-            this.$router.replace({ name: 'editor', params: { id: workspace.id } });
-            return;
-          } catch (err) {
-            if (err.status !== 401) {
-              throw err;
-            }
-            // The session ended on the server: carry on as a visitor
+        // The server knows whether there is a session: a 401 means there is none
+        const redeemed = await this.shareStore.redeemShareLink(this.token).catch((err) => {
+          if (err.status === 401) {
+            return null;
           }
+          throw err;
+        });
+        if (!redeemed) {
+          this.preview = await this.shareStore.fetchShareLinkPreview(this.token);
+          return;
         }
-        this.preview = await this.shareStore.fetchShareLinkPreview(this.token);
+        // The cookie may be valid without local session info (cleared or disabled storage)
+        if (!this.authStore.isAuthenticated) {
+          await this.authStore.completeLogin();
+        }
+        this.$router.replace({ name: 'editor', params: { id: redeemed.workspace.id } });
       } catch (err) {
         if (err.status === 403) {
           this.error = {
