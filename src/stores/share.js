@@ -142,19 +142,28 @@ export const useShareStore = defineStore('share', {
 
     /**
      * Persist a share token across the OAuth redirect (login/signup), so it can be re-redeemed
-     * automatically once the user is authenticated.
+     * automatically once the user is authenticated. With storage disabled the login still runs;
+     * the user then lands on the workspace list and opens the link again, now logged in.
      */
     setPendingShareToken(token) {
-      sessionStorage.setItem(PENDING_SHARE_TOKEN_KEY, token);
+      try {
+        sessionStorage.setItem(PENDING_SHARE_TOKEN_KEY, token);
+      } catch {
+        // storage disabled, see above
+      }
     },
 
     /**
      * Read and clear the pending share token, if any (call once after handling the auth callback).
      */
     consumePendingShareToken() {
-      const token = sessionStorage.getItem(PENDING_SHARE_TOKEN_KEY);
-      sessionStorage.removeItem(PENDING_SHARE_TOKEN_KEY);
-      return token;
+      try {
+        const token = sessionStorage.getItem(PENDING_SHARE_TOKEN_KEY);
+        sessionStorage.removeItem(PENDING_SHARE_TOKEN_KEY);
+        return token;
+      } catch {
+        return null;
+      }
     },
 
     /**

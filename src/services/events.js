@@ -1,29 +1,15 @@
 /**
  * Central client-side event bus.
  *
- * Event names and payloads mirror the server's realtime WebSocket envelope — see
- * `ceos-ard-server/openapi.yaml` (WorkspaceEvent / WorkspaceEventType) and
- * `ceos-ard-server/app/schemas/events.py`. Those three places must be updated together.
+ * Event names and payloads mirror the server's realtime WebSocket envelope (`WorkspaceEvent` in
+ * `ceos-ard-server/openapi.yaml` and `app/schemas/events.py`); `npm run check:events` keeps the
+ * three in sync. Client-only additions: `source` (`'local'` for this tab's own store actions,
+ * `'remote'` for events forwarded from the WebSocket) and the `realtime.*` events.
  *
- * Client-only additions that never appear on the wire:
- * - `source: 'local' | 'remote'` on every event — `'local'` (the default) for events emitted by
- *   this client's own store actions, `'remote'` for events forwarded from the WebSocket by the
- *   realtime store (the only place that sets it). It is not for deduplication (the server never
- *   sends a tab its own changes, filtered by client id); it discriminates behavior where local
- *   and remote genuinely differ, e.g. remote events still need to be applied to the files store,
- *   while local events already mutated it inside the emitting action.
- * - The `realtime.*` namespace (e.g. `realtime.resynced`).
- *
- * Usage:
- * - Stores subscribe in an exported `register*EventListeners()` function colocated with the
- *   store, called once from main.js. These subscriptions live for the app's lifetime. (This
- *   module deliberately has no Vue/Pinia imports so it stays usable anywhere, including Node
- *   scripts.)
- * - Only user-initiated store actions emit; low-level mutators never do (loop prevention).
- * - Handlers must be SELF-CONTAINED: depend only on the event payload and the handler's own
- *   store, never on the effects of other listeners. Handler execution order within one event is
- *   unspecified (events themselves are applied strictly in emit order). If a handler needs data,
- *   it belongs in the event payload - events carry complete snapshots for exactly this reason.
+ * Stores subscribe in a `register*EventListeners()` called once from main.js. Only user-initiated
+ * store actions emit. Handlers depend only on the event payload and their own store: their order
+ * within one event is unspecified, so events carry complete snapshots. No Vue/Pinia imports here,
+ * so the module also runs in Node scripts.
  *
  * @typedef {Object} FileItem
  * @property {string} name
@@ -57,7 +43,8 @@
  * @property {string[]} [pfs] `preview.generated` only: the PFS list the owner built the preview
  *   for; fetch the current preview instead of building.
  * @property {number} [seq] Present iff the event was published by the server broker.
- * @property {string} [target_user_id] `share.revoked` only.
+ * @property {string} [target_user_id] `share.revoked` and `share.updated` only.
+ * @property {string} [mode] `share.updated` only: this user's new share mode; refetch the workspace.
  */
 
 export const EVENTS = Object.freeze({
@@ -69,6 +56,7 @@ export const EVENTS = Object.freeze({
   FILE_REVERTED: 'file.reverted',
   FILE_COMMITTED: 'file.committed',
   SHARE_REVOKED: 'share.revoked',
+  SHARE_UPDATED: 'share.updated',
   WORKSPACE_ARCHIVED: 'workspace.archived',
   WORKSPACE_DELETED: 'workspace.deleted',
   WORKSPACE_SYNCED: 'workspace.synced',

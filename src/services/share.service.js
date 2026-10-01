@@ -1,5 +1,5 @@
 import { api } from '@/utils/api';
-import { CLIENT_ID, CLIENT_ID_HEADER } from '@/services/client-id';
+import { CLIENT_ID, CLIENT_ID_HEADER } from '@/utils/client-id';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 

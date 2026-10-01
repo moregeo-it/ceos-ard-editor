@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 
 import { EVENTS, emit, enqueue } from '@/services/events';
 import { openWorkspaceConnection } from '@/services/collab.service';
-import { CLIENT_ID } from '@/services/client-id';
+import { CLIENT_ID } from '@/utils/client-id';
 import { useAuthStore } from './auth';
 import { useEditorStore } from './editor';
 import { useNotificationsStore } from './notifications';

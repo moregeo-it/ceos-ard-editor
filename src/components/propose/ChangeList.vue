@@ -151,7 +151,8 @@ export default {
       try {
         if (commit.merged_remote) {
           await this.editorStore.refreshAfterRemoteUpdate();
-          // No preview pane in this view; drop the stale one instead of regenerating it
+          // Due to the commit, a pull from GitHub may happen afterwards that can include changes to the PFS.
+          // Drop the preview to ensure it is rebuilt based on the new files.
           this.previewStore.setPreviewHtml('');
           // The merge added commits beyond the one just made
           await this.proposalStore.fetchCommits(workspaceId);
