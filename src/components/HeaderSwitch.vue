@@ -1,7 +1,14 @@
 <template>
   <v-btn-toggle mandatory v-model="view" color="primary">
     <v-btn value="editor" :prepend-icon="icons.edit" :ripple="false"> Editor </v-btn>
-    <v-btn value="propose" :prepend-icon="icons.propose" :ripple="false"> Propose </v-btn>
+    <v-btn
+      v-if="workspacesStore.isOwner"
+      value="propose"
+      :prepend-icon="icons.propose"
+      :ripple="false"
+    >
+      Propose
+    </v-btn>
     <v-btn
       value="workspaces"
       :prepend-icon="icons.close"
@@ -71,7 +78,9 @@ export default {
     // stay uncommitted, the more likely they conflict with changes made on GitHub meanwhile
     async confirmUncommittedChanges() {
       const workspaceId = this.workspacesStore.currentWorkspace?.id;
-      if (!workspaceId || this.workspacesStore.isArchived) {
+      // Only the owner can commit, and the change list is owner-only on the server: for
+      // read-only collaborators there is nothing to warn about.
+      if (!workspaceId || this.workspacesStore.isReadOnly) {
         this.workspacesStore.leaveWorkspace();
         return;
       }

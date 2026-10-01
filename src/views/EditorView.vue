@@ -4,6 +4,15 @@
       <template #central-actions>
         <HeaderSwitch />
       </template>
+      <template #actions>
+        <ShareModeChip
+          v-if="!workspacesStore.isOwner && workspacesStore.viewerRole"
+          :mode="workspacesStore.viewerRole"
+        />
+        <v-btn v-if="workspacesStore.isOwner" :prepend-icon="icons.share" @click="openShareDialog">
+          Share
+        </v-btn>
+      </template>
     </HeaderBar>
 
     <!-- Main Content Area -->
@@ -37,13 +46,16 @@ import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
 import { usePreviewStore } from '@/stores/preview';
+import { useRealtimeStore } from '@/stores/realtime';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import { mdiNotebookEdit } from '@mdi/js';
+import { discardQueuedEvents } from '@/services/events';
+import { mdiNotebookEdit, mdiShareVariant } from '@mdi/js';
 import HeaderBar from '@/components/HeaderBar.vue';
 import HeaderSwitch from '@/components/HeaderSwitch.vue';
 import EditorPane from '@/components/ide/EditorPane.vue';
 import FilesPane from '@/components/ide/FilesPane.vue';
 import PreviewPane from '@/components/ide/PreviewPane.vue';
+import ShareModeChip from '@/components/workspace/ShareModeChip.vue';
 import { Splitpanes, Pane } from 'splitpanes';
 
 export default {
@@ -55,6 +67,7 @@ export default {
     HeaderSwitch,
     Pane,
     PreviewPane,
+    ShareModeChip,
     Splitpanes,
   },
   data() {
@@ -66,6 +79,7 @@ export default {
     return {
       icons: {
         title: mdiNotebookEdit,
+        share: mdiShareVariant,
       },
       panelSizeDefaults: panelSizeDefaults,
       panelSizes: {
@@ -94,11 +108,11 @@ export default {
     notificationsStore() {
       return useNotificationsStore();
     },
+    realtimeStore() {
+      return useRealtimeStore();
+    },
     editorStore() {
       return useEditorStore();
-    },
-    filesStore() {
-      return useFilesStore();
     },
     previewStore() {
       return usePreviewStore();
@@ -108,18 +122,39 @@ export default {
   async created() {
     // Must be read before loadWorkspace(), which sets currentWorkspace itself.
     const isFreshOpening = this.workspacesStore.currentWorkspace?.id !== this.workspaceId;
+    if (isFreshOpening) {
+      // Another workspace may have been open before (browser back, then a card): drop its queued
+      // events, tabs, tree and preview, and let its in-flight requests expire
+      discardQueuedEvents();
+      this.editorStore.reset();
+      useFilesStore().reset();
+      this.previewStore.reset();
+    }
 
     await this.loadWorkspace();
-    // Must be called after the workspace has loaded, otherwise isArchived is always false
-    if (this.workspacesStore.isArchived) {
+    // Subscribe to live changes once the workspace has loaded. Everyone connects (the server
+    // withholds a tab's own changes); read-only viewers get the owner's changes live.
+    if (this.workspace) {
+      this.realtimeStore.connect(this.workspaceId);
+    }
+    // Must be called after the workspace has loaded, otherwise isArchived is always false.
+    // Only offer reactivation to the owner.
+    if (this.workspacesStore.isArchived && this.workspacesStore.isOwner) {
       this.$root.openDialog('ArchivedDialog', {
         workspace: this.workspace,
         onAcceptance: async () => await this.handleToggleStatus(),
       });
-    } else if (isFreshOpening) {
+    } else if (isFreshOpening && this.workspacesStore.isOwner) {
+      // Syncing pushes and merges with the owner's GitHub credentials and changes the owner's
+      // workspace, so only the owner triggers it; collaborators are told about the outcome
+      // through the workspace.synced event instead.
       await this.syncRemoteChanges();
     }
     this.syncReady = true;
+  },
+
+  beforeUnmount() {
+    this.realtimeStore.disconnect();
   },
 
   methods: {
@@ -138,6 +173,10 @@ export default {
         this.notificationsStore.error(`Failed to load workspace: ${error.message}`);
         this.$router.push({ name: 'workspaces' });
       }
+    },
+
+    openShareDialog() {
+      this.$root.openDialog('ShareDialog', { workspace: this.workspace });
     },
 
     async handleToggleStatus() {
@@ -172,7 +211,8 @@ export default {
             this.notificationsStore.success(
               'Workspace updated with the latest changes from GitHub',
             );
-            await this.refreshAfterRemoteUpdate();
+            await this.editorStore.refreshAfterRemoteUpdate();
+            this.previewStore.requestPreviewRefresh();
             break;
           case 'conflict':
             this.$root.openDialog('SyncConflictDialog', {
@@ -211,21 +251,6 @@ export default {
         // Never block opening the workspace on a sync failure
         this.notificationsStore.warning(
           `Could not check GitHub for remote updates: ${error.message}`,
-        );
-      }
-    },
-
-    // The sync changed files on disk. Drop the cached file tree so the panes read the updated
-    // state, and reload what is already open in the editor.
-    async refreshAfterRemoteUpdate() {
-      this.filesStore.reset();
-      const skipped = await this.editorStore.resyncOpenFiles();
-      this.previewStore.generatePreview();
-
-      if (skipped.length) {
-        this.notificationsStore.warning(
-          'These open files keep your unsaved changes and were not updated with the changes ' +
-            `from GitHub: ${skipped.join(', ')}`,
         );
       }
     },

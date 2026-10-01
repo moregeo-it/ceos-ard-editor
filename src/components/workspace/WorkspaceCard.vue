@@ -4,6 +4,7 @@
       <v-icon :icon="icons.folder" start></v-icon>
       {{ workspace.title }}
       <v-spacer></v-spacer>
+      <ShareModeChip v-if="!isOwner" :mode="workspace.viewer_role" class="mr-2" />
       <v-chip :color="statusColor" size="small" variant="flat">
         {{ workspace.status }}
       </v-chip>
@@ -44,25 +45,32 @@
     </v-card-text>
 
     <v-card-actions class="mt-auto flex-wrap cursor-default border-t-sm" @click.stop>
-      <v-btn variant="text" :prepend-icon="icons.pencil" @click.stop="handleEdit">Settings</v-btn>
-      <v-spacer></v-spacer>
-      <v-btn
-        :color="toggleStatusColor"
-        variant="text"
-        :prepend-icon="toggleStatusIcon"
-        @click.stop="handleToggleStatus"
-      >
-        {{ toggleStatusLabel }}
-      </v-btn>
-      <v-btn color="error" variant="text" :prepend-icon="icons.delete" @click.stop="handleDelete">
-        Delete
-      </v-btn>
+      <template v-if="isOwner">
+        <v-btn variant="text" :prepend-icon="icons.pencil" @click.stop="handleEdit">Settings</v-btn>
+        <v-btn variant="text" :prepend-icon="icons.share" @click.stop="handleShare">Share</v-btn>
+        <v-spacer></v-spacer>
+        <v-btn
+          :color="toggleStatusColor"
+          variant="text"
+          :prepend-icon="toggleStatusIcon"
+          @click.stop="handleToggleStatus"
+        >
+          {{ toggleStatusLabel }}
+        </v-btn>
+        <v-btn color="error" variant="text" :prepend-icon="icons.delete" @click.stop="handleDelete">
+          Delete
+        </v-btn>
+      </template>
+      <template v-else>
+        <span class="text-caption text-medium-emphasis">Shared by {{ ownerLabel }}</span>
+      </template>
     </v-card-actions>
   </v-card>
 </template>
 
 <script>
 import PfsBadges from './PfsBadges.vue';
+import ShareModeChip from './ShareModeChip.vue';
 import {
   mdiFolder,
   mdiCalendar,
@@ -71,6 +79,7 @@ import {
   mdiPencil,
   mdiDelete,
   mdiPackageUp,
+  mdiShareVariant,
 } from '@mdi/js';
 
 export default {
@@ -78,6 +87,7 @@ export default {
 
   components: {
     PfsBadges,
+    ShareModeChip,
   },
 
   props: {
@@ -87,7 +97,7 @@ export default {
     },
   },
 
-  emits: ['view', 'edit', 'toggle-status', 'delete'],
+  emits: ['view', 'edit', 'toggle-status', 'delete', 'share'],
 
   data() {
     return {
@@ -99,6 +109,7 @@ export default {
         pencil: mdiPencil,
         delete: mdiDelete,
         activate: mdiPackageUp,
+        share: mdiShareVariant,
       },
     };
   },
@@ -110,6 +121,14 @@ export default {
 
     isArchived() {
       return this.workspace.status === 'archived' || false;
+    },
+
+    isOwner() {
+      return this.workspace.viewer_role === 'owner';
+    },
+
+    ownerLabel() {
+      return this.workspace.owner_full_name || this.workspace.owner_username || 'Unknown';
     },
 
     toggleStatusLabel() {
@@ -132,6 +151,10 @@ export default {
 
     handleEdit() {
       this.$emit('edit', this.workspace.id);
+    },
+
+    handleShare() {
+      this.$emit('share', this.workspace.id);
     },
 
     handleToggleStatus() {

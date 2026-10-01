@@ -4,8 +4,14 @@ import previewService from '@/services/preview.service';
 import { useWorkspacesStore } from './workspaces';
 import { useNotificationsStore } from './notifications';
 
+import { EVENTS, on } from '@/services/events';
+
+// A refresh requested while one is running; a queued build wins over queued fetches
+let queued = null; // 'build' | 'fetch' | null
+// Bumped by reset(): a request started before it must not write its result into the next workspace
+let resetCount = 0;
+
 const getDefaults = () => ({
-  selectedPfs: null,
   previewHtml: '',
   // Increments on every regeneration, even when the HTML is unchanged
   // (e.g. only an asset was deleted). Watch this instead of previewHtml.
@@ -19,7 +25,8 @@ export const usePreviewStore = defineStore('preview', {
 
   getters: {
     hasPreview: (state) => !!state.previewHtml,
-    hasSelectedPfs: (state) => Array.isArray(state.selectedPfs) && state.selectedPfs.length > 0,
+    // The workspace's PFS list is the preview selection: the owner saves it, everyone follows it
+    hasSelectedPfs: () => (useWorkspacesStore().currentWorkspace?.pfs?.length ?? 0) > 0,
   },
 
   actions: {
@@ -27,24 +34,17 @@ export const usePreviewStore = defineStore('preview', {
       this.scrollPosition = [x, y];
     },
 
-    /**
-     * Set the selected PFS
-     * @param {Array} pfs - Array of PFS identifiers
-     */
-    setSelectedPfs(pfs) {
-      this.selectedPfs = pfs;
-    },
-
-    /**
-     * Generate preview for the selected PFS
-     * @returns {Promise<string>} The generated HTML
-     */
     setPreviewHtml(html) {
       this.previewHtml = html;
       this.previewGeneration++;
     },
 
-    async generatePreview() {
+    /**
+     * Only the owner builds; everyone else, and the owner's other tabs on `preview.generated`,
+     * fetches the owner's last build.
+     * @param {{build?: boolean}} [options] `build: false` fetches even in an owner tab
+     */
+    async generatePreview({ build = true } = {}) {
       if (!this.hasSelectedPfs) {
         this.setPreviewHtml('');
         return;
@@ -52,86 +52,94 @@ export const usePreviewStore = defineStore('preview', {
 
       const workspacesStore = useWorkspacesStore();
       const notifications = useNotificationsStore();
-      const workspaceId = workspacesStore.currentWorkspace?.id;
+      const workspace = workspacesStore.currentWorkspace;
 
-      if (!workspaceId) {
+      if (!workspace?.id) {
         notifications.error('No workspace selected');
         return;
       }
 
+      const shouldBuild = build && workspacesStore.isOwner;
+      const started = resetCount;
       this.isGenerating = true;
       try {
-        this.setPreviewHtml(await previewService.generatePreview(workspaceId, this.selectedPfs));
+        const html = shouldBuild
+          ? await previewService.generatePreview(workspace.id, workspace.pfs)
+          : await previewService.fetchCurrentPreview(workspace.id);
+        if (started === resetCount) {
+          this.setPreviewHtml(html);
+        }
       } catch (error) {
-        notifications.error(`Failed to generate preview: ${error.message}`);
+        if (started !== resetCount) {
+          return;
+        }
+        // No build for this list yet: the owner's next build arrives as preview.generated
+        if (error.status !== 404 || shouldBuild) {
+          notifications.error(`Failed to generate preview: ${error.message}`);
+        }
         this.setPreviewHtml('');
       } finally {
-        this.isGenerating = false;
+        if (started === resetCount) {
+          this.isGenerating = false;
+        }
       }
     },
 
     /**
-     * Reset the store to defaults
+     * Regenerate the preview, coalescing concurrent requests: while a generation is running,
+     * further requests fold into a single follow-up run (e.g. saveAll of N files regenerates
+     * once or twice instead of N times).
+     * @param {{fetchOnly?: boolean}} [options] fetch the owner's last build instead of building
      */
+    async requestPreviewRefresh({ fetchOnly = false } = {}) {
+      if (this.isGenerating) {
+        queued = queued === 'build' || !fetchOnly ? 'build' : 'fetch';
+        return;
+      }
+      let build = !fetchOnly;
+      do {
+        queued = null;
+        await this.generatePreview({ build });
+        build = queued === 'build';
+      } while (queued);
+    },
+
     reset() {
+      queued = null;
+      resetCount++;
       Object.assign(this, getDefaults());
     },
   },
 });
 
-export function filesPreviewSyncPlugin({ store }) {
-  if (store.$id !== 'files') {
+let listenersRegistered = false;
+
+/**
+ * The owner's tab that changed a file rebuilds; everyone else refreshes from the owner's build
+ * on `preview.generated`. Fire-and-forget on purpose: generation can be slow and must not block
+ * the event queue; `requestPreviewRefresh` coalesces overlapping requests.
+ */
+export function registerPreviewEventListeners() {
+  if (listenersRegistered) {
     return;
   }
+  listenersRegistered = true;
 
-  store.$onAction(({ name, args, after }) => {
-    const preview = usePreviewStore();
-    after(async () => {
-      // Regenerate preview
-      switch (name) {
-        case 'createFile':
-        case 'renameFile':
-        case 'deleteFile':
-        case 'save':
-        case 'revertFile': {
-          try {
-            await preview.generatePreview();
-          } catch (error) {
-            useNotificationsStore().error(
-              'Updating preview after file operation failed: ' + error.message,
-            );
-          }
-          break;
-        }
-      }
+  on('file.*', (event) => {
+    if (event.type === EVENTS.FILE_COMMITTED) {
+      return; // Commits don't change file contents, so the preview is unaffected.
+    }
+    if (event.source !== 'local' || !useWorkspacesStore().isOwner) {
+      return; // The tab that made the change builds; its build ends in preview.generated
+    }
+    usePreviewStore().requestPreviewRefresh();
+  });
 
-      // Refresh preview options
-      switch (name) {
-        case 'createNewPfs':
-        case 'renameFile':
-        case 'deleteFile':
-        case 'revertFile': {
-          try {
-            if (name !== 'createNewPfs') {
-              const [filePath] = args;
-              if (filePath && !filePath.startsWith('/pfs/')) {
-                break; // Only refresh preview options if a pfs file was changed
-              }
-            }
+  on(EVENTS.PREVIEW_GENERATED, () => {
+    usePreviewStore().requestPreviewRefresh({ fetchOnly: true });
+  });
 
-            const workspaces = useWorkspacesStore();
-            const workspaceId = workspaces.currentWorkspace?.id;
-            if (workspaceId) {
-              await workspaces.fetchPfs(workspaceId);
-            }
-          } catch (error) {
-            useNotificationsStore().error(
-              'Updating preview options after file operation failed: ' + error.message,
-            );
-          }
-          break;
-        }
-      }
-    });
+  on(EVENTS.REALTIME_RESYNCED, () => {
+    usePreviewStore().requestPreviewRefresh();
   });
 }

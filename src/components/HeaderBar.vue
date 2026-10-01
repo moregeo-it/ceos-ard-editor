@@ -9,6 +9,10 @@
 
     <v-spacer />
 
+    <div class="d-flex align-center ga-2 mr-4">
+      <slot name="actions"></slot>
+    </div>
+
     <UserMenu />
   </v-app-bar>
 </template>
