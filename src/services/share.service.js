@@ -9,7 +9,7 @@ async function parseOrThrow(response) {
     return data;
   }
   const err = new Error(
-    data.detail || data.message || `Request failed with status ${response.status}`,
+    data.detail || data.message || data.error || `Request failed with status ${response.status}`,
   );
   err.status = response.status;
   throw err;

@@ -120,7 +120,7 @@
               invite link and will receive the permissions assigned to that link.<br /><br />
               Deleting an invite link prevents new people from joining, but it does not revoke
               access for people who have already joined. They will continue to have access and
-              appear under “People with access” To revoke their access, you must remove them from
+              appear under “People with access”. To revoke their access, you must remove them from
               that list; deleting the invite link alone is not sufficient.
             </p>
 
