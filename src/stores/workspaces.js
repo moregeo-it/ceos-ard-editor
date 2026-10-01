@@ -39,12 +39,11 @@ export const useWorkspacesStore = defineStore('workspaces', {
       return state.currentWorkspace?.viewer_role === 'owner';
     },
 
-    // True for readonly collaborators, for anyone browsing an archived workspace (mirrors the
-    // pre-existing archived-browsing behavior owners already relied on), and while the role is
-    // still unknown, so nothing ever renders as editable before the workspace has loaded.
+    // Only the owner edits, and nobody while the workspace is archived or the role is still
+    // unknown, so nothing ever renders as editable before the workspace has loaded.
     isReadOnly() {
       if (!this.viewerRole) return true;
-      return this.viewerRole === 'readonly' || this.isArchived;
+      return this.viewerRole !== 'owner' || this.isArchived;
     },
 
     activeWorkspaces: (state) => {
@@ -262,6 +261,12 @@ export function registerWorkspacesEventListeners() {
     if (workspace && event.fields?.includes('pfs')) {
       usePreviewStore().requestPreviewRefresh({ fetchOnly: true });
     }
+  });
+
+  // The owner changed this user's mode; viewer_role on the refetched workspace drives the UI
+  on(EVENTS.SHARE_UPDATED, async () => {
+    await useWorkspacesStore().refreshCurrentWorkspace();
+    useNotificationsStore().info('The owner changed your access to this workspace.');
   });
 
   // Files changed on disk beyond the single-file events. The tab that triggered the sync refreshes

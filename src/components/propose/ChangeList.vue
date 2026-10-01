@@ -151,7 +151,9 @@ export default {
       try {
         if (commit.merged_remote) {
           await this.editorStore.refreshAfterRemoteUpdate();
-          // No preview pane in this view; drop the stale one instead of regenerating it
+          // The merge changed files behind the cached preview and nothing else refreshes it from
+          // here. This view has no preview pane, so drop it: the editor view rebuilds it when
+          // opened again instead of building now for nothing
           this.previewStore.setPreviewHtml('');
           // The merge added commits beyond the one just made
           await this.proposalStore.fetchCommits(workspaceId);

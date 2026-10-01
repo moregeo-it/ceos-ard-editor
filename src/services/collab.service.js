@@ -22,7 +22,7 @@ function toWebSocketUrl(httpUrl) {
  * @param {Object} params
  * @param {string} params.workspaceId
  * @param {string} params.token - Raw JWT access token (not the "Bearer " header form).
- * @param {string} [params.clientId] - This page load's id, see `@/services/client-id`.
+ * @param {string} [params.clientId] - This page load's id, see `@/utils/client-id`.
  * @param {(event: Object) => void} params.onEvent - Called with each parsed event envelope.
  * @param {() => void} [params.onOpen]
  * @param {(info: {code: number, reason: string}) => void} [params.onClose] - Any close not
