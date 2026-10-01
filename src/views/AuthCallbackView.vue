@@ -41,6 +41,7 @@ import { useAuthStore } from '@/stores/auth';
 import authService from '@/services/auth.service';
 
 import { useNotificationsStore } from '@/stores/notifications';
+import { useShareStore } from '@/stores/share';
 
 export default {
   name: 'AuthCallbackView',
@@ -100,7 +101,14 @@ export default {
 
         // Normal flow - store auth and navigate
         authStore.handleAuthCallback(searchParams);
-        this.$router.push({ name: 'workspaces' });
+
+        const shareStore = useShareStore();
+        const pendingShareToken = shareStore.consumePendingShareToken();
+        if (pendingShareToken) {
+          this.$router.push({ name: 'share', params: { token: pendingShareToken } });
+        } else {
+          this.$router.push({ name: 'workspaces' });
+        }
       } catch (error) {
         const notifications = useNotificationsStore();
         notifications.error(`Authentication failed. Please try again. Error: ${error.message}`);

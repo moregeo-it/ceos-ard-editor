@@ -1,4 +1,5 @@
 import { useAuthStore } from '@/stores/auth';
+import { CLIENT_ID, CLIENT_ID_HEADER } from '@/utils/client-id';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -25,6 +26,8 @@ export async function fetchWithAuth(endpoint, options = {}) {
     'Content-Type': 'application/json',
     ...options.headers,
     Authorization: authStore.authorizationHeader,
+    // Realtime echo filter: this tab's own changes are left out of its socket
+    [CLIENT_ID_HEADER]: CLIENT_ID,
   };
 
   const response = await fetch(url, { ...options, headers });
