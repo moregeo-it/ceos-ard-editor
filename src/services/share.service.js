@@ -3,6 +3,18 @@ import { CLIENT_ID, CLIENT_ID_HEADER } from '@/utils/client-id';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
+async function parseOrThrow(response) {
+  const data = await response.json().catch(() => ({}));
+  if (response.ok) {
+    return data;
+  }
+  const err = new Error(
+    data.detail || data.message || data.error || `Request failed with status ${response.status}`,
+  );
+  err.status = response.status;
+  throw err;
+}
+
 export default {
   /**
    * List all direct shares (invites by GitHub username) for a workspace. Owner only.
@@ -47,13 +59,6 @@ export default {
   },
 
   /**
-   * Update a share link's mode, active state, and/or expiry. Owner only.
-   */
-  async updateShareLink(workspaceId, linkId, updates) {
-    return api.patch(`/workspaces/${workspaceId}/share-links/${linkId}`, updates);
-  },
-
-  /**
    * Permanently delete a share link. Owner only.
    */
   async deleteShareLink(workspaceId, linkId) {
@@ -61,18 +66,20 @@ export default {
   },
 
   /**
-   * Redeem a share link. Works whether or not the caller is authenticated - unlike the rest of
-   * this service, this does NOT go through the shared `api` helper (which requires an existing
-   * session), since anonymous visitors must be able to see a preview before logging in.
-   *
-   * Returns either:
-   * - { authenticated: true, share, workspace } on success (200)
-   * - { authenticated: false, preview } when the caller isn't logged in yet (401)
-   *
-   * Throws for 403 (access revoked) and 404 (invalid/expired link).
+   * What a link leads to, for visitors who aren't logged in. Public, so it bypasses the `api`
+   * helper (which needs a session). Throws with `status` 404 for an invalid or expired link.
+   */
+  async getShareLinkPreview(token) {
+    const response = await fetch(`${API_BASE_URL}/share-links/${encodeURIComponent(token)}`);
+    return parseOrThrow(response);
+  },
+
+  /**
+   * Grant the logged-in user the link's access; resolves to `{ share, workspace }`. The session
+   * cookie authenticates the call, so this also bypasses the `api` helper and throws with
+   * `status` 401 (not logged in), 403 (access revoked) or 404 (invalid/expired link).
    */
   async redeemShareLink(token) {
-    // The session cookie, if any, decides whether the caller counts as logged in
     const response = await fetch(
       `${API_BASE_URL}/share-links/${encodeURIComponent(token)}/redeem`,
       {
@@ -81,21 +88,6 @@ export default {
         headers: { 'Content-Type': 'application/json', [CLIENT_ID_HEADER]: CLIENT_ID },
       },
     );
-
-    const data = await response.json().catch(() => ({}));
-
-    if (response.status === 200) {
-      return { authenticated: true, share: data.share, workspace: data.workspace };
-    }
-
-    if (response.status === 401) {
-      return { authenticated: false, preview: data };
-    }
-
-    const message =
-      data.detail || data.message || data.error || `Request failed with status ${response.status}`;
-    const err = new Error(message);
-    err.status = response.status;
-    throw err;
+    return parseOrThrow(response);
   },
 };
