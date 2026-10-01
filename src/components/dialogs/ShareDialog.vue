@@ -2,11 +2,11 @@
   <v-dialog v-model="show" :width="sizes.medium" scrollable>
     <v-card>
       <v-card-title>Share "{{ workspace.title }}"</v-card-title>
-      <v-card-subtitle>Manage who can view this workspace.</v-card-subtitle>
+      <v-card-subtitle>Manage who can access this workspace.</v-card-subtitle>
 
       <v-tabs v-model="tab">
         <v-tab value="people">People with access</v-tab>
-        <v-tab value="link">Share link</v-tab>
+        <v-tab value="link">Share a link</v-tab>
       </v-tabs>
 
       <v-card-text style="max-height: 60vh">
@@ -115,6 +115,14 @@
                 Create link
               </v-btn>
             </v-form>
+            <p class="text-body-2 text-medium-emphasis mt-3 mb-0">
+              You can manage invite links here. Anyone with a GitHub account can join using an
+              invite link and will receive the permissions assigned to that link.<br /><br />
+              Deleting an invite link prevents new people from joining, but it does not revoke
+              access for people who have already joined. They will continue to have access and
+              appear under “People with access”. To revoke their access, you must remove them from
+              that list; deleting the invite link alone is not sufficient.
+            </p>
 
             <v-list class="mt-4">
               <v-list-item v-if="shareStore.isLoadingShareLinks">
@@ -133,16 +141,6 @@
                   <span v-else>Never expires</span>
                 </v-list-item-subtitle>
                 <template v-slot:append>
-                  <v-switch
-                    :aria-label="link.isActive ? 'Deactivate share link' : 'Activate share link'"
-                    :model-value="link.isActive"
-                    color="primary"
-                    density="compact"
-                    hide-details
-                    class="mr-2"
-                    :disabled="shareStore.isMutating"
-                    @update:model-value="(active) => toggleLinkActive(link, active)"
-                  />
                   <v-tooltip text="Copy link" location="top">
                     <template v-slot:activator="{ props }">
                       <v-btn
@@ -310,14 +308,6 @@ export default {
         this.notificationsStore.error(`Failed to create share link: ${error.message}`);
       } finally {
         this.isCreatingLink = false;
-      }
-    },
-
-    async toggleLinkActive(link, isActive) {
-      try {
-        await this.shareStore.updateShareLink(this.workspace.id, link.id, { isActive });
-      } catch (error) {
-        this.notificationsStore.error(`Failed to update share link: ${error.message}`);
       }
     },
 
