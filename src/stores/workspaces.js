@@ -172,10 +172,11 @@ export const useWorkspacesStore = defineStore('workspaces', {
 
     async fetchPfs(workspaceId) {
       const pfs = await workspaceService.fetchPfs(workspaceId);
-      if (workspaceId) {
-        this.workspacePfsOptions = pfs;
-      } else {
+      if (!workspaceId) {
         this.pfsOptions = pfs;
+      } else if (this.currentWorkspace?.id === workspaceId) {
+        // A late answer must not land in the workspace opened meanwhile
+        this.workspacePfsOptions = pfs;
       }
     },
 

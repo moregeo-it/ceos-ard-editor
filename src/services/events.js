@@ -2,8 +2,8 @@
  * Central client-side event bus.
  *
  * Event names and payloads mirror the server's realtime WebSocket envelope (`WorkspaceEvent` in
- * `ceos-ard-server/openapi.yaml` and `app/schemas/events.py`); `npm run check:events` keeps the
- * three in sync. Client-only additions: `source` (`'local'` for this tab's own store actions,
+ * `ceos-ard-server/openapi.yaml` and `app/schemas/events.py`); `npm run check:events` checks that
+ * the event names match, payloads are reviewed by hand. Client-only additions: `source` (`'local'` for this tab's own store actions,
  * `'remote'` for events forwarded from the WebSocket) and the `realtime.*` events.
  *
  * Stores subscribe in a `register*EventListeners()` called once from main.js. Only user-initiated
