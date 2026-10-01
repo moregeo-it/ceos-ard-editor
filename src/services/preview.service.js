@@ -7,7 +7,7 @@ export default {
   async generatePreview(workspaceId, pfs) {
     const query = new URLSearchParams();
     pfs.forEach((p) => query.append('pfs', p));
-    return api.get(`/workspaces/${workspaceId}/previews?${query}`);
+    return api.post(`/workspaces/${workspaceId}/previews?${query}`);
   },
 
   /**

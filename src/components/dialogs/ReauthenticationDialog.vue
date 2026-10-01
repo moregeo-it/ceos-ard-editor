@@ -146,7 +146,13 @@ export default {
       );
 
       if (confirmed) {
-        this.authStore.logout();
+        this.authStore
+          .logout()
+          .catch(() =>
+            this.notificationsStore.error(
+              'Logout failed, you are still logged in. Please try again.',
+            ),
+          );
       }
     },
   },

@@ -98,6 +98,10 @@ export default {
         const result = await this.shareStore.redeemShareLink(this.token);
 
         if (result.authenticated) {
+          if (!this.authStore.isAuthenticated) {
+            // The cookie outlived this browser's session info (e.g. cleared site storage)
+            await this.authStore.completeLogin();
+          }
           this.$router.replace({ name: 'editor', params: { id: result.workspace.id } });
           return;
         }

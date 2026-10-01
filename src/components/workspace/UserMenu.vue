@@ -57,11 +57,7 @@ export default {
         await this.authStore.logout();
         this.notificationsStore.success('Successfully logged out');
       } catch {
-        // Even if logout fails on backend, we still clear local auth
-        // Just notify user there might have been an issue
-        if (this.authStore.error) {
-          this.notificationsStore.warning('Logged out locally. Server logout may have failed.');
-        }
+        this.notificationsStore.error('Logout failed, you are still logged in. Please try again.');
       }
     },
   },

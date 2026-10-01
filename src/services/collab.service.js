@@ -16,12 +16,10 @@ function toWebSocketUrl(httpUrl) {
 /**
  * Open a WebSocket connection to a workspace's real-time change stream.
  *
- * The JWT goes in the `authorization` query param (browsers can't set headers on a handshake; a
- * session cookie will replace it, see ceos-ard-server#98). The client never sends anything.
+ * The browser authenticates the handshake with the session cookie. The client never sends anything.
  *
  * @param {Object} params
  * @param {string} params.workspaceId
- * @param {string} params.token - Raw JWT access token (not the "Bearer " header form).
  * @param {string} [params.clientId] - This page load's id, see `@/utils/client-id`.
  * @param {(event: Object) => void} params.onEvent - Called with each parsed event envelope.
  * @param {() => void} [params.onOpen]
@@ -30,18 +28,8 @@ function toWebSocketUrl(httpUrl) {
  *   reconnect logic.
  * @returns {{ close: () => void }}
  */
-export function openWorkspaceConnection({
-  workspaceId,
-  token,
-  clientId,
-  onEvent,
-  onOpen,
-  onClose,
-}) {
-  const params = new URLSearchParams({ authorization: token });
-  if (clientId) {
-    params.set('client_id', clientId);
-  }
+export function openWorkspaceConnection({ workspaceId, clientId, onEvent, onOpen, onClose }) {
+  const params = new URLSearchParams(clientId ? { client_id: clientId } : {});
   const socket = new WebSocket(
     `${toWebSocketUrl(API_BASE_URL)}/workspaces/${workspaceId}/ws?${params}`,
   );

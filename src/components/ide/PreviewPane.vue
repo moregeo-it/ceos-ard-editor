@@ -69,7 +69,6 @@
 </template>
 
 <script>
-import { useAuthStore } from '@/stores/auth';
 import { useEditorStore } from '@/stores/editor';
 import { usePreviewStore } from '@/stores/preview';
 import previewService from '@/services/preview.service';
@@ -105,9 +104,6 @@ export default {
     };
   },
   computed: {
-    authStore() {
-      return useAuthStore();
-    },
     editorStore() {
       return useEditorStore();
     },
@@ -213,8 +209,6 @@ export default {
       return URL.parse(url) !== null;
     },
     enhanceHtml(doc) {
-      const token = this.authStore.accessToken;
-
       // Fix relative links and target
       const links = doc.querySelectorAll('a[href]');
       links.forEach((link) => {
@@ -227,15 +221,15 @@ export default {
         }
       });
 
+      // Point relative assets at the API; the browser sends the session cookie with them
+      const assetUrl = (path) => `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${path}`;
+
       // Fix relative images
       const images = doc.querySelectorAll('img[src]');
       images.forEach((img) => {
         const src = img.getAttribute('src');
         if (src && !this.isAbsoluteUrl(src)) {
-          img.setAttribute(
-            'src',
-            `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${src}?authorization=${token}`,
-          );
+          img.setAttribute('src', assetUrl(src));
         }
       });
 
@@ -244,10 +238,7 @@ export default {
       stylesheets.forEach((sheet) => {
         const href = sheet.getAttribute('href');
         if (href && !this.isAbsoluteUrl(href)) {
-          sheet.setAttribute(
-            'href',
-            `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${href}?authorization=${token}`,
-          );
+          sheet.setAttribute('href', assetUrl(href));
         }
       });
 

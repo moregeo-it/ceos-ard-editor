@@ -4,6 +4,7 @@ import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
 import vuetify from './plugins/vuetify';
+import { useAuthStore } from './stores/auth';
 import { setEventErrorHandler } from './services/events';
 import { registerFilesEventListeners } from './stores/files';
 import { registerEditorEventListeners } from './stores/editor';
@@ -26,5 +27,6 @@ registerFilesEventListeners();
 registerEditorEventListeners();
 registerPreviewEventListeners();
 registerWorkspacesEventListeners();
+useAuthStore().listenForOtherTabs();
 
 app.mount('body');
