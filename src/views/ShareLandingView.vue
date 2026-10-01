@@ -90,7 +90,14 @@ export default {
     async open() {
       this.loading = true;
       try {
-        if (this.authStore.isAuthenticated) {
+        // The cookie may still be valid without local session info (cleared or disabled storage)
+        const loggedIn =
+          this.authStore.isAuthenticated ||
+          (await this.authStore.completeLogin().then(
+            () => true,
+            () => false,
+          ));
+        if (loggedIn) {
           try {
             const { workspace } = await this.shareStore.redeemShareLink(this.token);
             this.$router.replace({ name: 'editor', params: { id: workspace.id } });
