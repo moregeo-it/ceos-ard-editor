@@ -18,13 +18,7 @@
               <p class="text-body-1 text-medium-emphasis mb-1">
                 Shared by {{ preview.ownerDisplayName }}
               </p>
-              <div v-if="!preview.isActive" class="mb-4">
-                <v-alert type="warning" variant="tonal">
-                  This share link is no longer active.
-                </v-alert>
-              </div>
               <v-btn
-                v-else
                 color="primary"
                 size="large"
                 :prepend-icon="icons.github"
@@ -84,7 +78,7 @@ export default {
   },
 
   async created() {
-    await this.redeem();
+    await this.open();
   },
 
   methods: {
@@ -92,21 +86,23 @@ export default {
       return shareModeLabel(mode);
     },
 
-    async redeem() {
+    /** Logged in: redeem and enter the workspace. Otherwise show what the link leads to. */
+    async open() {
       this.loading = true;
       try {
-        const result = await this.shareStore.redeemShareLink(this.token);
-
-        if (result.authenticated) {
-          if (!this.authStore.isAuthenticated) {
-            // The cookie outlived this browser's session info (e.g. cleared site storage)
-            await this.authStore.completeLogin();
+        if (this.authStore.isAuthenticated) {
+          try {
+            const { workspace } = await this.shareStore.redeemShareLink(this.token);
+            this.$router.replace({ name: 'editor', params: { id: workspace.id } });
+            return;
+          } catch (err) {
+            if (err.status !== 401) {
+              throw err;
+            }
+            // The session ended on the server: carry on as a visitor
           }
-          this.$router.replace({ name: 'editor', params: { id: result.workspace.id } });
-          return;
         }
-
-        this.preview = result.preview;
+        this.preview = await this.shareStore.fetchShareLinkPreview(this.token);
       } catch (err) {
         if (err.status === 403) {
           this.error = {

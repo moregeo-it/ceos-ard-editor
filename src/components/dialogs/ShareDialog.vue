@@ -115,6 +115,12 @@
                 Create link
               </v-btn>
             </v-form>
+            <p class="text-body-2 text-medium-emphasis mt-3 mb-0">
+              Anyone with the link can open this workspace with the access you choose: logged-in
+              users get in right away, others sign in with GitHub first. Deleting the link stops new
+              people from joining; those who already joined keep their access and appear under
+              "People with access".
+            </p>
 
             <v-list class="mt-4">
               <v-list-item v-if="shareStore.isLoadingShareLinks">
@@ -133,16 +139,6 @@
                   <span v-else>Never expires</span>
                 </v-list-item-subtitle>
                 <template v-slot:append>
-                  <v-switch
-                    :aria-label="link.isActive ? 'Deactivate share link' : 'Activate share link'"
-                    :model-value="link.isActive"
-                    color="primary"
-                    density="compact"
-                    hide-details
-                    class="mr-2"
-                    :disabled="shareStore.isMutating"
-                    @update:model-value="(active) => toggleLinkActive(link, active)"
-                  />
                   <v-tooltip text="Copy link" location="top">
                     <template v-slot:activator="{ props }">
                       <v-btn
@@ -310,14 +306,6 @@ export default {
         this.notificationsStore.error(`Failed to create share link: ${error.message}`);
       } finally {
         this.isCreatingLink = false;
-      }
-    },
-
-    async toggleLinkActive(link, isActive) {
-      try {
-        await this.shareStore.updateShareLink(this.workspace.id, link.id, { isActive });
-      } catch (error) {
-        this.notificationsStore.error(`Failed to update share link: ${error.message}`);
       }
     },
 
