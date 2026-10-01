@@ -3,7 +3,7 @@
     <v-card>
       <v-card-title class="text-h5 d-flex align-center">
         <v-icon color="warning" :icon="icons.clockAlert" start class="mr-2" />
-        Session Expired
+        {{ title }}
       </v-card-title>
 
       <v-card-text class="pt-4">
@@ -19,9 +19,7 @@
           </ol>
         </v-alert>
 
-        <p class="text-body-1 mb-3">
-          Your session has expired. Please reauthenticate to continue working.
-        </p>
+        <p class="text-body-1 mb-3">{{ message }}</p>
 
         <v-alert v-if="unsavedChanges > 0" type="info" variant="tonal" density="compact">
           <v-icon size="small" :icon="icons.contentSave" class="mr-2" />
@@ -29,14 +27,14 @@
           <strong>{{ unsavedChanges }} unsaved change{{ unsavedChanges > 1 ? 's' : '' }}</strong>
         </v-alert>
 
-        <p class="text-body-2 text-medium-emphasis mt-3">
-          Your unsaved work will be preserved during authentication.
+        <p v-if="!otherAccount" class="text-body-2 text-medium-emphasis mt-3">
+          Your unsaved work is kept while you log in.
         </p>
       </v-card-text>
 
       <v-card-actions class="px-6 pb-4">
         <v-btn color="error" variant="text" :disabled="isAuthenticating" @click="handleCancel">
-          Logout
+          {{ otherAccount ? 'Discard and reload' : 'Logout' }}
         </v-btn>
 
         <v-spacer />
@@ -49,7 +47,7 @@
           :loading="isAuthenticating"
           @click="handleReauthenticate"
         >
-          Reauthenticate with GitHub
+          {{ otherAccount ? `Log in again as ${authStore.username}` : 'Log in again with GitHub' }}
         </v-btn>
       </v-card-actions>
 
@@ -103,6 +101,33 @@ export default {
     unsavedChanges() {
       return this.editorStore.opened.filter((file) => this.editorStore.changed[file.path]).length;
     },
+
+    otherAccount() {
+      return this.authStore.otherAccount;
+    },
+
+    title() {
+      switch (this.authStore.reauthReason) {
+        case 'logged_out':
+          return 'Logged out in another tab';
+        case 'other_account':
+          return 'Another account is logged in';
+        default:
+          return 'Session expired';
+      }
+    },
+
+    message() {
+      const me = this.authStore.username;
+      switch (this.authStore.reauthReason) {
+        case 'logged_out':
+          return `You were logged out in another tab. Log in again as ${me} to keep working here.`;
+        case 'other_account':
+          return `${this.otherAccount} is now logged in in this browser. The unsaved changes here belong to ${me} and can't be saved to that account.`;
+        default:
+          return 'Your session has expired. Log in again to continue working.';
+      }
+    },
   },
 
   methods: {
@@ -114,9 +139,15 @@ export default {
         // Attempt popup authentication with GitHub
         const authData = await authService.reauthenticateWithPopup('github');
 
-        // Success - update auth store
         this.authStore.updateAuthAfterReauth(authData);
-        this.notificationsStore.success('Successfully reauthenticated');
+        if (this.authStore.isPendingReauth) {
+          // The popup logged in another account; the dialog now says so
+          this.notificationsStore.warning(
+            `Logged in as ${authData.username}, not ${this.authStore.username}`,
+          );
+        } else {
+          this.notificationsStore.success('Logged in again');
+        }
 
         // Reset state
         this.isAuthenticating = false;
@@ -138,6 +169,17 @@ export default {
     },
 
     handleCancel() {
+      if (this.otherAccount) {
+        const n = this.unsavedChanges;
+        if (
+          confirm(
+            `Discard ${n} unsaved change${n > 1 ? 's' : ''} and continue as ${this.otherAccount}?`,
+          )
+        ) {
+          window.location.reload();
+        }
+        return;
+      }
       const confirmed = confirm(
         'Are you sure you want to logout?\n\n' +
           (this.unsavedChanges > 0

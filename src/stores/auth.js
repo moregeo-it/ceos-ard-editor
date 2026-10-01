@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import router from '@/router';
 import authService from '@/services/auth.service';
 import sessionService from '@/services/session.service';
+import { useEditorStore } from '@/stores/editor';
 
 const getDefaults = () => ({
   userId: null,
@@ -11,7 +12,13 @@ const getDefaults = () => ({
   isAuthenticated: false,
   isLoading: false,
   isPendingReauth: false,
+  // Why: 'expired', 'logged_out' (in another tab) or 'other_account' (logged in there)
+  reauthReason: null,
+  otherAccount: null,
 });
+
+// A more specific reason replaces a less specific one, never the other way round
+const REASON_RANK = { expired: 0, logged_out: 1, other_account: 2 };
 
 let listeningForOtherTabs = false;
 
@@ -124,20 +131,40 @@ export const useAuthStore = defineStore('auth', {
       sessionService.clear();
     },
 
-    setPendingReauth() {
+    /**
+     * Ask for a new login instead of giving up the page, so unsaved edits survive. `reason` tells
+     * the dialog what happened; `otherAccount` names the account another tab logged in with.
+     */
+    setPendingReauth(reason = 'expired', otherAccount = null) {
       // Nothing to renew once logged out, e.g. when another tab's logout closes this tab's socket
-      if (this.isAuthenticated) {
-        this.isPendingReauth = true;
+      if (!this.isAuthenticated) {
+        return;
       }
+      if (!this.isPendingReauth || REASON_RANK[reason] >= REASON_RANK[this.reauthReason]) {
+        this.reauthReason = reason;
+        this.otherAccount = otherAccount;
+      }
+      this.isPendingReauth = true;
     },
 
+    /** The login dialog's popup finished: continue as that account, unless the edits here belong to another. */
     updateAuthAfterReauth(session) {
+      const otherUser = session.userId !== this.userId;
+      if (otherUser && useEditorStore().hasUnsavedChanges) {
+        this.setPendingReauth('other_account', session.username);
+        return;
+      }
       this.applySession(session);
+      if (otherUser) {
+        window.location.reload();
+      }
     },
 
     /**
      * Follow logins and logouts of other tabs. A reauthentication there renews the shared cookie,
-     * so this tab takes over the new session, which also closes its login dialog.
+     * so this tab takes over the new session, which also closes its login dialog. A logout or
+     * another account's login would end this page; with unsaved edits the login dialog is shown
+     * instead, so they can still be saved.
      */
     listenForOtherTabs() {
       if (listeningForOtherTabs) {
@@ -150,12 +177,19 @@ export const useAuthStore = defineStore('auth', {
           return;
         }
         const session = sessionService.parse(event.newValue);
+        const unsaved = this.isAuthenticated && useEditorStore().hasUnsavedChanges;
         if (session && (!this.isAuthenticated || session.userId !== this.userId)) {
-          // A new login: rerun what this tab showed for the previous (or no) account, e.g. the
-          // landing page's login button or a share link's redemption
-          window.location.reload();
+          if (unsaved) {
+            this.setPendingReauth('other_account', session.username);
+          } else {
+            // A new login: rerun what this tab showed for the previous (or no) account, e.g. the
+            // landing page's login button or a share link's redemption
+            window.location.reload();
+          }
         } else if (session) {
           this._setSession(session);
+        } else if (unsaved) {
+          this.setPendingReauth('logged_out');
         } else if (this.isAuthenticated) {
           Object.assign(this, getDefaults());
           router.push({ name: 'landing' });
@@ -170,6 +204,8 @@ export const useAuthStore = defineStore('auth', {
       this.expiresAt = session.expiresAt;
       this.isAuthenticated = true;
       this.isPendingReauth = false;
+      this.reauthReason = null;
+      this.otherAccount = null;
     },
   },
 });
