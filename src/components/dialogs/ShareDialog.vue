@@ -6,7 +6,7 @@
 
       <v-tabs v-model="tab">
         <v-tab value="people">People with access</v-tab>
-        <v-tab value="link">Share link</v-tab>
+        <v-tab value="link">Share a link</v-tab>
       </v-tabs>
 
       <v-card-text style="max-height: 60vh">
