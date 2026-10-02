@@ -44,6 +44,11 @@ cp .env.example .env
 
 Update the `.env` file accordingly.
 
+The login is a session cookie set by the API, so the editor and the API must run on the same site:
+under the same registrable domain (e.g. `editor.ceos-ard.moregeo.it` and `api.ceos-ard.moregeo.it`),
+in development both on `localhost` (use `localhost` for both, not `127.0.0.1` for one of them).
+Developing in Safari over plain HTTP needs `SESSION_COOKIE_SECURE=false` on the server.
+
 ### Compile and Hot-Reload for Development
 
 ```sh

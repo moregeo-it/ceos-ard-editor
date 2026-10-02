@@ -1,9 +1,10 @@
 import { useAuthStore } from '@/stores/auth';
+import { CLIENT_ID, CLIENT_ID_HEADER } from '@/utils/client-id';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 /**
- * Fetch with automatic authentication
+ * Fetch from the API with the session cookie
  */
 export async function fetchWithAuth(endpoint, options = {}) {
   const authStore = useAuthStore();
@@ -13,8 +14,7 @@ export async function fetchWithAuth(endpoint, options = {}) {
     throw new Error('User is not authenticated');
   }
 
-  // Check if token is expired
-  if (authStore.isTokenExpired) {
+  if (authStore.isSessionExpired) {
     authStore.setPendingReauth();
     throw new Error('Session expired. Please login again.');
   }
@@ -24,10 +24,11 @@ export async function fetchWithAuth(endpoint, options = {}) {
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
-    Authorization: authStore.authorizationHeader,
+    // Realtime echo filter, and required by the server on requests that change data
+    [CLIENT_ID_HEADER]: CLIENT_ID,
   };
 
-  const response = await fetch(url, { ...options, headers });
+  const response = await fetch(url, { ...options, headers, credentials: 'include' });
 
   // Handle 401 Unauthorized
   if (response.status === 401) {
@@ -117,6 +118,18 @@ function parseErrorMessage(errorData, status) {
   }
 }
 
+// HTML (previews) as text, no content as null, anything else as JSON
+function parseBody(response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('text/html')) {
+    return response.text();
+  }
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
+    return null;
+  }
+  return response.json();
+}
+
 /**
  * Helper methods for common HTTP methods
  */
@@ -132,17 +145,7 @@ export const api = {
   },
 
   async get(endpoint, options = {}) {
-    const response = await fetchWithAuth(endpoint, { ...options, method: 'GET' });
-    const contentType = response.headers.get('content-type') || '';
-    if (contentType.includes('text/html')) {
-      return response.text();
-    }
-
-    if (response.status === 204 || response.headers.get('content-length') === '0') {
-      return null;
-    }
-
-    return response.json();
+    return parseBody(await fetchWithAuth(endpoint, { ...options, method: 'GET' }));
   },
 
   async post(endpoint, data, options = {}) {
@@ -151,7 +154,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    return response.json();
+    return parseBody(response);
   },
 
   async putRaw(endpoint, body, options = {}) {
