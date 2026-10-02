@@ -27,7 +27,10 @@ export default {
    * Grant one or more GitHub users access to a workspace. Owner only.
    */
   async createShares(workspaceId, githubUsernames, mode) {
-    return api.post(`/workspaces/${workspaceId}/shares`, { githubUsernames, mode });
+    return api.post(`/workspaces/${workspaceId}/shares`, {
+      github_usernames: githubUsernames,
+      mode,
+    });
   },
 
   /**
@@ -55,7 +58,7 @@ export default {
    * Create a signed, mode-bound share link for the workspace. Owner only.
    */
   async createShareLink(workspaceId, mode, expiresAt = null) {
-    return api.post(`/workspaces/${workspaceId}/share-links`, { mode, expiresAt });
+    return api.post(`/workspaces/${workspaceId}/share-links`, { mode, expires_at: expiresAt });
   },
 
   /**
