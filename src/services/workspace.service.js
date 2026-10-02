@@ -56,6 +56,6 @@ export default {
   async fetchPfs(workspaceId) {
     const endpoint = workspaceId ? `/workspaces/${workspaceId}/pfs` : '/pfs';
     const response = await api.get(endpoint);
-    return response?.pfsTypes || [];
+    return response?.pfs_types || [];
   },
 };
