@@ -17,9 +17,6 @@ const getDefaults = () => ({
   otherAccount: null,
 });
 
-// A more specific reason replaces a less specific one, never the other way round
-const REASON_RANK = { expired: 0, logged_out: 1, other_account: 2 };
-
 let listeningForOtherTabs = false;
 
 export const useAuthStore = defineStore('auth', {
@@ -140,7 +137,8 @@ export const useAuthStore = defineStore('auth', {
       if (!this.isAuthenticated) {
         return;
       }
-      if (!this.isPendingReauth || REASON_RANK[reason] >= REASON_RANK[this.reauthReason]) {
+      // A 401 can trail a cross-tab event, so 'expired' never replaces what another tab reported
+      if (!this.isPendingReauth || reason !== 'expired') {
         this.reauthReason = reason;
         this.otherAccount = otherAccount;
       }
