@@ -265,7 +265,7 @@ export function registerWorkspacesEventListeners() {
   });
 
   // The owner changed this user's mode; viewer_role on the refetched workspace drives the UI
-  on(EVENTS.SHARE_UPDATED, async () => {
+  on(EVENTS.COLLABORATOR_UPDATED, async () => {
     await useWorkspacesStore().refreshCurrentWorkspace();
     useNotificationsStore().info('The owner changed your access to this workspace.');
   });
@@ -286,7 +286,7 @@ export function registerWorkspacesEventListeners() {
       'Your access to this workspace has changed. Returning to your workspaces.',
     );
   };
-  on(EVENTS.SHARE_REVOKED, handleAccessLost);
+  on(EVENTS.COLLABORATOR_REVOKED, handleAccessLost);
   on(EVENTS.WORKSPACE_DELETED, handleAccessLost);
   on(EVENTS.REALTIME_ACCESS_LOST, handleAccessLost);
 }

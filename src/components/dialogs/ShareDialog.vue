@@ -39,20 +39,20 @@
                 type="submit"
                 color="primary"
                 :loading="isInviting"
-                :disabled="inviteUsernames.length === 0 || shareStore.isLoadingShares"
+                :disabled="inviteUsernames.length === 0 || shareStore.isLoadingCollaborators"
               >
                 Invite
               </v-btn>
             </v-form>
 
             <v-list class="mt-4">
-              <v-list-item v-if="shareStore.isLoadingShares">
+              <v-list-item v-if="shareStore.isLoadingCollaborators">
                 <v-progress-linear indeterminate size="24" color="primary" />
               </v-list-item>
-              <v-list-item v-else-if="shares.length === 0">
+              <v-list-item v-else-if="collaborators.length === 0">
                 <span class="text-medium-emphasis">Not shared with anyone yet.</span>
               </v-list-item>
-              <v-list-item v-for="share in shares" :key="share.id">
+              <v-list-item v-for="share in collaborators" :key="share.id">
                 <template v-slot:prepend>
                   <v-icon :icon="icons.account" />
                 </template>
@@ -110,7 +110,7 @@
                 type="submit"
                 color="primary"
                 :loading="isCreatingLink"
-                :disabled="shareStore.isLoadingShareLinks"
+                :disabled="shareStore.isLoadingShares"
               >
                 Create link
               </v-btn>
@@ -125,13 +125,13 @@
             </p>
 
             <v-list class="mt-4">
-              <v-list-item v-if="shareStore.isLoadingShareLinks">
+              <v-list-item v-if="shareStore.isLoadingShares">
                 <v-progress-circular indeterminate size="24" color="primary" />
               </v-list-item>
-              <v-list-item v-else-if="shareLinks.length === 0">
+              <v-list-item v-else-if="shares.length === 0">
                 <span class="text-medium-emphasis">No share links created yet.</span>
               </v-list-item>
-              <v-list-item v-for="link in shareLinks" :key="link.id">
+              <v-list-item v-for="link in shares" :key="link.id">
                 <v-list-item-title class="text-truncate">{{ link.url }}</v-list-item-title>
                 <v-list-item-subtitle>
                   <v-chip size="x-small" color="primary" variant="tonal" class="mr-1">
@@ -188,7 +188,7 @@ import { mdiAccountCircle, mdiClose, mdiContentCopy, mdiDelete } from '@mdi/js';
 import DialogMixin from '@/components/DialogMixin';
 import { useShareStore } from '@/stores/share';
 import { useNotificationsStore } from '@/stores/notifications';
-import { SHARE_MODES, shareModeLabel } from '@/utils/shareMode';
+import { ACCESS_MODES, shareModeLabel } from '@/utils/shareMode';
 
 export default {
   name: 'ShareDialog',
@@ -215,7 +215,7 @@ export default {
       isInviting: false,
       linkMode: 'readonly',
       isCreatingLink: false,
-      modeOptions: SHARE_MODES,
+      modeOptions: ACCESS_MODES,
     };
   },
 
@@ -226,11 +226,11 @@ export default {
     notificationsStore() {
       return useNotificationsStore();
     },
+    collaborators() {
+      return this.shareStore.collaborators;
+    },
     shares() {
       return this.shareStore.shares;
-    },
-    shareLinks() {
-      return this.shareStore.shareLinks;
     },
   },
 
@@ -243,8 +243,8 @@ export default {
       this.shareStore.setActiveWorkspace(this.workspace.id);
       try {
         await Promise.all([
+          this.shareStore.fetchCollaborators(this.workspace.id),
           this.shareStore.fetchShares(this.workspace.id),
-          this.shareStore.fetchShareLinks(this.workspace.id),
         ]);
       } catch (error) {
         this.notificationsStore.error(`Failed to load sharing info: ${error.message}`);
@@ -268,7 +268,7 @@ export default {
 
       this.isInviting = true;
       try {
-        await this.shareStore.createShares(
+        await this.shareStore.addCollaborators(
           this.workspace.id,
           this.inviteUsernames,
           this.inviteMode,
@@ -284,7 +284,7 @@ export default {
 
     async changeShareMode(share, mode) {
       try {
-        await this.shareStore.updateShare(this.workspace.id, share.id, mode);
+        await this.shareStore.updateCollaborator(this.workspace.id, share.id, mode);
       } catch (error) {
         this.notificationsStore.error(`Failed to update access: ${error.message}`);
       }
@@ -292,7 +292,7 @@ export default {
 
     async removeShare(share) {
       try {
-        await this.shareStore.revokeShare(this.workspace.id, share.id);
+        await this.shareStore.revokeCollaborator(this.workspace.id, share.id);
         this.notificationsStore.success(`Removed access for ${share.invitee_github_username}`);
       } catch (error) {
         this.notificationsStore.error(`Failed to remove access: ${error.message}`);
@@ -302,7 +302,7 @@ export default {
     async createLink() {
       this.isCreatingLink = true;
       try {
-        await this.shareStore.createShareLink(this.workspace.id, this.linkMode);
+        await this.shareStore.createShare(this.workspace.id, this.linkMode);
         this.notificationsStore.success('Share link created');
       } catch (error) {
         this.notificationsStore.error(`Failed to create share link: ${error.message}`);
@@ -313,7 +313,7 @@ export default {
 
     async deleteLink(link) {
       try {
-        await this.shareStore.deleteShareLink(this.workspace.id, link.id);
+        await this.shareStore.deleteShare(this.workspace.id, link.id);
         this.notificationsStore.success('Share link deleted');
       } catch (error) {
         this.notificationsStore.error(`Failed to delete share link: ${error.message}`);
