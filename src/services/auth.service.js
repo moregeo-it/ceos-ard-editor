@@ -64,7 +64,7 @@ export default {
   /**
    * Reauthenticate using popup window (preserves application state)
    */
-  reauthenticateWithPopup(provider) {
+  reauthenticateWithPopup(provider, { selectAccount = false } = {}) {
     return new Promise((resolve, reject) => {
       const width = 600;
       const height = 700;
@@ -72,7 +72,9 @@ export default {
       const top = window.screenY + (window.outerHeight - height) / 2;
 
       // Open OAuth endpoint in popup window
-      const authUrl = `${API_BASE_URL}/auth/login?identity_provider=${provider}`;
+      // The picker lets the user switch back to this tab's account; GitHub otherwise reuses its session
+      const prompt = selectAccount ? '&prompt=select_account' : '';
+      const authUrl = `${API_BASE_URL}/auth/login?identity_provider=${provider}${prompt}`;
       const popup = window.open(
         authUrl,
         'oauth_reauth',
