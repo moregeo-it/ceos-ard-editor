@@ -145,7 +145,7 @@ export default {
       try {
         // Attempt popup authentication with GitHub
         const authData = await authService.reauthenticateWithPopup('github', {
-          selectAccount: Boolean(this.otherAccount),
+          selectAccount: this.authStore.reauthReason !== 'expired',
         });
 
         this.authStore.updateAuthAfterReauth(authData);
