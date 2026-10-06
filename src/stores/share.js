@@ -4,10 +4,10 @@ import shareService from '@/services/share.service';
 const PENDING_SHARE_TOKEN_KEY = 'ceos_ard_editor_pending_share_token';
 
 const getDefaults = () => ({
+  collaborators: [],
   shares: [],
-  shareLinks: [],
+  isLoadingCollaborators: false,
   isLoadingShares: false,
-  isLoadingShareLinks: false,
   isMutating: false,
   activeWorkspaceId: null,
 });
@@ -28,6 +28,18 @@ export const useShareStore = defineStore('share', {
   state: () => getDefaults(),
 
   actions: {
+    async fetchCollaborators(workspaceId) {
+      this.isLoadingCollaborators = true;
+      try {
+        const response = await shareService.listCollaborators(workspaceId);
+        // Ignore responses for a workspace the dialog has since moved away from.
+        if (workspaceId !== this.activeWorkspaceId) return;
+        this.collaborators = response || [];
+      } finally {
+        if (workspaceId === this.activeWorkspaceId) this.isLoadingCollaborators = false;
+      }
+    },
+
     async fetchShares(workspaceId) {
       this.isLoadingShares = true;
       try {
@@ -37,18 +49,6 @@ export const useShareStore = defineStore('share', {
         this.shares = response || [];
       } finally {
         if (workspaceId === this.activeWorkspaceId) this.isLoadingShares = false;
-      }
-    },
-
-    async fetchShareLinks(workspaceId) {
-      this.isLoadingShareLinks = true;
-      try {
-        const response = await shareService.listShareLinks(workspaceId);
-        // Ignore responses for a workspace the dialog has since moved away from.
-        if (workspaceId !== this.activeWorkspaceId) return;
-        this.shareLinks = response || [];
-      } finally {
-        if (workspaceId === this.activeWorkspaceId) this.isLoadingShareLinks = false;
       }
     },
 
@@ -71,69 +71,69 @@ export const useShareStore = defineStore('share', {
       }
     },
 
-    createShares(workspaceId, githubUsernames, mode) {
+    addCollaborators(workspaceId, githubUsernames, mode) {
       return this._mutate(
         workspaceId,
-        () => shareService.createShares(workspaceId, githubUsernames, mode),
-        (newShares) => {
-          // Merge: replace any existing shares with the same id, prepend the rest
-          for (const share of newShares || []) {
-            if (!replaceById(this.shares, share.id, share)) {
-              this.shares.unshift(share);
+        () => shareService.addCollaborators(workspaceId, githubUsernames, mode),
+        (added) => {
+          // Merge: replace any existing collaborator with the same id, prepend the rest
+          for (const collaborator of added || []) {
+            if (!replaceById(this.collaborators, collaborator.id, collaborator)) {
+              this.collaborators.unshift(collaborator);
             }
           }
         },
       );
     },
 
-    updateShare(workspaceId, shareId, mode) {
+    updateCollaborator(workspaceId, collaboratorId, mode) {
       return this._mutate(
         workspaceId,
-        () => shareService.updateShare(workspaceId, shareId, mode),
-        (updated) => replaceById(this.shares, shareId, updated),
+        () => shareService.updateCollaborator(workspaceId, collaboratorId, mode),
+        (updated) => replaceById(this.collaborators, collaboratorId, updated),
       );
     },
 
-    revokeShare(workspaceId, shareId) {
+    revokeCollaborator(workspaceId, collaboratorId) {
       return this._mutate(
         workspaceId,
-        () => shareService.revokeShare(workspaceId, shareId),
+        () => shareService.revokeCollaborator(workspaceId, collaboratorId),
         () => {
           // Revoke returns 204 (no body). A revoked invitee isn't dropped from the list - it stays,
           // shown greyed-out as "revoked" (that's what a reload returns and what the dialog renders),
           // so flip the row's status in place instead of removing it.
-          const share = this.shares.find((s) => s.id === shareId);
-          if (share) {
-            replaceById(this.shares, shareId, { ...share, status: 'revoked' });
+          const collaborator = this.collaborators.find((c) => c.id === collaboratorId);
+          if (collaborator) {
+            replaceById(this.collaborators, collaboratorId, { ...collaborator, status: 'revoked' });
           }
         },
       );
     },
 
-    createShareLink(workspaceId, mode, expiresAt = null) {
+    createShare(workspaceId, mode, expiresAt = null) {
       return this._mutate(
         workspaceId,
-        () => shareService.createShareLink(workspaceId, mode, expiresAt),
-        (link) => this.shareLinks.unshift(link),
+        () => shareService.createShare(workspaceId, mode, expiresAt),
+        (share) => this.shares.unshift(share),
       );
     },
 
-    deleteShareLink(workspaceId, linkId) {
+    deleteShare(workspaceId, shareId) {
       return this._mutate(
         workspaceId,
-        () => shareService.deleteShareLink(workspaceId, linkId),
+        () => shareService.deleteShare(workspaceId, shareId),
         () => {
-          this.shareLinks = this.shareLinks.filter((l) => l.id !== linkId);
+          this.shares = this.shares.filter((s) => s.id !== shareId);
         },
       );
     },
 
-    async fetchShareLinkPreview(token) {
-      return shareService.getShareLinkPreview(token);
+    async fetchSharePreview(token) {
+      return shareService.getSharePreview(token);
     },
 
-    async redeemShareLink(token) {
-      return shareService.redeemShareLink(token);
+    async redeemShare(token) {
+      return shareService.redeemShare(token);
     },
 
     /**
@@ -167,8 +167,8 @@ export const useShareStore = defineStore('share', {
      */
     setActiveWorkspace(workspaceId) {
       this.activeWorkspaceId = workspaceId;
+      this.collaborators = [];
       this.shares = [];
-      this.shareLinks = [];
     },
 
     reset() {

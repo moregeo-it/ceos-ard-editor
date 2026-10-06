@@ -31,7 +31,7 @@ function toWebSocketUrl(httpUrl) {
 export function openWorkspaceConnection({ workspaceId, clientId, onEvent, onOpen, onClose }) {
   const params = new URLSearchParams(clientId ? { client_id: clientId } : {});
   const socket = new WebSocket(
-    `${toWebSocketUrl(API_BASE_URL)}/workspaces/${workspaceId}/ws?${params}`,
+    `${toWebSocketUrl(API_BASE_URL)}/workspaces/${workspaceId}/events?${params}`,
   );
   let closedByCaller = false;
   let silenceTimer = null;
