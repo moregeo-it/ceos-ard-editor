@@ -57,13 +57,6 @@ export const useAuthStore = defineStore('auth', {
     },
 
     /**
-     * Initiate Google login
-     */
-    loginWithGoogle() {
-      authService.loginWithGoogle();
-    },
-
-    /**
      * Handle OAuth callback after successful authentication
      */
     handleAuthCallback(searchParams) {

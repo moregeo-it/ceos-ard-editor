@@ -7,7 +7,7 @@ Web-based YAML editor for CEOS Analysis Ready Data (ARD) metadata.
 
 ## Features
 
-- 🔐 GitHub & Google OAuth authentication
+- 🔐 GitHub OAuth authentication
 - 📁 Workspace management
 - ✏️ CodeMirror YAML editor
 - 📊 diff2html change preview

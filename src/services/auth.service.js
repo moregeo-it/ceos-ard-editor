@@ -10,13 +10,6 @@ export default {
   },
 
   /**
-   * Initiate Google OAuth login
-   */
-  loginWithGoogle() {
-    window.location.href = `${API_BASE_URL}/auth/login?identity_provider=google`;
-  },
-
-  /**
    * Parse authentication callback URL parameters
    */
   parseAuthCallback(searchParams) {
