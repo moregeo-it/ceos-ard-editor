@@ -12,16 +12,7 @@ export default {
   },
 
   /**
-   * Initiate Google OAuth login
-   */
-  loginWithGoogle() {
-    window.location.href = `${API_BASE_URL}/auth/login?identity_provider=google`;
-  },
-
-  /**
-   * Read the session the login cookie belongs to. Rejects with `status` 401 when the browser sent
-   * no cookie, e.g. because it blocks cookies for the API host.
-   * @returns {Promise<import('./session.service').Session>}
+   * Parse authentication callback URL parameters
    */
   async fetchSession() {
     const response = await fetch(`${API_BASE_URL}/auth/user`, { credentials: 'include' });
@@ -64,7 +55,7 @@ export default {
   /**
    * Reauthenticate using popup window (preserves application state)
    */
-  reauthenticateWithPopup(provider) {
+  reauthenticateWithPopup(provider, { selectAccount = false } = {}) {
     return new Promise((resolve, reject) => {
       const width = 600;
       const height = 700;
@@ -72,7 +63,9 @@ export default {
       const top = window.screenY + (window.outerHeight - height) / 2;
 
       // Open OAuth endpoint in popup window
-      const authUrl = `${API_BASE_URL}/auth/login?identity_provider=${provider}`;
+      // The picker lets the user switch back to this tab's account; GitHub otherwise reuses its session
+      const prompt = selectAccount ? '&prompt=select_account' : '';
+      const authUrl = `${API_BASE_URL}/auth/login?identity_provider=${provider}${prompt}`;
       const popup = window.open(
         authUrl,
         'oauth_reauth',
