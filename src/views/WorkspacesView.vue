@@ -193,6 +193,7 @@ export default {
           );
           const workspace = await this.workspacesStore.createWorkspace(data);
           this.announceFork(workspace, isFirstWorkspace);
+          this.handleViewWorkspace(workspace.id);
         } else {
           await this.workspacesStore.updateWorkspace(data.id, {
             title: data.title,
