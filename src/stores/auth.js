@@ -40,13 +40,8 @@ export const useAuthStore = defineStore('auth', {
       authService.loginWithGitHub();
     },
 
-    loginWithGoogle() {
-      authService.loginWithGoogle();
-    },
-
     /**
-     * After the OAuth callback set the session cookie: learn who is logged in and until when.
-     * Rejects with `status` 401 when the browser didn't send the cookie back.
+     * Handle OAuth callback after successful authentication
      */
     async completeLogin() {
       const session = await authService.fetchSession();

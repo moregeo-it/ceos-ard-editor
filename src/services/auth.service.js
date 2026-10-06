@@ -12,16 +12,7 @@ export default {
   },
 
   /**
-   * Initiate Google OAuth login
-   */
-  loginWithGoogle() {
-    window.location.href = `${API_BASE_URL}/auth/login?identity_provider=google`;
-  },
-
-  /**
-   * Read the session the login cookie belongs to. Rejects with `status` 401 when the browser sent
-   * no cookie, e.g. because it blocks cookies for the API host.
-   * @returns {Promise<import('./session.service').Session>}
+   * Parse authentication callback URL parameters
    */
   async fetchSession() {
     const response = await fetch(`${API_BASE_URL}/auth/user`, { credentials: 'include' });

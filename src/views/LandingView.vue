@@ -30,7 +30,7 @@
               <v-col cols="12" md="6" class="d-flex flex-column align-center">
                 <p class="text-h6 mb-6 text-center">Sign in to get started</p>
 
-                <LoginButton provider="github" @click="handleGitHubLogin" />
+                <LoginButton @click="handleGitHubLogin" />
               </v-col>
             </v-row>
           </v-card>
