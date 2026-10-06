@@ -56,7 +56,7 @@
                 <template v-slot:prepend>
                   <v-icon :icon="icons.account" />
                 </template>
-                <v-list-item-title>{{ share.invitedGithubUsername }}</v-list-item-title>
+                <v-list-item-title>{{ share.invitee_github_username }}</v-list-item-title>
                 <v-list-item-subtitle>
                   <v-chip size="x-small" :color="statusColor(share.status)" variant="tonal">
                     {{ share.status }}
@@ -137,7 +137,7 @@
                   <v-chip size="x-small" color="primary" variant="tonal" class="mr-1">
                     {{ modeLabel(link.mode) }}
                   </v-chip>
-                  <span v-if="link.expiresAt">Expires {{ formatDate(link.expiresAt) }}</span>
+                  <span v-if="link.expires_at">Expires {{ formatDate(link.expires_at) }}</span>
                   <span v-else>Never expires</span>
                 </v-list-item-subtitle>
                 <template v-slot:append>
@@ -293,7 +293,7 @@ export default {
     async removeShare(share) {
       try {
         await this.shareStore.revokeShare(this.workspace.id, share.id);
-        this.notificationsStore.success(`Removed access for ${share.invitedGithubUsername}`);
+        this.notificationsStore.success(`Removed access for ${share.invitee_github_username}`);
       } catch (error) {
         this.notificationsStore.error(`Failed to remove access: ${error.message}`);
       }

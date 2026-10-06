@@ -11,12 +11,12 @@
 
             <template v-else-if="preview">
               <v-icon size="64" color="primary" class="mb-4">{{ icons.share }}</v-icon>
-              <h2 class="text-h5 mb-2">{{ preview.workspaceTitle }}</h2>
+              <h2 class="text-h5 mb-2">{{ preview.workspace_title }}</h2>
               <v-chip class="mb-6" size="small" color="primary" variant="tonal">
                 {{ modeLabel(preview.mode) }}
               </v-chip>
               <p class="text-body-1 text-medium-emphasis mb-1">
-                Shared by {{ preview.ownerDisplayName }}
+                Shared by {{ preview.owner_display_name }}
               </p>
               <v-btn
                 color="primary"
