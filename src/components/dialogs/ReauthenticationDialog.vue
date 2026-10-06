@@ -33,7 +33,13 @@
       </v-card-text>
 
       <v-card-actions class="px-6 pb-4">
-        <v-btn color="error" variant="text" :disabled="isAuthenticating" @click="handleCancel">
+        <v-btn
+          color="error"
+          variant="text"
+          class="text-none"
+          :disabled="isAuthenticating"
+          @click="handleCancel"
+        >
           {{ otherAccount ? 'Discard and reload' : 'Logout' }}
         </v-btn>
 
@@ -44,10 +50,11 @@
           variant="elevated"
           :prepend-icon="icons.github"
           size="large"
+          class="text-none"
           :loading="isAuthenticating"
           @click="handleReauthenticate"
         >
-          {{ otherAccount ? `Log in again as ${authStore.username}` : 'Log in again with GitHub' }}
+          Log in again
         </v-btn>
       </v-card-actions>
 
@@ -123,7 +130,7 @@ export default {
         case 'logged_out':
           return `You were logged out in another tab. Log in again as ${me} to keep working here.`;
         case 'other_account':
-          return `${this.otherAccount} is now logged in in this browser. The unsaved changes here belong to ${me} and can't be saved to that account.`;
+          return `${this.otherAccount} is now logged in in this browser. The unsaved changes here belong to ${me} and can't be saved to that account. Log in again as ${me} to save them; GitHub will ask which account to use.`;
         default:
           return 'Your session has expired. Log in again to continue working.';
       }
@@ -137,7 +144,9 @@ export default {
 
       try {
         // Attempt popup authentication with GitHub
-        const authData = await authService.reauthenticateWithPopup('github');
+        const authData = await authService.reauthenticateWithPopup('github', {
+          selectAccount: Boolean(this.otherAccount),
+        });
 
         this.authStore.updateAuthAfterReauth(authData);
         if (this.authStore.isPendingReauth) {
