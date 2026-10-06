@@ -188,7 +188,7 @@ import { mdiAccountCircle, mdiClose, mdiContentCopy, mdiDelete } from '@mdi/js';
 import DialogMixin from '@/components/DialogMixin';
 import { useShareStore } from '@/stores/share';
 import { useNotificationsStore } from '@/stores/notifications';
-import { SHARE_MODES, shareModeLabel } from '@/utils/shareMode';
+import { ACCESS_MODES, shareModeLabel } from '@/utils/shareMode';
 
 export default {
   name: 'ShareDialog',
@@ -215,7 +215,7 @@ export default {
       isInviting: false,
       linkMode: 'readonly',
       isCreatingLink: false,
-      modeOptions: SHARE_MODES,
+      modeOptions: ACCESS_MODES,
     };
   },
 

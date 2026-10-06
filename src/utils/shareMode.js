@@ -7,12 +7,12 @@ import { mdiEyeOutline } from '@mdi/js';
  * Phase 1 supports readonly sharing only. Additional roles (comment, edit) are
  * deferred to later phases.
  */
-export const SHARE_MODES = [{ value: 'readonly', title: 'View only', icon: mdiEyeOutline }];
+export const ACCESS_MODES = [{ value: 'readonly', title: 'View only', icon: mdiEyeOutline }];
 
 export function shareModeLabel(mode) {
-  return SHARE_MODES.find((option) => option.value === mode)?.title || mode;
+  return ACCESS_MODES.find((option) => option.value === mode)?.title || mode;
 }
 
 export function shareModeIcon(mode) {
-  return SHARE_MODES.find((option) => option.value === mode)?.icon;
+  return ACCESS_MODES.find((option) => option.value === mode)?.icon;
 }
