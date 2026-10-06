@@ -17,17 +17,17 @@ async function parseOrThrow(response) {
 
 export default {
   /**
-   * List all direct shares (invites by GitHub username) for a workspace. Owner only.
+   * List the collaborators (invited by GitHub username, or joined through a share) of a workspace. Owner only.
    */
-  async listShares(workspaceId) {
-    return api.get(`/workspaces/${workspaceId}/shares`);
+  async listCollaborators(workspaceId) {
+    return api.get(`/workspaces/${workspaceId}/collaborators`);
   },
 
   /**
    * Grant one or more GitHub users access to a workspace. Owner only.
    */
-  async createShares(workspaceId, githubUsernames, mode) {
-    return api.post(`/workspaces/${workspaceId}/shares`, {
+  async addCollaborators(workspaceId, githubUsernames, mode) {
+    return api.post(`/workspaces/${workspaceId}/collaborators`, {
       github_usernames: githubUsernames,
       mode,
     });
@@ -36,61 +36,58 @@ export default {
   /**
    * Change a collaborator's access mode. Owner only.
    */
-  async updateShare(workspaceId, shareId, mode) {
-    return api.patch(`/workspaces/${workspaceId}/shares/${shareId}`, { mode });
+  async updateCollaborator(workspaceId, collaboratorId, mode) {
+    return api.patch(`/workspaces/${workspaceId}/collaborators/${collaboratorId}`, { mode });
   },
 
   /**
    * Revoke a collaborator's access. Owner only.
    */
-  async revokeShare(workspaceId, shareId) {
+  async revokeCollaborator(workspaceId, collaboratorId) {
+    return api.delete(`/workspaces/${workspaceId}/collaborators/${collaboratorId}`);
+  },
+
+  /**
+   * List the shares (links) of a workspace. Owner only.
+   */
+  async listShares(workspaceId) {
+    return api.get(`/workspaces/${workspaceId}/shares`);
+  },
+
+  /**
+   * Create a mode-bound share (link) for the workspace. Owner only.
+   */
+  async createShare(workspaceId, mode, expiresAt = null) {
+    return api.post(`/workspaces/${workspaceId}/shares`, { mode, expires_at: expiresAt });
+  },
+
+  /**
+   * Permanently delete a share. Owner only.
+   */
+  async deleteShare(workspaceId, shareId) {
     return api.delete(`/workspaces/${workspaceId}/shares/${shareId}`);
   },
 
   /**
-   * List all share links for a workspace. Owner only.
+   * What a share leads to, for visitors who aren't logged in. Public, so it bypasses the `api`
+   * helper (which needs a session). Throws with `status` 404 for an invalid or expired share.
    */
-  async listShareLinks(workspaceId) {
-    return api.get(`/workspaces/${workspaceId}/share-links`);
-  },
-
-  /**
-   * Create a signed, mode-bound share link for the workspace. Owner only.
-   */
-  async createShareLink(workspaceId, mode, expiresAt = null) {
-    return api.post(`/workspaces/${workspaceId}/share-links`, { mode, expires_at: expiresAt });
-  },
-
-  /**
-   * Permanently delete a share link. Owner only.
-   */
-  async deleteShareLink(workspaceId, linkId) {
-    return api.delete(`/workspaces/${workspaceId}/share-links/${linkId}`);
-  },
-
-  /**
-   * What a link leads to, for visitors who aren't logged in. Public, so it bypasses the `api`
-   * helper (which needs a session). Throws with `status` 404 for an invalid or expired link.
-   */
-  async getShareLinkPreview(token) {
-    const response = await fetch(`${API_BASE_URL}/share-links/${encodeURIComponent(token)}`);
+  async getSharePreview(token) {
+    const response = await fetch(`${API_BASE_URL}/shares/${encodeURIComponent(token)}`);
     return parseOrThrow(response);
   },
 
   /**
-   * Grant the logged-in user the link's access; resolves to `{ share, workspace }`. The session
+   * Grant the logged-in user the share's access; resolves to `{ collaborator, workspace }`. The session
    * cookie authenticates the call, so this also bypasses the `api` helper and throws with
-   * `status` 401 (not logged in), 403 (access revoked) or 404 (invalid/expired link).
+   * `status` 401 (not logged in), 403 (access revoked) or 404 (invalid/expired share).
    */
-  async redeemShareLink(token) {
-    const response = await fetch(
-      `${API_BASE_URL}/share-links/${encodeURIComponent(token)}/redeem`,
-      {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', [CLIENT_ID_HEADER]: CLIENT_ID },
-      },
-    );
+  async redeemShare(token) {
+    const response = await fetch(`${API_BASE_URL}/shares/${encodeURIComponent(token)}/redeem`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', [CLIENT_ID_HEADER]: CLIENT_ID },
+    });
     return parseOrThrow(response);
   },
 };

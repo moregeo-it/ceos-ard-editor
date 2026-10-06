@@ -91,14 +91,14 @@ export default {
       this.loading = true;
       try {
         // The server knows whether there is a session: a 401 means there is none
-        const redeemed = await this.shareStore.redeemShareLink(this.token).catch((err) => {
+        const redeemed = await this.shareStore.redeemShare(this.token).catch((err) => {
           if (err.status === 401) {
             return null;
           }
           throw err;
         });
         if (!redeemed) {
-          this.preview = await this.shareStore.fetchShareLinkPreview(this.token);
+          this.preview = await this.shareStore.fetchSharePreview(this.token);
           return;
         }
         // The cookie may be valid without local session info (cleared or disabled storage)
