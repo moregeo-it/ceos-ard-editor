@@ -150,8 +150,9 @@ export default {
     // Update iframe content if preview already exists (e.g., returning from Propose view)
     if (this.previewHtml) {
       this.updateIframeContent();
-    } else {
-      await this.previewStore.generatePreview();
+    } else if (!this.previewStore.isGenerating) {
+      // Through the queue, so changes arriving during this first build still refresh it afterwards
+      await this.previewStore.requestPreviewRefresh();
     }
   },
   watch: {

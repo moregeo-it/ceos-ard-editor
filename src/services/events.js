@@ -120,7 +120,8 @@ export function enqueue(task) {
 /**
  * Skip every dispatch still waiting in the queue. Called when a workspace is left or another one
  * is opened, so events of the old workspace never reach the next one's freshly reset stores. A
- * handler already running is not interrupted; the stores discard its late writes themselves.
+ * handler already running is not interrupted (the stores discard its late writes themselves), but
+ * the event's remaining handlers are skipped.
  */
 export function discardQueuedEvents() {
   epoch++;
@@ -145,11 +146,15 @@ export function discardQueuedEvents() {
 export function emit(type, payload = {}) {
   const event = { ts: new Date().toISOString(), source: 'local', ...payload, type };
   return enqueue(async () => {
+    const dispatchedIn = epoch;
     for (const [pattern, set] of handlers) {
       if (!matches(pattern, type)) {
         continue;
       }
       for (const handler of [...set]) {
+        if (dispatchedIn !== epoch) {
+          return;
+        }
         try {
           await handler(event);
         } catch (error) {

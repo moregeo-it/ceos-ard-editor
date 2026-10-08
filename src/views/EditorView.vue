@@ -89,6 +89,8 @@ export default {
       },
       // Panes only mount after the remote sync, so the file tree reads the synced state
       syncReady: false,
+      // Set in beforeUnmount: created() and the sync may still resume after their awaits
+      unmounted: false,
     };
   },
 
@@ -132,6 +134,9 @@ export default {
     }
 
     await this.loadWorkspace();
+    if (this.unmounted) {
+      return;
+    }
     // Subscribe to live changes once the workspace has loaded. Everyone connects (the server
     // withholds a tab's own changes); read-only viewers get the owner's changes live.
     if (this.workspace) {
@@ -154,6 +159,7 @@ export default {
   },
 
   beforeUnmount() {
+    this.unmounted = true;
     this.realtimeStore.disconnect();
   },
 
@@ -170,6 +176,9 @@ export default {
       try {
         await this.workspacesStore.getWorkspace(this.workspaceId);
       } catch (error) {
+        if (this.unmounted) {
+          return;
+        }
         this.notificationsStore.error(`Failed to load workspace: ${error.message}`);
         this.$router.push({ name: 'workspaces' });
       }
@@ -195,6 +204,9 @@ export default {
     async syncRemoteChanges() {
       try {
         const result = await this.workspacesStore.syncWorkspace(this.workspaceId);
+        if (this.unmounted) {
+          return;
+        }
 
         // The fork was recreated behind the scenes. Reported because a repository appearing
         // in someone's GitHub account should never be silent, even when it is a restoration.
@@ -248,6 +260,9 @@ export default {
             break;
         }
       } catch (error) {
+        if (this.unmounted) {
+          return;
+        }
         // Never block opening the workspace on a sync failure
         this.notificationsStore.warning(
           `Could not check GitHub for remote updates: ${error.message}`,

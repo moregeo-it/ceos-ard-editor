@@ -12,6 +12,9 @@ import { useShareStore } from './share';
 import { EVENTS, discardQueuedEvents, on } from '@/services/events';
 import workspaceService from '@/services/workspace.service';
 
+// Bumped by every getWorkspace() and reset: only the latest request may set currentWorkspace
+let workspaceRequest = 0;
+
 export const useWorkspacesStore = defineStore('workspaces', {
   state: () => ({
     pfsOptions: [],
@@ -183,9 +186,13 @@ export const useWorkspacesStore = defineStore('workspaces', {
     async getWorkspace(workspaceId) {
       this.isWorkspaceLoading[workspaceId] = true;
 
+      const request = ++workspaceRequest;
       try {
-        this.currentWorkspace = await workspaceService.getWorkspace(workspaceId);
-        return this.currentWorkspace;
+        const workspace = await workspaceService.getWorkspace(workspaceId);
+        if (request === workspaceRequest) {
+          this.currentWorkspace = workspace;
+        }
+        return workspace;
       } finally {
         this.isWorkspaceLoading[workspaceId] = false;
       }
@@ -196,6 +203,7 @@ export const useWorkspacesStore = defineStore('workspaces', {
     },
 
     resetCurrentWorkspace() {
+      workspaceRequest++;
       this.currentWorkspace = null;
     },
 

@@ -2,12 +2,10 @@ import { api } from '@/utils/api';
 
 export default {
   /**
-   * Generate the preview for the given PFS list (owner only; publishes `preview.generated`)
+   * Build the preview for the workspace's saved PFS list (owner only; publishes `preview.generated`)
    */
-  async generatePreview(workspaceId, pfs) {
-    const query = new URLSearchParams();
-    pfs.forEach((p) => query.append('pfs', p));
-    return api.post(`/workspaces/${workspaceId}/previews?${query}`);
+  async generatePreview(workspaceId) {
+    return api.post(`/workspaces/${workspaceId}/previews`);
   },
 
   /**

@@ -82,7 +82,12 @@ export const useAuthStore = defineStore('auth', {
     async _confirmSession() {
       const checked = this.expiresAt;
       try {
-        this._takeOver(await authService.fetchSession());
+        const session = await authService.fetchSession();
+        // Logged out or in again meanwhile, here or in another tab: that newer state wins
+        if (this.expiresAt !== checked || sessionService.load()?.expiresAt !== checked) {
+          return;
+        }
+        this._takeOver(session);
       } catch (error) {
         if (error.status !== 401) {
           return;
