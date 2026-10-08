@@ -3,10 +3,7 @@ import { defineStore } from 'pinia';
 import { useFilesStore } from './files';
 import { useNotificationsStore } from './notifications';
 
-import { EVENTS, on } from '@/services/events';
-
-// Bumped by reset(): a request started before it must not write into the next workspace
-let resetCount = 0;
+import { EVENTS, on, workspaceSession } from '@/services/events';
 
 const getDefaults = () => ({
   opened: [], // Opened files
@@ -36,9 +33,14 @@ export const useEditorStore = defineStore('editor', {
         console.warn('File path should start with /. Prepending it automatically.');
         path = '/' + path;
       }
-      const started = resetCount;
+      const started = workspaceSession();
       let file = await files.loadFileContext(path);
-      if (started !== resetCount || !file || file.is_directory || file.status === 'deleted') {
+      if (
+        started !== workspaceSession() ||
+        !file ||
+        file.is_directory ||
+        file.status === 'deleted'
+      ) {
         return;
       }
       if (!this.opened.find((f) => f.path === path)) {
@@ -58,14 +60,14 @@ export const useEditorStore = defineStore('editor', {
       if (!this.opened.find((f) => f.path === path)) {
         return;
       }
-      const started = resetCount;
+      const started = workspaceSession();
       const before = this.data[path];
       const data = await useFilesStore().load(path);
       const isBinary = data.type.startsWith('image/') || data.type === 'application/pdf';
       const content = isBinary ? data : await data.text();
       // Edits typed while it loaded become unsaved changes instead of being overwritten
       if (
-        started !== resetCount ||
+        started !== workspaceSession() ||
         !this.opened.some((f) => f.path === path) ||
         this.data[path] !== before
       ) {
@@ -84,13 +86,13 @@ export const useEditorStore = defineStore('editor', {
       if (!this.changed[path]) {
         return false;
       }
-      const started = resetCount;
+      const started = workspaceSession();
       this.saving[path] = true;
       try {
         const data = this.data[path];
         // Preview regeneration happens via the `file.saved` event files.save() emits.
         await useFilesStore().save(path, data);
-        if (started === resetCount) {
+        if (started === workspaceSession()) {
           this.original[path] = data;
           this.changed[path] = false;
         }
@@ -98,7 +100,7 @@ export const useEditorStore = defineStore('editor', {
       } catch (error) {
         return error;
       } finally {
-        if (started === resetCount) {
+        if (started === workspaceSession()) {
           this.saving[path] = false;
         }
       }
@@ -133,10 +135,10 @@ export const useEditorStore = defineStore('editor', {
      * about (naming `source` as what they missed), and their paths returned.
      */
     async refreshAfterRemoteUpdate({ source = 'the changes from GitHub' } = {}) {
-      const started = resetCount;
+      const started = workspaceSession();
       await useFilesStore().reloadTree();
       const skipped = await this.resyncOpenFiles();
-      if (skipped.length && started === resetCount) {
+      if (skipped.length && started === workspaceSession()) {
         useNotificationsStore().warning(
           `These open files keep your unsaved changes and were not updated with ${source}: ` +
             skipped.join(', '),
@@ -152,7 +154,7 @@ export const useEditorStore = defineStore('editor', {
      */
     async resyncOpenFiles() {
       const files = useFilesStore();
-      const started = resetCount;
+      const started = workspaceSession();
       const skipped = [];
 
       for (const file of [...this.opened]) {
@@ -168,7 +170,7 @@ export const useEditorStore = defineStore('editor', {
           }
           // Also repopulates the files store, which the tabs read their state from
           const context = await files.loadFileContext(path, true);
-          if (started !== resetCount) {
+          if (started !== workspaceSession()) {
             return skipped; // The workspace was left meanwhile
           }
           const index = this.opened.findIndex((f) => f.path === path);
@@ -181,7 +183,7 @@ export const useEditorStore = defineStore('editor', {
         } catch {
           // The file is gone from the updated workspace. Keep tabs with unsaved changes open so
           // the user decides what to do with them, as for a locally deleted file.
-          if (!this.changed[path] && started === resetCount) {
+          if (!this.changed[path] && started === workspaceSession()) {
             this.close(path);
           }
         }
@@ -300,7 +302,6 @@ export const useEditorStore = defineStore('editor', {
     },
 
     reset() {
-      resetCount++;
       Object.assign(this, getDefaults());
     },
   },

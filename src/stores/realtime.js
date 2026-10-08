@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 
-import { EVENTS, emit, enqueue } from '@/services/events';
+import { EVENTS, emit, enqueue, workspaceSession } from '@/services/events';
 import { openWorkspaceConnection } from '@/services/collab.service';
 import { CLIENT_ID } from '@/utils/client-id';
 import { useAuthStore } from './auth';
@@ -204,6 +204,7 @@ export const useRealtimeStore = defineStore('realtime', {
      */
     async resync() {
       const workspaceId = this.workspaceId;
+      const started = workspaceSession();
       try {
         const workspaces = useWorkspacesStore();
         await workspaces.refreshCurrentWorkspace();
@@ -211,7 +212,7 @@ export const useRealtimeStore = defineStore('realtime', {
         await useEditorStore().refreshAfterRemoteUpdate({
           source: 'the changes made while disconnected',
         });
-        if (this.workspaceId !== workspaceId) {
+        if (started !== workspaceSession()) {
           return; // Left or switched workspaces meanwhile
         }
         emit(EVENTS.REALTIME_RESYNCED, { workspaceId });

@@ -9,11 +9,8 @@ import { useProposalStore } from './proposal';
 import { useRealtimeStore } from './realtime';
 import { useShareStore } from './share';
 
-import { EVENTS, discardQueuedEvents, on } from '@/services/events';
+import { EVENTS, on, startWorkspaceSession, workspaceSession } from '@/services/events';
 import workspaceService from '@/services/workspace.service';
-
-// Bumped by every getWorkspace() and reset: only the latest request may set currentWorkspace
-let workspaceRequest = 0;
 
 export const useWorkspacesStore = defineStore('workspaces', {
   state: () => ({
@@ -186,10 +183,10 @@ export const useWorkspacesStore = defineStore('workspaces', {
     async getWorkspace(workspaceId) {
       this.isWorkspaceLoading[workspaceId] = true;
 
-      const request = ++workspaceRequest;
+      const started = workspaceSession();
       try {
         const workspace = await workspaceService.getWorkspace(workspaceId);
-        if (request === workspaceRequest) {
+        if (started === workspaceSession()) {
           this.currentWorkspace = workspace;
         }
         return workspace;
@@ -202,14 +199,15 @@ export const useWorkspacesStore = defineStore('workspaces', {
       return workspaceService.syncWorkspace(workspaceId);
     },
 
+    /** No workspace is open any more, e.g. back on the list (also by the browser's back button). */
     resetCurrentWorkspace() {
-      workspaceRequest++;
+      startWorkspaceSession();
       this.currentWorkspace = null;
     },
 
     /** Drop every per-workspace store and return to the workspace list. */
     leaveWorkspace() {
-      discardQueuedEvents();
+      startWorkspaceSession();
       useRealtimeStore().reset();
       useEditorStore().reset();
       useFilesStore().reset();

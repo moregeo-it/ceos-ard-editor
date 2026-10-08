@@ -4,12 +4,10 @@ import previewService from '@/services/preview.service';
 import { useWorkspacesStore } from './workspaces';
 import { useNotificationsStore } from './notifications';
 
-import { EVENTS, on } from '@/services/events';
+import { EVENTS, on, workspaceSession } from '@/services/events';
 
 // A refresh requested while one is running; a queued build wins over queued fetches
 let queued = null; // 'build' | 'fetch' | null
-// Bumped by reset(): a request started before it must not write its result into the next workspace
-let resetCount = 0;
 
 const getDefaults = () => ({
   previewHtml: '',
@@ -60,17 +58,17 @@ export const usePreviewStore = defineStore('preview', {
       }
 
       const shouldBuild = build && workspacesStore.isOwner;
-      const started = resetCount;
+      const started = workspaceSession();
       this.isGenerating = true;
       try {
         const html = shouldBuild
           ? await previewService.generatePreview(workspace.id)
           : await previewService.fetchCurrentPreview(workspace.id);
-        if (started === resetCount) {
+        if (started === workspaceSession()) {
           this.setPreviewHtml(html);
         }
       } catch (error) {
-        if (started !== resetCount) {
+        if (started !== workspaceSession()) {
           return;
         }
         // No build for this list yet: the owner's next build arrives as preview.generated
@@ -79,7 +77,7 @@ export const usePreviewStore = defineStore('preview', {
         }
         this.setPreviewHtml('');
       } finally {
-        if (started === resetCount) {
+        if (started === workspaceSession()) {
           this.isGenerating = false;
         }
       }
@@ -96,12 +94,12 @@ export const usePreviewStore = defineStore('preview', {
         queued = queued === 'build' || !fetchOnly ? 'build' : 'fetch';
         return;
       }
-      const started = resetCount;
+      const started = workspaceSession();
       let build = !fetchOnly;
       do {
         queued = null;
         await this.generatePreview({ build });
-        if (started !== resetCount) {
+        if (started !== workspaceSession()) {
           return; // Another workspace now; its queue is not this loop's to run
         }
         build = queued === 'build';
@@ -110,7 +108,6 @@ export const usePreviewStore = defineStore('preview', {
 
     reset() {
       queued = null;
-      resetCount++;
       Object.assign(this, getDefaults());
     },
   },
