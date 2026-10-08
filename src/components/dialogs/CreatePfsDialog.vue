@@ -124,8 +124,9 @@ export default {
     },
     idError() {
       if (!this.touched.id) return [];
-      if (!this.id || this.id.trim().length < 2) {
-        return ['Please provide a PFS ID with at least 2 characters'];
+      // pfsId in the server's openapi.yaml: the ID becomes a folder name and a CLI argument
+      if (!/^[A-Z0-9]{2,10}$/.test(this.id)) {
+        return ['Use 2 to 10 capital letters or digits, no other characters are allowed'];
       }
 
       return [];

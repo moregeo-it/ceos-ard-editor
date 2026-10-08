@@ -1,0 +1,137 @@
+<template>
+  <v-container class="fill-height">
+    <v-row justify="center" align="center">
+      <v-col cols="12" md="6" class="text-center">
+        <v-card class="pa-8" elevation="4">
+          <v-card-text>
+            <template v-if="loading">
+              <v-progress-circular indeterminate size="64" color="primary" class="mb-4" />
+              <p class="text-body-1 text-medium-emphasis">Checking share link...</p>
+            </template>
+
+            <template v-else-if="preview">
+              <v-icon size="64" color="primary" class="mb-4">{{ icons.share }}</v-icon>
+              <h2 class="text-h5 mb-2">{{ preview.workspace_title }}</h2>
+              <v-chip class="mb-6" size="small" color="primary" variant="tonal">
+                {{ modeLabel(preview.mode) }}
+              </v-chip>
+              <p class="text-body-1 text-medium-emphasis mb-1">
+                Shared by {{ preview.owner_display_name }}
+              </p>
+              <v-btn
+                color="primary"
+                size="large"
+                :prepend-icon="icons.github"
+                @click="continueWithGitHub"
+              >
+                Continue with GitHub
+              </v-btn>
+            </template>
+
+            <template v-else-if="error">
+              <v-icon size="64" color="error" class="mb-4">{{ icons.alert }}</v-icon>
+              <h2 class="text-h5 mb-4">{{ error.title }}</h2>
+              <v-alert type="error" variant="tonal" class="mb-4">{{ error.message }}</v-alert>
+              <v-btn color="primary" @click="$router.push({ name: 'workspaces' })">
+                Go to my workspaces
+              </v-btn>
+            </template>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+  </v-container>
+</template>
+
+<script>
+import { mdiAlertCircle, mdiGithub, mdiShareVariant } from '@mdi/js';
+import { useAuthStore } from '@/stores/auth';
+import { useShareStore } from '@/stores/share';
+import { shareModeLabel } from '@/utils/shareMode';
+
+export default {
+  name: 'ShareLandingView',
+
+  data() {
+    return {
+      icons: {
+        alert: mdiAlertCircle,
+        github: mdiGithub,
+        share: mdiShareVariant,
+      },
+      loading: true,
+      preview: null,
+      error: null,
+    };
+  },
+
+  computed: {
+    token() {
+      return this.$route.params.token;
+    },
+    authStore() {
+      return useAuthStore();
+    },
+    shareStore() {
+      return useShareStore();
+    },
+  },
+
+  async created() {
+    await this.open();
+  },
+
+  methods: {
+    modeLabel(mode) {
+      return shareModeLabel(mode);
+    },
+
+    /** Redeem the link and enter the workspace. Not logged in: show what the link leads to. */
+    async open() {
+      this.loading = true;
+      try {
+        // The server knows whether there is a session: a 401 means there is none
+        const redeemed = await this.shareStore.redeemShare(this.token).catch((err) => {
+          if (err.status === 401) {
+            return null;
+          }
+          throw err;
+        });
+        if (!redeemed) {
+          this.preview = await this.shareStore.fetchSharePreview(this.token);
+          return;
+        }
+        // The cookie may be valid without local session info (cleared or disabled storage)
+        if (!this.authStore.isAuthenticated) {
+          await this.authStore.completeLogin();
+        }
+        this.$router.replace({ name: 'editor', params: { id: redeemed.workspace.id } });
+      } catch (err) {
+        if (err.status === 403) {
+          this.error = {
+            title: 'Access revoked',
+            message: 'Your access to this workspace was previously revoked by the owner.',
+          };
+        } else if (err.status === 404) {
+          this.error = {
+            title: 'Invalid link',
+            message: 'This share link is invalid, expired, or no longer exists.',
+          };
+        } else {
+          this.error = {
+            title: 'Something went wrong',
+            message: err.message || 'Failed to open this share link. Please try again.',
+          };
+        }
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    continueWithGitHub() {
+      this.shareStore.setPendingShareToken(this.token);
+      this.authStore.loginWithGitHub();
+    },
+  },
+};
+</script>

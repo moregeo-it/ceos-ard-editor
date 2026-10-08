@@ -4,6 +4,7 @@
       <PfsSelect
         v-model="selectedPfs"
         :items="pfsOptions"
+        :readonly="!workspacesStore.isOwner"
         label="Select PFS for Preview"
         multiple
         chips
@@ -41,7 +42,10 @@
       </div>
 
       <v-alert v-else-if="!previewHtml" type="info" variant="tonal" class="ma-4">
-        <template v-if="!previewStore.hasSelectedPfs">
+        <template v-if="!workspacesStore.isOwner"
+          >The owner has not generated a preview yet.</template
+        >
+        <template v-else-if="!previewStore.hasSelectedPfs">
           Select at least one PFS from the list above to create a preview.
         </template>
         <template v-else>No preview generated. Please try again.</template>
@@ -65,7 +69,6 @@
 </template>
 
 <script>
-import { useAuthStore } from '@/stores/auth';
 import { useEditorStore } from '@/stores/editor';
 import { usePreviewStore } from '@/stores/preview';
 import previewService from '@/services/preview.service';
@@ -93,17 +96,14 @@ export default {
         docx: false,
       },
       pfsMenuOpen: false,
-      // The selection when the menu opened, to regenerate only if it changed
-      selectionBeforeMenu: null,
+      // The owner's edits while the menu is open; null shows the workspace's saved list
+      draftPfs: null,
       icons: {
         download: mdiDownload,
       },
     };
   },
   computed: {
-    authStore() {
-      return useAuthStore();
-    },
     editorStore() {
       return useEditorStore();
     },
@@ -122,12 +122,13 @@ export default {
     pfsOptions() {
       return this.workspacesStore?.workspacePfsOptions || [];
     },
+    // The workspace's PFS list is the preview selection (saved by the owner, followed by everyone)
     selectedPfs: {
       get() {
-        return this.previewStore.selectedPfs;
+        return this.draftPfs ?? this.currentWorkspace?.pfs ?? [];
       },
       set(value) {
-        this.previewStore.setSelectedPfs(value);
+        this.draftPfs = value;
       },
     },
     previewHtml() {
@@ -141,9 +142,6 @@ export default {
     },
   },
   async created() {
-    if (this.selectedPfs === null) {
-      this.selectedPfs = this.currentWorkspace.pfs || [];
-    }
     if (this.workspaceId) {
       await this.workspacesStore.fetchPfs(this.workspaceId);
     }
@@ -152,8 +150,9 @@ export default {
     // Update iframe content if preview already exists (e.g., returning from Propose view)
     if (this.previewHtml) {
       this.updateIframeContent();
-    } else {
-      await this.previewStore.generatePreview();
+    } else if (!this.previewStore.isGenerating) {
+      // Through the queue, so changes arriving during this first build still refresh it afterwards
+      await this.previewStore.requestPreviewRefresh();
     }
   },
   watch: {
@@ -211,8 +210,6 @@ export default {
       return URL.parse(url) !== null;
     },
     enhanceHtml(doc) {
-      const token = this.authStore.accessToken;
-
       // Fix relative links and target
       const links = doc.querySelectorAll('a[href]');
       links.forEach((link) => {
@@ -225,15 +222,15 @@ export default {
         }
       });
 
+      // Point relative assets at the API; the browser sends the session cookie with them
+      const assetUrl = (path) => `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${path}`;
+
       // Fix relative images
       const images = doc.querySelectorAll('img[src]');
       images.forEach((img) => {
         const src = img.getAttribute('src');
         if (src && !this.isAbsoluteUrl(src)) {
-          img.setAttribute(
-            'src',
-            `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${src}?authorization=${token}`,
-          );
+          img.setAttribute('src', assetUrl(src));
         }
       });
 
@@ -242,10 +239,7 @@ export default {
       stylesheets.forEach((sheet) => {
         const href = sheet.getAttribute('href');
         if (href && !this.isAbsoluteUrl(href)) {
-          sheet.setAttribute(
-            'href',
-            `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${href}?authorization=${token}`,
-          );
+          sheet.setAttribute('href', assetUrl(href));
         }
       });
 
@@ -283,19 +277,30 @@ export default {
         }
       });
     },
-    // Regenerate once the menu closes, not on every toggled item of the multi-select
+    // Save and regenerate once the menu closes, not on every toggled item of the multi-select
     async handleMenuToggle(open) {
       this.pfsMenuOpen = open;
       if (open) {
-        this.selectionBeforeMenu = [...(this.selectedPfs ?? [])];
+        this.draftPfs = [...this.selectedPfs];
         return;
       }
-      const before = this.selectionBeforeMenu;
-      this.selectionBeforeMenu = null;
-      if (before && sameList(before, this.selectedPfs ?? [])) {
+      const before = this.currentWorkspace?.pfs ?? [];
+      const after = this.draftPfs ?? before;
+      if (sameList(before, after)) {
+        this.draftPfs = null;
         return;
       }
-      await this.previewStore.generatePreview();
+      // Saved on the workspace so viewers and the owner's other tabs show the same preview; on
+      // failure the chips fall back to the saved list
+      try {
+        await this.workspacesStore.updateWorkspacePfs(this.workspaceId, after);
+      } catch (error) {
+        useNotificationsStore().error(`Failed to save the PFS selection: ${error.message}`);
+        return;
+      } finally {
+        this.draftPfs = null;
+      }
+      await this.previewStore.requestPreviewRefresh();
     },
 
     async downloadPreview(documentType) {

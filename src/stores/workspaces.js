@@ -6,7 +6,10 @@ import { useFilesStore } from './files';
 import { useNotificationsStore } from './notifications';
 import { usePreviewStore } from './preview';
 import { useProposalStore } from './proposal';
+import { useRealtimeStore } from './realtime';
+import { useShareStore } from './share';
 
+import { EVENTS, on, startWorkspaceSession, workspaceSession } from '@/services/events';
 import workspaceService from '@/services/workspace.service';
 
 export const useWorkspacesStore = defineStore('workspaces', {
@@ -27,12 +30,32 @@ export const useWorkspacesStore = defineStore('workspaces', {
       return state.currentWorkspace?.status === 'archived' || false;
     },
 
+    // "owner" | "readonly" | undefined (not yet loaded)
+    viewerRole: (state) => {
+      return state.currentWorkspace?.viewer_role;
+    },
+
+    isOwner: (state) => {
+      return state.currentWorkspace?.viewer_role === 'owner';
+    },
+
+    // Only the owner edits, and nobody while the workspace is archived or the role is still
+    // unknown, so nothing ever renders as editable before the workspace has loaded.
+    isReadOnly() {
+      if (!this.viewerRole) return true;
+      return this.viewerRole !== 'owner' || this.isArchived;
+    },
+
     activeWorkspaces: (state) => {
-      return state.workspaces.filter((w) => w.status === 'active');
+      return state.workspaces.filter((w) => w.status === 'active' && w.viewer_role === 'owner');
     },
 
     archivedWorkspaces: (state) => {
-      return state.workspaces.filter((w) => w.status === 'archived');
+      return state.workspaces.filter((w) => w.status === 'archived' && w.viewer_role === 'owner');
+    },
+
+    sharedWorkspaces: (state) => {
+      return state.workspaces.filter((w) => w.viewer_role && w.viewer_role !== 'owner');
     },
   },
 
@@ -71,6 +94,26 @@ export const useWorkspacesStore = defineStore('workspaces', {
       } finally {
         this.isWorkspaceLoading[workspaceId] = false;
       }
+    },
+
+    // The loading flag unmounts the editor panes, so the in-editor updates below don't set it
+    // (toggleWorkspaceStatus is the exception: reactivating via the ArchivedDialog remounts).
+
+    /** Save the owner's preview selection as the workspace's PFS list; viewers follow it. */
+    async updateWorkspacePfs(workspaceId, pfs) {
+      const updatedWorkspace = await workspaceService.updateWorkspace(workspaceId, { pfs });
+      this.applyWorkspace(updatedWorkspace);
+      return updatedWorkspace;
+    },
+
+    async refreshCurrentWorkspace() {
+      const workspaceId = this.currentWorkspace?.id;
+      if (!workspaceId) {
+        return null;
+      }
+      const workspace = await workspaceService.getWorkspace(workspaceId);
+      this.applyWorkspace(workspace);
+      return workspace;
     },
 
     applyWorkspace(workspace) {
@@ -129,19 +172,24 @@ export const useWorkspacesStore = defineStore('workspaces', {
 
     async fetchPfs(workspaceId) {
       const pfs = await workspaceService.fetchPfs(workspaceId);
-      if (workspaceId) {
-        this.workspacePfsOptions = pfs;
-      } else {
+      if (!workspaceId) {
         this.pfsOptions = pfs;
+      } else if (this.currentWorkspace?.id === workspaceId) {
+        // A late answer must not land in the workspace opened meanwhile
+        this.workspacePfsOptions = pfs;
       }
     },
 
     async getWorkspace(workspaceId) {
       this.isWorkspaceLoading[workspaceId] = true;
 
+      const started = workspaceSession();
       try {
-        this.currentWorkspace = await workspaceService.getWorkspace(workspaceId);
-        return this.currentWorkspace;
+        const workspace = await workspaceService.getWorkspace(workspaceId);
+        if (started === workspaceSession()) {
+          this.currentWorkspace = workspace;
+        }
+        return workspace;
       } finally {
         this.isWorkspaceLoading[workspaceId] = false;
       }
@@ -151,19 +199,100 @@ export const useWorkspacesStore = defineStore('workspaces', {
       return workspaceService.syncWorkspace(workspaceId);
     },
 
+    /** No workspace is open any more, e.g. back on the list (also by the browser's back button). */
     resetCurrentWorkspace() {
+      startWorkspaceSession();
       this.currentWorkspace = null;
     },
 
     /** Drop every per-workspace store and return to the workspace list. */
     leaveWorkspace() {
+      startWorkspaceSession();
+      useRealtimeStore().reset();
       useEditorStore().reset();
       useFilesStore().reset();
       useNotificationsStore().reset();
       usePreviewStore().reset();
       useProposalStore().reset();
+      useShareStore().reset();
       this.resetCurrentWorkspace();
       router.push({ name: 'workspaces' }).catch(() => {});
     },
   },
 });
+
+// Events after which the PFS options may have changed (a save doesn't add/remove PFS folders).
+const PFS_AFFECTING_EVENTS = new Set([
+  EVENTS.FILE_CREATED,
+  EVENTS.FILE_RENAMED,
+  EVENTS.FILE_DELETED,
+  EVENTS.FILE_REVERTED,
+]);
+
+function affectsPfs(event) {
+  const paths = [event.path, event.old_path, event.file?.path];
+  return paths.some((path) => typeof path === 'string' && path.startsWith('/pfs/'));
+}
+
+let listenersRegistered = false;
+
+/**
+ * React to workspace events: refresh the PFS options when files under /pfs/ change, refetch the
+ * workspace when the owner changed it, and leave the workspace when access is lost.
+ */
+export function registerWorkspacesEventListeners() {
+  if (listenersRegistered) {
+    return;
+  }
+  listenersRegistered = true;
+
+  on('file.*', async (event) => {
+    if (!PFS_AFFECTING_EVENTS.has(event.type) || !affectsPfs(event)) {
+      return;
+    }
+    const workspaces = useWorkspacesStore();
+    const workspaceId = workspaces.currentWorkspace?.id;
+    if (workspaceId) {
+      await workspaces.fetchPfs(workspaceId);
+    }
+  });
+
+  on(EVENTS.WORKSPACE_ARCHIVED, async () => {
+    await useWorkspacesStore().refreshCurrentWorkspace();
+  });
+
+  // Title, description, PFS list or status changed by the owner; a changed PFS list is the
+  // owner's preview selection, which every viewer (and the owner's other tabs) follows.
+  on(EVENTS.WORKSPACE_UPDATED, async (event) => {
+    const workspace = await useWorkspacesStore().refreshCurrentWorkspace();
+    if (workspace && event.fields?.includes('pfs')) {
+      usePreviewStore().requestPreviewRefresh({ fetchOnly: true });
+    }
+  });
+
+  // The owner changed this user's mode; viewer_role on the refetched workspace drives the UI
+  on(EVENTS.COLLABORATOR_UPDATED, async () => {
+    await useWorkspacesStore().refreshCurrentWorkspace();
+    useNotificationsStore().info('The owner changed your access to this workspace.');
+  });
+
+  // Files changed on disk beyond the single-file events. The tab that triggered the sync refreshes
+  // inline and is filtered by the server; every other client refreshes here. The preview is
+  // untouched by a sync; the owner's rebuild arrives as preview.generated.
+  on(EVENTS.WORKSPACE_SYNCED, async () => {
+    useNotificationsStore().info('The workspace was updated with the latest changes from GitHub.');
+    await useEditorStore().refreshAfterRemoteUpdate();
+  });
+
+  // Access is gone (terminal event, or a handshake refused with 4003): leave, then warn (leaving
+  // clears the notifications).
+  const handleAccessLost = () => {
+    useWorkspacesStore().leaveWorkspace();
+    useNotificationsStore().warning(
+      'Your access to this workspace has changed. Returning to your workspaces.',
+    );
+  };
+  on(EVENTS.COLLABORATOR_REVOKED, handleAccessLost);
+  on(EVENTS.WORKSPACE_DELETED, handleAccessLost);
+  on(EVENTS.REALTIME_ACCESS_LOST, handleAccessLost);
+}

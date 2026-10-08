@@ -3,6 +3,8 @@ import proposalService from '@/services/proposal.service';
 
 import { useWorkspacesStore } from './workspaces';
 
+import { EVENTS, emit, workspaceSession } from '@/services/events';
+
 const getDefaults = () => ({
   diffList: [],
   proposal: null,
@@ -73,14 +75,23 @@ export const useProposalStore = defineStore('proposal', {
     },
 
     async commitChanges(workspaceId, commitMessage) {
+      const started = workspaceSession();
+      // The pre-commit diff list is exactly what the commit contained ({path, status, source?}).
+      const changes = this.diffList;
       this.isCommitting = true;
       try {
         const commit = await proposalService.commitChanges(workspaceId, commitMessage);
+        if (started !== workspaceSession()) {
+          return commit;
+        }
         this.commits.unshift(commit);
         this.diffList = [];
+        emit(EVENTS.FILE_COMMITTED, { commit, changes });
         return commit;
       } finally {
-        this.isCommitting = false;
+        if (started === workspaceSession()) {
+          this.isCommitting = false;
+        }
       }
     },
 
