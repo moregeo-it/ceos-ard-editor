@@ -25,10 +25,11 @@
           <PfsSelect
             v-model="formData.pfs"
             :items="workspacesStore.pfsOptions"
-            label="Product Format Specification (Optional)"
+            label="Product Format Specification"
             multiple
             chips
-            hint="If not selected, backend will assign a default PFS"
+            :rules="rules.pfs"
+            hint="At least one PFS needs to be selected to show preview"
             persistent-hint
             class="mb-3"
           />
@@ -102,6 +103,7 @@ export default {
           (v) => !!v || 'Title is required',
           (v) => (v && v.length >= 3) || 'Title must be at least 3 characters',
         ],
+        pfs: [(v) => v?.length > 0 || 'Select at least one PFS'],
       },
     };
   },
@@ -144,7 +146,7 @@ export default {
       const payload = {
         title: this.formData.title,
         description: this.formData.description || null,
-        pfs: this.formData.pfs && this.formData.pfs.length > 0 ? this.formData.pfs : null,
+        pfs: this.formData.pfs,
       };
 
       // Include workspace ID for update mode
