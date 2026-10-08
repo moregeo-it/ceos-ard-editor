@@ -64,7 +64,7 @@ export const usePreviewStore = defineStore('preview', {
       this.isGenerating = true;
       try {
         const html = shouldBuild
-          ? await previewService.generatePreview(workspace.id, workspace.pfs)
+          ? await previewService.generatePreview(workspace.id)
           : await previewService.fetchCurrentPreview(workspace.id);
         if (started === resetCount) {
           this.setPreviewHtml(html);
@@ -96,10 +96,14 @@ export const usePreviewStore = defineStore('preview', {
         queued = queued === 'build' || !fetchOnly ? 'build' : 'fetch';
         return;
       }
+      const started = resetCount;
       let build = !fetchOnly;
       do {
         queued = null;
         await this.generatePreview({ build });
+        if (started !== resetCount) {
+          return; // Another workspace now; its queue is not this loop's to run
+        }
         build = queued === 'build';
       } while (queued);
     },

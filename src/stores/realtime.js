@@ -6,6 +6,7 @@ import { CLIENT_ID } from '@/utils/client-id';
 import { useAuthStore } from './auth';
 import { useEditorStore } from './editor';
 import { useNotificationsStore } from './notifications';
+import { useWorkspacesStore } from './workspaces';
 
 const RECONNECT_MIN_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
@@ -196,16 +197,24 @@ export const useRealtimeStore = defineStore('realtime', {
     },
 
     /**
-     * Full reconciliation on reconnect: reload the tree and the open files (unsaved edits are
-     * kept), then announce it via a single `realtime.resynced` event (no per-file event storm).
-     * Cheaper than server-side event replay and always converges.
+     * Full reconciliation on reconnect: reload the workspace (status, PFS selection), its PFS
+     * options, the tree and the open files (unsaved edits are kept), then announce it via a single
+     * `realtime.resynced` event (no per-file event storm). Cheaper than server-side event replay
+     * and always converges.
      */
     async resync() {
+      const workspaceId = this.workspaceId;
       try {
+        const workspaces = useWorkspacesStore();
+        await workspaces.refreshCurrentWorkspace();
+        await workspaces.fetchPfs(workspaceId);
         await useEditorStore().refreshAfterRemoteUpdate({
           source: 'the changes made while disconnected',
         });
-        emit(EVENTS.REALTIME_RESYNCED, { workspaceId: this.workspaceId });
+        if (this.workspaceId !== workspaceId) {
+          return; // Left or switched workspaces meanwhile
+        }
+        emit(EVENTS.REALTIME_RESYNCED, { workspaceId });
       } catch (error) {
         useNotificationsStore().error('Failed to resync workspace: ' + error.message);
       }

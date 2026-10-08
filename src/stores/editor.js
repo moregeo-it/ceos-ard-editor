@@ -53,15 +53,22 @@ export const useEditorStore = defineStore('editor', {
         await this.sync(path);
       }
     },
+    /** Load an open file from the server, unless the tab was closed or typed into meanwhile. */
     async sync(path) {
       if (!this.opened.find((f) => f.path === path)) {
         return;
       }
       const started = resetCount;
+      const before = this.data[path];
       const data = await useFilesStore().load(path);
       const isBinary = data.type.startsWith('image/') || data.type === 'application/pdf';
       const content = isBinary ? data : await data.text();
-      if (started !== resetCount) {
+      // Edits typed while it loaded become unsaved changes instead of being overwritten
+      if (
+        started !== resetCount ||
+        !this.opened.some((f) => f.path === path) ||
+        this.data[path] !== before
+      ) {
         return;
       }
       this.original[path] = content;
@@ -150,15 +157,14 @@ export const useEditorStore = defineStore('editor', {
 
       for (const file of [...this.opened]) {
         const path = file.path;
-        const hasUnsavedChanges = this.changed[path];
-        if (hasUnsavedChanges) {
-          skipped.push(path);
-        }
 
         try {
-          // Never overwrite unsaved work with the updated content
-          if (!hasUnsavedChanges) {
+          // Never overwrite unsaved work with the updated content, including edits typed meanwhile
+          if (!this.changed[path]) {
             await this.sync(path);
+          }
+          if (this.changed[path]) {
+            skipped.push(path);
           }
           // Also repopulates the files store, which the tabs read their state from
           const context = await files.loadFileContext(path, true);
@@ -175,7 +181,7 @@ export const useEditorStore = defineStore('editor', {
         } catch {
           // The file is gone from the updated workspace. Keep tabs with unsaved changes open so
           // the user decides what to do with them, as for a locally deleted file.
-          if (!hasUnsavedChanges && started === resetCount) {
+          if (!this.changed[path] && started === resetCount) {
             this.close(path);
           }
         }
@@ -325,14 +331,15 @@ export function registerEditorEventListeners() {
       return;
     }
     const editor = useEditorStore();
+    if (!editor.changed[event.path]) {
+      await editor.sync(event.path); // no-op if the file isn't open
+    }
     if (editor.changed[event.path]) {
-      // Saved elsewhere by this user while this tab has unsaved edits: keep them.
+      // Saved elsewhere by this user while this tab has unsaved edits (or got some while loading): keep them.
       useNotificationsStore().warning(
         `${event.path} was saved elsewhere; this tab keeps its unsaved changes.`,
       );
-      return;
     }
-    await editor.sync(event.path); // no-op if the file isn't open
   });
 
   on(EVENTS.FILE_DELETED, async (event) => {
