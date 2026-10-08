@@ -8,7 +8,7 @@
             v-model.trim="id"
             variant="outlined"
             label="ID"
-            placeholder="e.g. NRB or SAR-NRB"
+            placeholder="e.g. NRB"
             hint="Creates a new PFS folder in the workspace with the specified name"
             persistent-hint
             density="compact"
@@ -125,10 +125,8 @@ export default {
     idError() {
       if (!this.touched.id) return [];
       // pfsId in the server's openapi.yaml: the ID becomes a folder name and a CLI argument
-      if (!/^[A-Z0-9][A-Z0-9-]*[A-Z0-9]$/.test(this.id) || this.id.length > 10) {
-        return [
-          'Use 2 to 10 capital letters, digits or dashes, not starting or ending with a dash',
-        ];
+      if (!/^[A-Z0-9]{2,10}$/.test(this.id)) {
+        return ['Use 2 to 10 capital letters or digits'];
       }
 
       return [];
