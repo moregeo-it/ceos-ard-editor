@@ -73,8 +73,8 @@ const handlers = new Map(); // pattern -> Set<handler>
 // Serializes all dispatches: one event is fully handled before the next starts, for WebSocket and
 // local events alike.
 let queue = Promise.resolve();
-// Bumped by discardQueuedEvents(): dispatches queued before it are skipped
-let epoch = 0;
+// The current workspace session, see startWorkspaceSession()
+let session = 0;
 
 let onError = (error, type) => console.error(`Event handler failed for ${type}:`, error);
 
@@ -112,19 +112,22 @@ export function on(pattern, handler) {
  * Used by the realtime store so a reconnect resync stays ordered ahead of live events.
  */
 export function enqueue(task) {
-  const queuedIn = epoch;
-  queue = queue.then(() => (queuedIn === epoch ? task() : undefined)).catch(() => {});
+  const queuedIn = session;
+  queue = queue.then(() => (queuedIn === session ? task() : undefined)).catch(() => {});
   return queue;
 }
 
 /**
- * Skip every dispatch still waiting in the queue. Called when a workspace is left or another one
- * is opened, so events of the old workspace never reach the next one's freshly reset stores. A
- * handler already running is not interrupted (the stores discard its late writes themselves), but
- * the event's remaining handlers are skipped.
+ * Start a new workspace session, when a workspace is opened or left. Dispatches still waiting in the
+ * queue are skipped, as are the remaining handlers of the one running, and stores drop the results
+ * of requests started in an older session (`workspaceSession()` before and after their await).
  */
-export function discardQueuedEvents() {
-  epoch++;
+export function startWorkspaceSession() {
+  session++;
+}
+
+export function workspaceSession() {
+  return session;
 }
 
 /**
@@ -146,13 +149,13 @@ export function discardQueuedEvents() {
 export function emit(type, payload = {}) {
   const event = { ts: new Date().toISOString(), source: 'local', ...payload, type };
   return enqueue(async () => {
-    const dispatchedIn = epoch;
+    const dispatchedIn = session;
     for (const [pattern, set] of handlers) {
       if (!matches(pattern, type)) {
         continue;
       }
       for (const handler of [...set]) {
-        if (dispatchedIn !== epoch) {
+        if (dispatchedIn !== session) {
           return;
         }
         try {

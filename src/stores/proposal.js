@@ -3,10 +3,7 @@ import proposalService from '@/services/proposal.service';
 
 import { useWorkspacesStore } from './workspaces';
 
-import { EVENTS, emit } from '@/services/events';
-
-// Bumped by reset(): a commit started before it must not touch the next workspace
-let resetCount = 0;
+import { EVENTS, emit, workspaceSession } from '@/services/events';
 
 const getDefaults = () => ({
   diffList: [],
@@ -78,13 +75,13 @@ export const useProposalStore = defineStore('proposal', {
     },
 
     async commitChanges(workspaceId, commitMessage) {
-      const started = resetCount;
+      const started = workspaceSession();
       // The pre-commit diff list is exactly what the commit contained ({path, status, source?}).
       const changes = this.diffList;
       this.isCommitting = true;
       try {
         const commit = await proposalService.commitChanges(workspaceId, commitMessage);
-        if (started !== resetCount) {
+        if (started !== workspaceSession()) {
           return commit;
         }
         this.commits.unshift(commit);
@@ -92,14 +89,13 @@ export const useProposalStore = defineStore('proposal', {
         emit(EVENTS.FILE_COMMITTED, { commit, changes });
         return commit;
       } finally {
-        if (started === resetCount) {
+        if (started === workspaceSession()) {
           this.isCommitting = false;
         }
       }
     },
 
     reset() {
-      resetCount++;
       Object.assign(this, getDefaults());
     },
   },

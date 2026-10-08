@@ -2,16 +2,13 @@ import { defineStore } from 'pinia';
 
 import { useWorkspacesStore } from './workspaces';
 
-import { EVENTS, emit, on } from '@/services/events';
+import { EVENTS, emit, on, workspaceSession } from '@/services/events';
 import fileService from '@/services/file.service';
 
 const getWorkspaceId = () => {
   const workspaces = useWorkspacesStore();
   return workspaces.currentWorkspace?.id;
 };
-
-// Bumped by reset(): a fetch started before it must not write its result into the next workspace
-let resetCount = 0;
 
 const getDefaults = () => ({
   all: {},
@@ -90,11 +87,11 @@ export const useFilesStore = defineStore('files', {
       if (Array.isArray(this.all[path]) && typeof this.all[path].usage !== 'undefined' && !force) {
         return this.all[path]; // Already loaded
       }
-      const started = resetCount;
+      const started = workspaceSession();
       this.isPathLoading.push(path);
       try {
         const context = await fileService.loadFileContext(getWorkspaceId(), path);
-        if (started === resetCount) {
+        if (started === workspaceSession()) {
           this.all[path] = context;
         }
         return context;
@@ -109,11 +106,11 @@ export const useFilesStore = defineStore('files', {
       if (this.isFolderComplete[path] && !force) {
         return; // Already loaded
       }
-      const started = resetCount;
+      const started = workspaceSession();
       this.isPathLoading.push(path);
       try {
         const files = await fileService.fetchFileTree(getWorkspaceId(), path);
-        if (started !== resetCount) {
+        if (started !== workspaceSession()) {
           return;
         }
         files.forEach((file) => (this.all[file.path] = file));
@@ -131,7 +128,7 @@ export const useFilesStore = defineStore('files', {
      */
     async reloadTree() {
       const workspaceId = getWorkspaceId();
-      const started = resetCount;
+      const started = workspaceSession();
       const next = {};
       const complete = {};
       const fetchInto = async (path) => {
@@ -153,7 +150,7 @@ export const useFilesStore = defineStore('files', {
       } finally {
         this.resetPathLoading('/');
       }
-      if (started !== resetCount) {
+      if (started !== workspaceSession()) {
         return; // The workspace was left meanwhile; the tree now belongs to the next one
       }
 
@@ -226,15 +223,15 @@ export const useFilesStore = defineStore('files', {
         return;
       }
 
-      const started = resetCount;
+      const started = workspaceSession();
       this.isSearchLoading = true;
       try {
         const files = await fileService.searchFiles(getWorkspaceId(), query);
-        if (started === resetCount) {
+        if (started === workspaceSession()) {
           this.searchResults = files.map(toFileTreeObject);
         }
       } finally {
-        if (started === resetCount) {
+        if (started === workspaceSession()) {
           this.isSearchLoading = false;
         }
       }
@@ -346,9 +343,9 @@ export const useFilesStore = defineStore('files', {
      * Create new file or folder
      */
     async createFile(path, name, type) {
-      const started = resetCount;
+      const started = workspaceSession();
       const fileData = await fileService.createFile(getWorkspaceId(), path, name, type);
-      if (started !== resetCount) {
+      if (started !== workspaceSession()) {
         return fileData;
       }
       this.updateFile(fileData);
@@ -360,9 +357,9 @@ export const useFilesStore = defineStore('files', {
      * Create a new pfs folder and document with content of source pfs
      */
     async createNewPfs(content) {
-      const started = resetCount;
+      const started = workspaceSession();
       const fileData = await fileService.createNewPFS(getWorkspaceId(), content);
-      if (started !== resetCount) {
+      if (started !== workspaceSession()) {
         return fileData;
       }
       this.updateFile(fileData);
@@ -374,9 +371,9 @@ export const useFilesStore = defineStore('files', {
      * Rename file or folder
      */
     async renameFile(filePath, newName) {
-      const started = resetCount;
+      const started = workspaceSession();
       const fileData = await fileService.renameFile(getWorkspaceId(), filePath, newName);
-      if (started !== resetCount) {
+      if (started !== workspaceSession()) {
         return fileData;
       }
       this.deleteFileFromStore(filePath);
@@ -393,9 +390,9 @@ export const useFilesStore = defineStore('files', {
       // and event payload need it. Fall back to search results, where a folder may not be in `all`.
       const existing =
         this.all[filePath] ?? this.searchResults?.find((file) => file.path === filePath) ?? null;
-      const started = resetCount;
+      const started = workspaceSession();
       const fileData = await fileService.deleteFile(getWorkspaceId(), filePath);
-      if (started !== resetCount) {
+      if (started !== workspaceSession()) {
         return fileData;
       }
       const tracked = !!(fileData && fileData.path);
@@ -419,9 +416,9 @@ export const useFilesStore = defineStore('files', {
      * Save file content
      */
     async save(filePath, content) {
-      const started = resetCount;
+      const started = workspaceSession();
       const fileData = await fileService.saveFile(getWorkspaceId(), filePath, content);
-      if (started !== resetCount) {
+      if (started !== workspaceSession()) {
         return;
       }
       this.updateFile(fileData);
@@ -435,9 +432,9 @@ export const useFilesStore = defineStore('files', {
     async revertFile(filePath) {
       // Only a deleted file's revert restores parent folders; check before the status is updated.
       const wasDeleted = this.all[filePath]?.status === 'deleted';
-      const started = resetCount;
+      const started = workspaceSession();
       const fileData = await fileService.revertFile(getWorkspaceId(), filePath);
-      if (started !== resetCount) {
+      if (started !== workspaceSession()) {
         return fileData;
       }
       if (filePath !== fileData.path) {
@@ -459,7 +456,6 @@ export const useFilesStore = defineStore('files', {
      * Clear all state
      */
     reset() {
-      resetCount++;
       Object.assign(this, getDefaults());
     },
   },

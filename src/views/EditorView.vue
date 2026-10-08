@@ -48,7 +48,7 @@ import { useNotificationsStore } from '@/stores/notifications';
 import { usePreviewStore } from '@/stores/preview';
 import { useRealtimeStore } from '@/stores/realtime';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import { discardQueuedEvents } from '@/services/events';
+import { startWorkspaceSession } from '@/services/events';
 import { mdiNotebookEdit, mdiShareVariant } from '@mdi/js';
 import HeaderBar from '@/components/HeaderBar.vue';
 import HeaderSwitch from '@/components/HeaderSwitch.vue';
@@ -127,7 +127,7 @@ export default {
     if (isFreshOpening) {
       // Another workspace may have been open before (browser back, then a card): drop its queued
       // events, tabs, tree and preview, and let its in-flight requests expire
-      discardQueuedEvents();
+      startWorkspaceSession();
       this.editorStore.reset();
       useFilesStore().reset();
       this.previewStore.reset();
