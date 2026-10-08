@@ -346,7 +346,11 @@ export const useFilesStore = defineStore('files', {
      * Create new file or folder
      */
     async createFile(path, name, type) {
+      const started = resetCount;
       const fileData = await fileService.createFile(getWorkspaceId(), path, name, type);
+      if (started !== resetCount) {
+        return fileData;
+      }
       this.updateFile(fileData);
       emit(EVENTS.FILE_CREATED, { path: fileData.path, file: fileData });
       return fileData;
@@ -356,7 +360,11 @@ export const useFilesStore = defineStore('files', {
      * Create a new pfs folder and document with content of source pfs
      */
     async createNewPfs(content) {
+      const started = resetCount;
       const fileData = await fileService.createNewPFS(getWorkspaceId(), content);
+      if (started !== resetCount) {
+        return fileData;
+      }
       this.updateFile(fileData);
       emit(EVENTS.FILE_CREATED, { path: fileData.path, file: fileData });
       return fileData;
@@ -366,7 +374,11 @@ export const useFilesStore = defineStore('files', {
      * Rename file or folder
      */
     async renameFile(filePath, newName) {
+      const started = resetCount;
       const fileData = await fileService.renameFile(getWorkspaceId(), filePath, newName);
+      if (started !== resetCount) {
+        return fileData;
+      }
       this.deleteFileFromStore(filePath);
       this.updateFile(fileData);
       emit(EVENTS.FILE_RENAMED, { path: filePath, old_path: filePath, file: fileData });
@@ -381,7 +393,11 @@ export const useFilesStore = defineStore('files', {
       // and event payload need it. Fall back to search results, where a folder may not be in `all`.
       const existing =
         this.all[filePath] ?? this.searchResults?.find((file) => file.path === filePath) ?? null;
+      const started = resetCount;
       const fileData = await fileService.deleteFile(getWorkspaceId(), filePath);
+      if (started !== resetCount) {
+        return fileData;
+      }
       const tracked = !!(fileData && fileData.path);
       const file = tracked ? fileData : existing;
       if (existing?.is_directory || fileData?.is_directory) {
@@ -403,7 +419,11 @@ export const useFilesStore = defineStore('files', {
      * Save file content
      */
     async save(filePath, content) {
+      const started = resetCount;
       const fileData = await fileService.saveFile(getWorkspaceId(), filePath, content);
+      if (started !== resetCount) {
+        return;
+      }
       this.updateFile(fileData);
       this.syncAncestorFolders(filePath);
       emit(EVENTS.FILE_SAVED, { path: fileData.path, file: fileData });
@@ -415,7 +435,11 @@ export const useFilesStore = defineStore('files', {
     async revertFile(filePath) {
       // Only a deleted file's revert restores parent folders; check before the status is updated.
       const wasDeleted = this.all[filePath]?.status === 'deleted';
+      const started = resetCount;
       const fileData = await fileService.revertFile(getWorkspaceId(), filePath);
+      if (started !== resetCount) {
+        return fileData;
+      }
       if (filePath !== fileData.path) {
         this.deleteFileFromStore(filePath);
       }

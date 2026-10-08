@@ -76,8 +76,8 @@ export const useAuthStore = defineStore('auth', {
 
     /**
      * The stored session is only what this browser last knew; check it against the cookie without
-     * holding up startup. A dead cookie signs out, another account's cookie reloads, and a network
-     * error keeps the stored session (the next request's 401 still asks for a new login).
+     * holding up startup. A dead cookie signs out, another account's cookie reloads (with unsaved
+     * edits, both ask for a new login instead), and a network error keeps the stored session.
      */
     async _confirmSession() {
       const checked = this.expiresAt;
@@ -87,7 +87,7 @@ export const useAuthStore = defineStore('auth', {
         if (this.expiresAt !== checked || sessionService.load()?.expiresAt !== checked) {
           return;
         }
-        this._takeOver(session);
+        this.updateAuthAfterReauth(session);
       } catch (error) {
         if (error.status !== 401) {
           return;
@@ -95,7 +95,11 @@ export const useAuthStore = defineStore('auth', {
         // Another tab may have logged in while this request, sent with the old cookie, was in flight
         const stored = sessionService.load();
         if (stored && stored.expiresAt !== checked) {
-          this._takeOver(stored);
+          this.updateAuthAfterReauth(stored);
+          return;
+        }
+        if (useEditorStore().hasUnsavedChanges) {
+          this.setPendingReauth('logged_out');
           return;
         }
         this.clearAuth();
@@ -104,14 +108,6 @@ export const useAuthStore = defineStore('auth', {
         if (router.currentRoute.value.meta.requiresAuth) {
           router.push({ name: 'landing' });
         }
-      }
-    },
-
-    _takeOver(session) {
-      const otherUser = session.userId !== this.userId;
-      this.applySession(session);
-      if (otherUser) {
-        window.location.reload();
       }
     },
 
@@ -145,7 +141,7 @@ export const useAuthStore = defineStore('auth', {
       this.isPendingReauth = true;
     },
 
-    /** The login dialog's popup finished: continue as that account, unless the edits here belong to another. */
+    /** Continue as this session (login dialog, startup check), unless the edits here belong to another account. */
     updateAuthAfterReauth(session) {
       const otherUser = session.userId !== this.userId;
       if (otherUser && useEditorStore().hasUnsavedChanges) {
