@@ -1,5 +1,5 @@
 <template>
-  <v-dialog v-model="show" :width="sizes.medium" scrollable>
+  <v-dialog v-model="show" width="800" scrollable>
     <v-card>
       <v-card-title>Share "{{ workspace.title }}"</v-card-title>
       <v-card-subtitle>Manage who can access this workspace.</v-card-subtitle>
@@ -9,7 +9,7 @@
         <v-tab value="link">Share a link</v-tab>
       </v-tabs>
 
-      <v-card-text style="max-height: 60vh">
+      <v-card-text style="height: 400px">
         <v-tabs-window v-model="tab">
           <!-- People with access -->
           <v-tabs-window-item value="people">
