@@ -4,7 +4,7 @@
       <v-card-title>Share "{{ workspace.title }}"</v-card-title>
       <v-card-subtitle>Manage who can access this workspace.</v-card-subtitle>
 
-      <v-tabs v-model="tab">
+      <v-tabs v-model="tab" class="flex-shrink-0">
         <v-tab value="people">People with access</v-tab>
         <v-tab value="link">Share a link</v-tab>
       </v-tabs>
@@ -43,6 +43,10 @@
                 Invite
               </v-btn>
             </v-form>
+            <p class="text-body-2 text-medium-emphasis mt-3 mb-0">
+              Type a GitHub username and press Enter or Invite. To invite several people at once,
+              separate their usernames with commas or spaces.
+            </p>
 
             <v-list class="mt-4">
               <v-list-item v-if="shareStore.isLoadingCollaborators">
@@ -57,36 +61,48 @@
                 </template>
                 <v-list-item-title>{{ share.invitee_github_username }}</v-list-item-title>
                 <v-list-item-subtitle>
-                  <v-chip size="x-small" :color="statusColor(share.status)" variant="tonal">
+                  <span v-if="share.id in removals">Access removed</span>
+                  <v-chip v-else size="x-small" :color="statusColor(share.status)" variant="tonal">
                     {{ share.status }}
                   </v-chip>
                 </v-list-item-subtitle>
                 <template v-slot:append>
-                  <v-select
-                    :model-value="share.mode"
-                    :items="modeOptions"
-                    density="compact"
-                    hide-details
-                    variant="underlined"
-                    style="max-width: 150px"
-                    class="mr-2"
-                    :disabled="share.status === 'revoked' || shareStore.isMutating"
-                    @update:model-value="(mode) => changeShareMode(share, mode)"
-                  />
-                  <v-tooltip text="Remove access" location="top">
-                    <template v-slot:activator="{ props }">
-                      <v-btn
-                        v-bind="props"
-                        icon
-                        variant="text"
-                        size="small"
-                        :disabled="shareStore.isMutating || share.status === 'revoked'"
-                        @click="removeShare(share)"
-                      >
-                        <v-icon :icon="icons.close" />
-                      </v-btn>
-                    </template>
-                  </v-tooltip>
+                  <v-btn
+                    v-if="share.id in removals"
+                    variant="flat"
+                    color="primary"
+                    :disabled="!removals[share.id]"
+                    @click="undoRemoval(share)"
+                  >
+                    Undo
+                  </v-btn>
+                  <template v-else>
+                    <v-select
+                      :model-value="share.mode"
+                      :items="modeOptions"
+                      density="compact"
+                      hide-details
+                      variant="underlined"
+                      style="max-width: 150px"
+                      class="mr-2"
+                      :disabled="shareStore.isMutating"
+                      @update:model-value="(mode) => changeShareMode(share, mode)"
+                    />
+                    <v-tooltip text="Remove access" location="top">
+                      <template v-slot:activator="{ props }">
+                        <v-btn
+                          v-bind="props"
+                          icon
+                          variant="text"
+                          size="small"
+                          :disabled="shareStore.isMutating"
+                          @click="removeShare(share)"
+                        >
+                          <v-icon :icon="icons.close" />
+                        </v-btn>
+                      </template>
+                    </v-tooltip>
+                  </template>
                 </template>
               </v-list-item>
             </v-list>
@@ -117,10 +133,9 @@
             <p class="text-body-2 text-medium-emphasis mt-3 mb-0">
               You can manage invite links here. Anyone with a GitHub account can join using an
               invite link and will receive the permissions assigned to that link.<br /><br />
-              Deleting an invite link prevents new people from joining, but it does not revoke
-              access for people who have already joined. They will continue to have access and
-              appear under “People with access”. To revoke their access, you must remove them from
-              that list; deleting the invite link alone is not sufficient.
+              Deleting an invite link stops new people from joining, but people who already joined
+              keep their access until you remove them under “People with access”. Someone you remove
+              can join again through an invite link that still exists, so delete that link too.
             </p>
 
             <v-list class="mt-4">
@@ -189,6 +204,9 @@ import { useShareStore } from '@/stores/share';
 import { useNotificationsStore } from '@/stores/notifications';
 import { ACCESS_MODES, shareModeLabel } from '@/utils/shareMode';
 
+// How long a removal can be undone before it is sent
+const UNDO_SECONDS = 10;
+
 export default {
   name: 'ShareDialog',
   mixins: [DialogMixin],
@@ -216,6 +234,8 @@ export default {
       linkMode: 'readonly',
       isCreatingLink: false,
       modeOptions: ACCESS_MODES,
+      // Collaborator id -> timer of a removal that can still be undone, null once it is being sent
+      removals: {},
     };
   },
 
@@ -245,6 +265,12 @@ export default {
 
   created() {
     this.loadData();
+    window.addEventListener('pagehide', this.sendRemovalsOnPageHide);
+  },
+
+  beforeUnmount() {
+    window.removeEventListener('pagehide', this.sendRemovalsOnPageHide);
+    this.sendRemovals();
   },
 
   methods: {
@@ -265,7 +291,7 @@ export default {
     },
 
     statusColor(status) {
-      return { accepted: 'success', pending: 'warning', revoked: 'grey' }[status] || 'grey';
+      return { accepted: 'success', pending: 'warning' }[status] || 'grey';
     },
 
     formatDate(dateString) {
@@ -277,7 +303,13 @@ export default {
 
       this.isInviting = true;
       try {
-        await this.shareStore.addCollaborators(this.workspace.id, this.invitees, this.inviteMode);
+        const added = await this.shareStore.addCollaborators(
+          this.workspace.id,
+          this.invitees,
+          this.inviteMode,
+        );
+        // Invited again before the removal was sent: keep them
+        added?.forEach((collaborator) => this.undoRemoval(collaborator));
         this.notificationsStore.success('Invitation sent successfully');
         this.inviteUsernames = [];
         this.inviteSearch = '';
@@ -296,13 +328,40 @@ export default {
       }
     },
 
-    async removeShare(share) {
+    removeShare(share) {
+      this.removals[share.id] = setTimeout(() => this.sendRemoval(share), UNDO_SECONDS * 1000);
+    },
+
+    undoRemoval(share) {
+      if (this.removals[share.id]) {
+        clearTimeout(this.removals[share.id]);
+        delete this.removals[share.id];
+      }
+    },
+
+    async sendRemoval(share, options) {
+      clearTimeout(this.removals[share.id]);
+      this.removals[share.id] = null;
       try {
-        await this.shareStore.revokeCollaborator(this.workspace.id, share.id);
+        await this.shareStore.revokeCollaborator(this.workspace.id, share.id, options);
         this.notificationsStore.success(`Removed access for ${share.invitee_github_username}`);
       } catch (error) {
         this.notificationsStore.error(`Failed to remove access: ${error.message}`);
+      } finally {
+        delete this.removals[share.id];
       }
+    },
+
+    // The dialog closes or the page goes away: no time left to undo
+    sendRemovals(options) {
+      this.collaborators
+        .filter((share) => this.removals[share.id])
+        .forEach((share) => this.sendRemoval(share, options));
+    },
+
+    sendRemovalsOnPageHide() {
+      // keepalive: the request outlives the page
+      this.sendRemovals({ keepalive: true });
     },
 
     async createLink() {

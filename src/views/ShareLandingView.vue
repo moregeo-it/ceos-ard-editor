@@ -109,8 +109,8 @@ export default {
       } catch (err) {
         if (err.status === 403) {
           this.error = {
-            title: 'Access revoked',
-            message: 'Your access to this workspace was previously revoked by the owner.',
+            title: 'GitHub account required',
+            message: 'Share links need a GitHub login. Please log in with your GitHub account.',
           };
         } else if (err.status === 404) {
           this.error = {

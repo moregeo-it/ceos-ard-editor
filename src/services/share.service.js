@@ -41,10 +41,10 @@ export default {
   },
 
   /**
-   * Revoke a collaborator's access. Owner only.
+   * Remove a collaborator; a share they still hold lets them join again. Owner only.
    */
-  async revokeCollaborator(workspaceId, collaboratorId) {
-    return api.delete(`/workspaces/${workspaceId}/collaborators/${collaboratorId}`);
+  async revokeCollaborator(workspaceId, collaboratorId, options = {}) {
+    return api.delete(`/workspaces/${workspaceId}/collaborators/${collaboratorId}`, options);
   },
 
   /**
@@ -80,7 +80,7 @@ export default {
   /**
    * Grant the logged-in user the share's access; resolves to `{ collaborator, workspace }`. The session
    * cookie authenticates the call, so this also bypasses the `api` helper and throws with
-   * `status` 401 (not logged in), 403 (access revoked) or 404 (invalid/expired share).
+   * `status` 401 (not logged in), 403 (not a GitHub login) or 404 (invalid/expired share).
    */
   async redeemShare(token) {
     const response = await fetch(`${API_BASE_URL}/shares/${encodeURIComponent(token)}/redeem`, {

@@ -94,18 +94,12 @@ export const useShareStore = defineStore('share', {
       );
     },
 
-    revokeCollaborator(workspaceId, collaboratorId) {
+    revokeCollaborator(workspaceId, collaboratorId, options) {
       return this._mutate(
         workspaceId,
-        () => shareService.revokeCollaborator(workspaceId, collaboratorId),
+        () => shareService.revokeCollaborator(workspaceId, collaboratorId, options),
         () => {
-          // Revoke returns 204 (no body). A revoked invitee isn't dropped from the list - it stays,
-          // shown greyed-out as "revoked" (that's what a reload returns and what the dialog renders),
-          // so flip the row's status in place instead of removing it.
-          const collaborator = this.collaborators.find((c) => c.id === collaboratorId);
-          if (collaborator) {
-            replaceById(this.collaborators, collaboratorId, { ...collaborator, status: 'revoked' });
-          }
+          this.collaborators = this.collaborators.filter((c) => c.id !== collaboratorId);
         },
       );
     },
