@@ -205,19 +205,27 @@ export const useRealtimeStore = defineStore('realtime', {
     async resync() {
       const workspaceId = this.workspaceId;
       const started = workspaceSession();
+      const workspaces = useWorkspacesStore();
+      const steps = [
+        () => workspaces.refreshCurrentWorkspace(),
+        () => workspaces.fetchPfs(workspaceId),
+        () =>
+          useEditorStore().refreshAfterRemoteUpdate({
+            source: 'the changes made while disconnected',
+          }),
+      ];
       try {
-        const workspaces = useWorkspacesStore();
-        await workspaces.refreshCurrentWorkspace();
-        await workspaces.fetchPfs(workspaceId);
-        await useEditorStore().refreshAfterRemoteUpdate({
-          source: 'the changes made while disconnected',
-        });
-        if (started !== workspaceSession()) {
-          return; // Left or switched workspaces meanwhile
+        for (const step of steps) {
+          await step();
+          if (started !== workspaceSession()) {
+            return; // Left or switched workspaces meanwhile
+          }
         }
         emit(EVENTS.REALTIME_RESYNCED, { workspaceId });
       } catch (error) {
-        useNotificationsStore().error('Failed to resync workspace: ' + error.message);
+        if (started === workspaceSession()) {
+          useNotificationsStore().error('Failed to resync workspace: ' + error.message);
+        }
       }
     },
   },

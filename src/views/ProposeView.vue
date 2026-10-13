@@ -91,6 +91,7 @@ export default {
   },
 
   async created() {
+    this.workspacesStore.enterWorkspace(this.workspaceId);
     // The Propose view is owner-only - collaborators (any share mode) never see it, not even read-only.
     try {
       await this.workspacesStore.getWorkspace(this.workspaceId);

@@ -204,6 +204,22 @@ export const useWorkspacesStore = defineStore('workspaces', {
       return workspaceService.syncWorkspace(workspaceId);
     },
 
+    /**
+     * Drop the previous workspace's state when a view opens another one, however it was reached.
+     * @returns {boolean} whether it is another workspace
+     */
+    enterWorkspace(workspaceId) {
+      if (this.currentWorkspace?.id === workspaceId) {
+        return false;
+      }
+      startWorkspaceSession();
+      useEditorStore().reset();
+      useFilesStore().reset();
+      usePreviewStore().reset();
+      useProposalStore().reset();
+      return true;
+    },
+
     /** No workspace is open any more, e.g. back on the list (also by the browser's back button). */
     resetCurrentWorkspace() {
       startWorkspaceSession();
