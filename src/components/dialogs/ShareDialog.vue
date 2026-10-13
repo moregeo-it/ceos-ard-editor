@@ -14,16 +14,20 @@
           <!-- People with access -->
           <v-tabs-window-item value="people">
             <v-form class="d-flex ga-2 align-start mt-2" @submit.prevent="sendInvite">
+              <!-- Enter sends (the combobox blocks the form's submit); a comma or space adds a chip -->
               <v-combobox
                 v-model="inviteUsernames"
+                v-model:search="inviteSearch"
                 label="GitHub username(s)"
                 multiple
                 chips
                 closable-chips
+                :delimiters="[',', ' ']"
                 variant="outlined"
                 density="compact"
                 hide-details
                 :disabled="isInviting"
+                @keyup.enter="sendInvite"
               />
               <v-select
                 v-model="inviteMode"
@@ -35,12 +39,7 @@
                 style="max-width: 160px"
                 :disabled="isInviting"
               />
-              <v-btn
-                type="submit"
-                color="primary"
-                :loading="isInviting"
-                :disabled="inviteUsernames.length === 0 || shareStore.isLoadingCollaborators"
-              >
+              <v-btn type="submit" color="primary" :loading="isInviting" :disabled="!canInvite">
                 Invite
               </v-btn>
             </v-form>
@@ -211,6 +210,7 @@ export default {
       },
       tab: 'people',
       inviteUsernames: [],
+      inviteSearch: '',
       inviteMode: 'readonly',
       isInviting: false,
       linkMode: 'readonly',
@@ -231,6 +231,15 @@ export default {
     },
     shares() {
       return this.shareStore.shares;
+    },
+    // The chips and the name still being typed
+    invitees() {
+      return [...new Set([...this.inviteUsernames, this.inviteSearch?.trim()].filter(Boolean))];
+    },
+    canInvite() {
+      return (
+        this.invitees.length > 0 && !this.isInviting && !this.shareStore.isLoadingCollaborators
+      );
     },
   },
 
@@ -264,17 +273,14 @@ export default {
     },
 
     async sendInvite() {
-      if (this.inviteUsernames.length === 0) return;
+      if (!this.canInvite) return;
 
       this.isInviting = true;
       try {
-        await this.shareStore.addCollaborators(
-          this.workspace.id,
-          this.inviteUsernames,
-          this.inviteMode,
-        );
+        await this.shareStore.addCollaborators(this.workspace.id, this.invitees, this.inviteMode);
         this.notificationsStore.success('Invitation sent successfully');
         this.inviteUsernames = [];
+        this.inviteSearch = '';
       } catch (error) {
         this.notificationsStore.error(`Failed to invite: ${error.message}`);
       } finally {
