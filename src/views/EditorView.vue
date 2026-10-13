@@ -133,15 +133,13 @@ export default {
       this.previewStore.reset();
     }
 
-    await this.loadWorkspace();
-    if (this.unmounted) {
+    const loaded = await this.loadWorkspace();
+    if (!loaded) {
       return;
     }
     // Subscribe to live changes once the workspace has loaded. Everyone connects (the server
     // withholds a tab's own changes); read-only viewers get the owner's changes live.
-    if (this.workspace) {
-      this.realtimeStore.connect(this.workspaceId);
-    }
+    this.realtimeStore.connect(this.workspaceId);
     // Must be called after the workspace has loaded, otherwise isArchived is always false.
     // Only offer reactivation to the owner.
     if (this.workspacesStore.isArchived && this.workspacesStore.isOwner) {
@@ -172,15 +170,17 @@ export default {
       }
     },
 
+    /** Whether the workspace loaded and this view is still open */
     async loadWorkspace() {
       try {
         await this.workspacesStore.getWorkspace(this.workspaceId);
+        return !this.unmounted;
       } catch (error) {
-        if (this.unmounted) {
-          return;
+        if (!this.unmounted) {
+          this.notificationsStore.error(`Failed to load workspace: ${error.message}`);
+          this.$router.push({ name: 'workspaces' });
         }
-        this.notificationsStore.error(`Failed to load workspace: ${error.message}`);
-        this.$router.push({ name: 'workspaces' });
+        return false;
       }
     },
 
@@ -224,6 +224,9 @@ export default {
               'Workspace updated with the latest changes from GitHub',
             );
             await this.editorStore.refreshAfterRemoteUpdate();
+            if (this.unmounted) {
+              return;
+            }
             this.previewStore.requestPreviewRefresh();
             break;
           case 'conflict':

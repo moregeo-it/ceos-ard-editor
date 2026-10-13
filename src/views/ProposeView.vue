@@ -62,6 +62,7 @@ export default {
         changes: localStorage.changesPanelSize ?? panelSizeDefaults.changes,
         pr: localStorage.prPanelSize ?? panelSizeDefaults.pr,
       },
+      unmounted: false,
     };
   },
 
@@ -94,8 +95,14 @@ export default {
     try {
       await this.workspacesStore.getWorkspace(this.workspaceId);
     } catch (error) {
+      if (this.unmounted) {
+        return;
+      }
       this.notificationsStore.error(`Failed to load workspace: ${error.message}`);
       this.$router.push({ name: 'workspaces' });
+      return;
+    }
+    if (this.unmounted) {
       return;
     }
 
@@ -112,6 +119,10 @@ export default {
     this.proposalStore.fetchCommits(this.workspaceId).catch((error) => {
       this.notificationsStore.error(`Failed to load commits: ${error.message}`);
     });
+  },
+
+  beforeUnmount() {
+    this.unmounted = true;
   },
 
   methods: {

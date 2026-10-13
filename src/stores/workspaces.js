@@ -106,12 +106,17 @@ export const useWorkspacesStore = defineStore('workspaces', {
       return updatedWorkspace;
     },
 
+    /** The current workspace reloaded; null without one, or when another session started meanwhile. */
     async refreshCurrentWorkspace() {
       const workspaceId = this.currentWorkspace?.id;
       if (!workspaceId) {
         return null;
       }
+      const started = workspaceSession();
       const workspace = await workspaceService.getWorkspace(workspaceId);
+      if (started !== workspaceSession()) {
+        return null;
+      }
       this.applyWorkspace(workspace);
       return workspace;
     },
@@ -272,8 +277,9 @@ export function registerWorkspacesEventListeners() {
 
   // The owner changed this user's mode; viewer_role on the refetched workspace drives the UI
   on(EVENTS.COLLABORATOR_UPDATED, async () => {
-    await useWorkspacesStore().refreshCurrentWorkspace();
-    useNotificationsStore().info('The owner changed your access to this workspace.');
+    if (await useWorkspacesStore().refreshCurrentWorkspace()) {
+      useNotificationsStore().info('The owner changed your access to this workspace.');
+    }
   });
 
   // Files changed on disk beyond the single-file events. The tab that triggered the sync refreshes

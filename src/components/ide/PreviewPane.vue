@@ -77,6 +77,7 @@ import { mdiDownload } from '@mdi/js';
 import { useNotificationsStore } from '@/stores/notifications';
 import { downloadBlob } from '@/utils/api';
 import PfsSelect from '@/components/PfsSelect.vue';
+import { workspaceSession } from '@/services/events';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -292,6 +293,7 @@ export default {
       }
       // Saved on the workspace so viewers and the owner's other tabs show the same preview; on
       // failure the chips fall back to the saved list
+      const started = workspaceSession();
       try {
         await this.workspacesStore.updateWorkspacePfs(this.workspaceId, after);
       } catch (error) {
@@ -300,7 +302,9 @@ export default {
       } finally {
         this.draftPfs = null;
       }
-      await this.previewStore.requestPreviewRefresh();
+      if (started === workspaceSession()) {
+        await this.previewStore.requestPreviewRefresh();
+      }
     },
 
     async downloadPreview(documentType) {

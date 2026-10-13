@@ -137,6 +137,9 @@ export const useEditorStore = defineStore('editor', {
     async refreshAfterRemoteUpdate({ source = 'the changes from GitHub' } = {}) {
       const started = workspaceSession();
       await useFilesStore().reloadTree();
+      if (started !== workspaceSession()) {
+        return [];
+      }
       const skipped = await this.resyncOpenFiles();
       if (skipped.length && started === workspaceSession()) {
         useNotificationsStore().warning(
