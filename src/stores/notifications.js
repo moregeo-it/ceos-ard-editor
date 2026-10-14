@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia';
 
+import { useAuthStore } from './auth';
+
 const getDefaults = () => ({
   show: false,
   message: '',
@@ -23,6 +25,10 @@ export const useNotificationsStore = defineStore('notifications', {
     },
 
     error(message, timeout = 7000) {
+      // The request failed because the session ended; the login dialog already says so
+      if (useAuthStore().isPendingReauth) {
+        return;
+      }
       this.showNotification({ message, type: 'error', timeout });
     },
 

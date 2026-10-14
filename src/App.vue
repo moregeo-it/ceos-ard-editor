@@ -60,6 +60,10 @@ export default {
   watch: {
     'authStore.isPendingReauth'(needsReauth) {
       if (needsReauth) {
+        // An error shown just before is most likely this session ending
+        if (this.notificationsStore.type === 'error') {
+          this.notificationsStore.hide();
+        }
         this.openDialog('ReauthenticationDialog', {
           show: true,
         });
