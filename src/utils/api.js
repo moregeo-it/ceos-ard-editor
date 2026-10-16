@@ -1,10 +1,20 @@
+import { watch } from 'vue';
+
 import { useAuthStore } from '@/stores/auth';
 import { CLIENT_ID, CLIENT_ID_HEADER } from '@/utils/client-id';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
+// Requests waiting for the user to log in again go out one at a time, in the order they came, so
+// two saves of a file reach the server oldest first
+let queue = Promise.resolve();
+let queued = 0;
+const DROPPED = Symbol('dropped');
+
 /**
- * Fetch from the API with the session cookie
+ * Fetch from the API with the session cookie. A request refused because the session ended (401)
+ * waits until the user has logged in again and is then sent again. After a logout, or a login as
+ * another account, it is dropped: its promise never settles, and the app reloads before next use.
  */
 export async function fetchWithAuth(endpoint, options = {}) {
   const authStore = useAuthStore();
@@ -13,11 +23,8 @@ export async function fetchWithAuth(endpoint, options = {}) {
   if (!authStore.isAuthenticated) {
     throw new Error('User is not authenticated');
   }
-
-  if (authStore.isSessionExpired) {
-    authStore.setPendingReauth();
-    throw new Error('Session expired. Please login again.');
-  }
+  // The user it is sent for, never another account logged in meanwhile
+  const sentBy = authStore.userId;
 
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
 
@@ -27,13 +34,26 @@ export async function fetchWithAuth(endpoint, options = {}) {
     // Realtime echo filter, and required by the server on requests that change data
     [CLIENT_ID_HEADER]: CLIENT_ID,
   };
+  let sentWith;
+  const send = () => {
+    sentWith = authStore.expiresAt;
+    return fetch(url, { ...options, headers, credentials: 'include' });
+  };
 
-  const response = await fetch(url, { ...options, headers, credentials: 'include' });
-
-  // Handle 401 Unauthorized
-  if (response.status === 401) {
+  if (authStore.isSessionExpired) {
     authStore.setPendingReauth();
-    throw new Error('Authentication failed. Please login again.');
+  }
+  // Queued too while earlier ones are still waiting, so none overtakes them
+  let response =
+    authStore.isPendingReauth || queued > 0
+      ? await sendInTurn(authStore, sentBy, send)
+      : await send();
+  while (response.status === 401) {
+    // Unless a login (here or in another tab) replaced the session it went out with
+    if (authStore.expiresAt === sentWith) {
+      authStore.setPendingReauth();
+    }
+    response = await sendInTurn(authStore, sentBy, send);
   }
 
   if (!response.ok) {
@@ -46,6 +66,39 @@ export async function fetchWithAuth(endpoint, options = {}) {
   }
 
   return response;
+}
+
+/** Send once the requests before it are done and `sentBy` is logged in; dropped otherwise. */
+function sendInTurn(authStore, sentBy, send) {
+  queued += 1;
+  const turn = queue.then(async () => {
+    if (authStore.isPendingReauth) {
+      await dialogClosed(authStore);
+    }
+    return authStore.isAuthenticated && authStore.userId === sentBy ? send() : DROPPED;
+  });
+  // A dropped request settles its turn, so the ones after it still go out
+  queue = turn
+    .catch(() => {})
+    .finally(() => {
+      queued -= 1;
+    });
+  return turn.then((response) => (response === DROPPED ? new Promise(() => {}) : response));
+}
+
+/** Resolves when the login dialog closes, after a login or a logout. */
+function dialogClosed(authStore) {
+  return new Promise((resolve) => {
+    const stop = watch(
+      () => authStore.isPendingReauth,
+      (pending) => {
+        if (!pending) {
+          stop();
+          resolve();
+        }
+      },
+    );
+  });
 }
 
 /**

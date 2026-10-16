@@ -19,6 +19,7 @@
           </ol>
         </v-alert>
 
+        <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
         <p class="text-body-1 mb-3">{{ message }}</p>
 
         <v-alert v-if="unsavedChanges > 0" type="info" variant="tonal" density="compact">
@@ -84,6 +85,8 @@ export default {
     return {
       isAuthenticating: false,
       popupBlocked: false,
+      // Shown in the dialog: error notifications are held back while it is open
+      error: null,
       icons: {
         clockAlert: mdiClockAlertOutline,
         contentSave: mdiContentSaveAlert,
@@ -141,6 +144,7 @@ export default {
     async handleReauthenticate() {
       this.isAuthenticating = true;
       this.popupBlocked = false;
+      this.error = null;
 
       try {
         // Attempt popup authentication with GitHub
@@ -172,7 +176,7 @@ export default {
           this.notificationsStore.info('Authentication cancelled');
         } else {
           // Other error
-          this.notificationsStore.error('Reauthentication failed: ' + error.message);
+          this.error = 'Reauthentication failed: ' + error.message;
         }
       }
     },
@@ -197,13 +201,10 @@ export default {
       );
 
       if (confirmed) {
-        this.authStore
-          .logout()
-          .catch(() =>
-            this.notificationsStore.error(
-              'Logout failed, you are still logged in. Please try again.',
-            ),
-          );
+        this.error = null;
+        this.authStore.logout().catch(() => {
+          this.error = 'Logout failed, you are still logged in. Please try again.';
+        });
       }
     },
   },
