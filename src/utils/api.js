@@ -3,14 +3,12 @@ import { CLIENT_ID, CLIENT_ID_HEADER } from '@/utils/client-id';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-// Requests waiting for the user to log in again, in the order they were made
-const waiting = [];
-let draining = false;
-let made = 0;
+// Resolves when the login dialog closes; shared by every request waiting for it
+let dialogClosed = null;
 
 /**
  * Fetch from the API with the session cookie. On a 401 the request waits for the user to log in
- * again and is then sent again; after a logout or a login as another account it never settles.
+ * again and is then sent once more; after a logout or a login as another account it never settles.
  */
 export async function fetchWithAuth(endpoint, options = {}) {
   const authStore = useAuthStore();
@@ -28,28 +26,29 @@ export async function fetchWithAuth(endpoint, options = {}) {
     // Realtime echo filter, and required by the server on requests that change data
     [CLIENT_ID_HEADER]: CLIENT_ID,
   };
-  const request = {
-    order: made++,
-    sentBy: authStore.userId,
-    send() {
-      this.sentWith = authStore.expiresAt;
-      return fetch(url, { ...options, headers, credentials: 'include' });
-    },
+  const sentBy = authStore.userId;
+  let sentWith;
+  const send = () => {
+    sentWith = authStore.expiresAt;
+    return fetch(url, { ...options, headers, credentials: 'include' });
   };
 
   if (authStore.isSessionExpired) {
     authStore.setPendingReauth();
   }
-  let response;
-  if (authStore.isPendingReauth || draining) {
-    // Behind the requests already waiting
-    response = await sendAgainLater(authStore, request);
-  } else {
-    response = await request.send();
-    if (response.status === 401) {
-      askForLogin(authStore, request);
-      response = await sendAgainLater(authStore, request);
+  let response = authStore.isPendingReauth ? null : await send();
+  if (!response || response.status === 401) {
+    // Unless a login since replaced the session the request was sent with
+    if (response && authStore.expiresAt === sentWith) {
+      authStore.setPendingReauth();
     }
+    await loginDialogClosed(authStore);
+    // Logged out, or another account logged in: dropped
+    if (!authStore.isAuthenticated || authStore.userId !== sentBy) {
+      return new Promise(() => {});
+    }
+    // Once: a second 401 fails like any other error
+    response = await send();
   }
 
   if (!response.ok) {
@@ -64,76 +63,25 @@ export async function fetchWithAuth(endpoint, options = {}) {
   return response;
 }
 
-/** Open the login dialog, unless a login since replaced the session the request was sent with. */
-function askForLogin(authStore, request) {
-  if (authStore.expiresAt === request.sentWith) {
-    authStore.setPendingReauth();
+/** Resolves when the login dialog closes, after a login or a logout; at once if it isn't open. */
+function loginDialogClosed(authStore) {
+  if (!authStore.isPendingReauth) {
+    return Promise.resolve();
   }
-}
-
-/** Resolves with the response once the request is sent again after the login. */
-function sendAgainLater(authStore, request) {
-  return new Promise((resolve, reject) => {
-    Object.assign(request, { resolve, reject });
-    enqueue(request);
-    drain(authStore);
-  });
-}
-
-/** Insert by the order the requests were made. */
-function enqueue(request) {
-  const later = waiting.findIndex((other) => other.order > request.order);
-  waiting.splice(later === -1 ? waiting.length : later, 0, request);
-}
-
-/** Send the waiting requests one at a time, oldest first, while the user is logged in. */
-async function drain(authStore) {
-  if (draining) {
-    return;
-  }
-  draining = true;
-  try {
-    while (waiting.length > 0) {
-      if (authStore.isPendingReauth) {
-        await dialogClosed(authStore);
-        continue;
-      }
-      const request = waiting.shift();
-      // Logged out, or another account logged in: dropped
-      if (!authStore.isAuthenticated || authStore.userId !== request.sentBy) {
-        continue;
-      }
-      try {
-        const response = await request.send();
-        if (response.status === 401) {
-          askForLogin(authStore, request);
-          enqueue(request);
-        } else {
-          request.resolve(response);
-        }
-      } catch (error) {
-        request.reject(error);
-      }
-    }
-  } finally {
-    draining = false;
-  }
-}
-
-/** Resolves when the login dialog closes, after a login or a logout. */
-function dialogClosed(authStore) {
-  return new Promise((resolve) => {
+  dialogClosed ??= new Promise((resolve) => {
     // Detached: it outlives the component whose request started the wait
     const unsubscribe = authStore.$subscribe(
       () => {
         if (!authStore.isPendingReauth) {
           unsubscribe();
+          dialogClosed = null;
           resolve();
         }
       },
       { detached: true },
     );
   });
+  return dialogClosed;
 }
 
 /**
