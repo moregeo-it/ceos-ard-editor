@@ -24,7 +24,9 @@
 
           <PfsSelect
             v-model="formData.pfs"
-            :items="workspacesStore.pfsOptions"
+            :items="pfsItems"
+            :loading="loadingPfs"
+            :no-data-text="loadingPfs ? 'Loading PFS…' : undefined"
             label="Product Format Specification"
             multiple
             chips
@@ -33,6 +35,10 @@
             persistent-hint
             class="mb-3"
           />
+
+          <v-alert v-if="pfsError" type="warning" variant="tonal" density="compact" class="mb-3">
+            Couldn't load PFSes of this workspace, so newly added PFS are missing currently.
+          </v-alert>
 
           <v-textarea
             v-model="formData.description"
@@ -63,6 +69,7 @@
 
 <script>
 import DialogMixin from '@/components/DialogMixin';
+import workspaceService from '@/services/workspace.service';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { mdiFolderPlus, mdiFolderEdit, mdiFolder, mdiFileDocument, mdiText } from '@mdi/js';
 import PfsSelect from '@/components/PfsSelect.vue';
@@ -98,6 +105,10 @@ export default {
         pfs: [],
         description: '',
       },
+      // The workspace's own PFS, including ones created in it but not merged upstream yet
+      workspacePfs: null,
+      loadingPfs: false,
+      pfsError: null,
       rules: {
         title: [
           (v) => !!v || 'Title is required',
@@ -123,6 +134,12 @@ export default {
     submitButtonText() {
       return this.isUpdateMode ? 'Update Workspace' : 'Create Workspace';
     },
+    pfsItems() {
+      if (this.loadingPfs) {
+        return [];
+      }
+      return this.workspacePfs ?? this.workspacesStore.pfsOptions;
+    },
   },
   created() {
     if (this.workspace) {
@@ -137,8 +154,21 @@ export default {
         description: this.workspace.description || '',
       };
     }
+    if (this.isUpdateMode && this.workspace) {
+      this.loadWorkspacePfs();
+    }
   },
   methods: {
+    async loadWorkspacePfs() {
+      this.loadingPfs = true;
+      try {
+        this.workspacePfs = await workspaceService.fetchPfs(this.workspace.id);
+      } catch (error) {
+        this.pfsError = error.message;
+      } finally {
+        this.loadingPfs = false;
+      }
+    },
     async handleSubmit() {
       const { valid } = await this.$refs.form.validate();
       if (!valid) return;
