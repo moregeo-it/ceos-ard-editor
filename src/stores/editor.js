@@ -5,6 +5,9 @@ import { useNotificationsStore } from './notifications';
 
 import { EVENTS, on, workspaceSession } from '@/services/events';
 
+// The latest save per file path, which the next save of that file waits for
+const savesInFlight = {};
+
 const getDefaults = () => ({
   opened: [], // Opened files
   original: {}, // Original data per file path
@@ -82,28 +85,40 @@ export const useEditorStore = defineStore('editor', {
       this.data[path] = content;
       this.changed[path] = this.original[path] !== content;
     },
+    /** One save per file at a time: a later save waits, then sends the content as it is by then. */
     async save(path) {
-      if (!this.changed[path]) {
-        return false;
-      }
       const started = workspaceSession();
-      this.saving[path] = true;
-      try {
-        const data = this.data[path];
-        // Preview regeneration happens via the `file.saved` event files.save() emits.
-        await useFilesStore().save(path, data);
-        if (started === workspaceSession()) {
-          this.original[path] = data;
-          this.changed[path] = false;
+      const previous = savesInFlight[path];
+      const current = (async () => {
+        await previous;
+        if (started !== workspaceSession() || !this.changed[path]) {
+          return false;
         }
-        return true;
-      } catch (error) {
-        return error;
-      } finally {
-        if (started === workspaceSession()) {
-          this.saving[path] = false;
+        this.saving[path] = true;
+        try {
+          const data = this.data[path];
+          // Preview regeneration happens via the `file.saved` event files.save() emits.
+          await useFilesStore().save(path, data);
+          if (started === workspaceSession()) {
+            this.original[path] = data;
+            // Edits typed during the save stay unsaved
+            this.changed[path] = this.data[path] !== data;
+          }
+          return true;
+        } catch (error) {
+          return error;
+        } finally {
+          if (started === workspaceSession()) {
+            this.saving[path] = false;
+          }
         }
+      })();
+      savesInFlight[path] = current;
+      const result = await current;
+      if (savesInFlight[path] === current) {
+        delete savesInFlight[path];
       }
+      return result;
     },
     async saveAll() {
       const savePromises = this.opened.map((file) => this.save(file.path));
