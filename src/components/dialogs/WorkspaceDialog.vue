@@ -37,8 +37,7 @@
           />
 
           <v-alert v-if="pfsError" type="warning" variant="tonal" density="compact" class="mb-3">
-            Couldn't load this workspace's PFS ({{ pfsError }}), so only the upstream ones are
-            listed.
+            Couldn't load PFSes of this workspace, so newly added PFS are missing currently.
           </v-alert>
 
           <v-textarea
