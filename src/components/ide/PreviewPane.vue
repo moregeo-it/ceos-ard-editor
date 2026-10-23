@@ -12,6 +12,16 @@
         class="preview-select mr-2 flex-grow-1"
         @update:menu="handleMenuToggle"
       />
+      <v-tooltip :text="pfsTooltip" location="bottom" max-width="320">
+        <template #activator="{ props }">
+          <v-icon
+            v-bind="props"
+            :icon="icons.info"
+            tabindex="0"
+            aria-label="About the PFS selection"
+          />
+        </template>
+      </v-tooltip>
       <v-btn
         color="primary"
         class="ml-2"
@@ -73,7 +83,7 @@ import { useEditorStore } from '@/stores/editor';
 import { usePreviewStore } from '@/stores/preview';
 import previewService from '@/services/preview.service';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import { mdiDownload } from '@mdi/js';
+import { mdiDownload, mdiInformationOutline } from '@mdi/js';
 import { useNotificationsStore } from '@/stores/notifications';
 import { downloadBlob } from '@/utils/api';
 import PfsSelect from '@/components/PfsSelect.vue';
@@ -101,6 +111,7 @@ export default {
       draftPfs: null,
       icons: {
         download: mdiDownload,
+        info: mdiInformationOutline,
       },
     };
   },
@@ -131,6 +142,11 @@ export default {
       set(value) {
         this.draftPfs = value;
       },
+    },
+    pfsTooltip() {
+      return this.workspacesStore.isOwner
+        ? "Changing the selection updates the workspace's PFS, as in its settings, so everyone with access sees the same preview."
+        : 'The workspace owner chooses which PFS the preview shows.';
     },
     previewHtml() {
       return this.previewStore.previewHtml;

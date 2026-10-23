@@ -31,7 +31,7 @@
             multiple
             chips
             :rules="rules.pfs"
-            hint="At least one PFS needs to be selected to show preview"
+            hint="The workspace preview is generated from these PFS, for everyone with access."
             persistent-hint
             class="mb-3"
           />
