@@ -41,6 +41,9 @@ const components = {
   UncommittedChangesDialog: defineAsyncComponent(
     () => import('@/components/dialogs/UncommittedChangesDialog.vue'),
   ),
+  UploadFilesDialog: defineAsyncComponent(
+    () => import('@/components/dialogs/UploadFilesDialog.vue'),
+  ),
   WorkspaceDialog: defineAsyncComponent(() => import('@/components/dialogs/WorkspaceDialog.vue')),
 };
 
