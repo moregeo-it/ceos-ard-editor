@@ -4,8 +4,13 @@
       <v-card>
         <v-card-title>Create New</v-card-title>
         <v-card-text>
-          <v-radio-group v-model="type" inline class="mb-3">
-            <v-radio label="File" value="file"></v-radio>
+          <v-radio-group
+            v-model="type"
+            inline
+            :messages="inAssets ? ['Files in /assets can only be uploaded'] : []"
+            class="mb-3"
+          >
+            <v-radio label="File" value="file" :disabled="inAssets"></v-radio>
             <v-radio label="Folder" value="folder"></v-radio>
           </v-radio-group>
 
@@ -64,6 +69,11 @@ export default {
     };
   },
   computed: {
+    // Assets are images, which an empty new file can't be
+    inAssets() {
+      const path = this.path.replace(/^\/+/, '');
+      return path === 'assets' || path.startsWith('assets/');
+    },
     hasExtension() {
       const parts = this.name.split('.');
       return parts.length > 1 && parts[parts.length - 1].length > 0;
@@ -82,6 +92,13 @@ export default {
     },
     isValid() {
       return this.nameError.length === 0;
+    },
+  },
+  watch: {
+    inAssets(inAssets) {
+      if (inAssets) {
+        this.type = 'folder';
+      }
     },
   },
   created() {
