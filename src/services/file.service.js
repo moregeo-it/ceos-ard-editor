@@ -61,7 +61,16 @@ export default {
    * Save file content
    */
   async saveFile(workspaceId, filePath, content) {
-    return api.putRaw(`/workspaces/${workspaceId}/files/${encodeURIComponent(filePath)}`, content);
+    // A file (upload) is sent with its own type instead of the JSON default
+    const options =
+      content instanceof Blob
+        ? { headers: { 'Content-Type': content.type || 'application/octet-stream' } }
+        : {};
+    return api.putRaw(
+      `/workspaces/${workspaceId}/files/${encodeURIComponent(filePath)}`,
+      content,
+      options,
+    );
   },
 
   /**

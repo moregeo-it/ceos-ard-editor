@@ -116,6 +116,13 @@
           </template>
           <v-list-item-title>Create</v-list-item-title>
         </v-list-item>
+
+        <v-list-item v-if="!workspacesStore.isReadOnly" @click="requestUpload">
+          <template v-slot:prepend>
+            <v-icon :icon="icons.upload" size="small" />
+          </template>
+          <v-list-item-title>Upload</v-list-item-title>
+        </v-list-item>
       </template>
 
       <template v-if="item.status !== 'deleted' && !isPfsItem && !workspacesStore.isReadOnly">
@@ -150,6 +157,7 @@ import {
   mdiUndoVariant,
   mdiDownload,
   mdiCodeJson,
+  mdiUpload,
 } from '@mdi/js';
 import { downloadBlob } from '@/utils/api';
 import { useWorkspacesStore } from '@/stores/workspaces';
@@ -175,6 +183,7 @@ export default {
         revert: mdiUndoVariant,
         download: mdiDownload,
         codeeditor: mdiCodeJson,
+        upload: mdiUpload,
       },
     };
   },
@@ -283,6 +292,21 @@ export default {
       this.$root.openDialog('CreatePfsDialog', {
         onAcceptance: this.handleCreatePfs,
       });
+    },
+
+    requestUpload() {
+      this.$root.openDialog('UploadFilesDialog', {
+        folder: this.item.path,
+        onAcceptance: this.handleUpload,
+      });
+    },
+
+    handleUpload({ folder, paths }) {
+      // Show the uploaded files
+      this.filesStore.openedFolders = [...new Set([...this.filesStore.openedFolders, folder])];
+      this.notificationsStore.success(
+        `Uploaded ${paths.length === 1 ? '1 file' : `${paths.length} files`} to ${folder}`,
+      );
     },
 
     async handleCreate({ type, path, name }) {
