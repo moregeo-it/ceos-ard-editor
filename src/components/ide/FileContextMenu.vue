@@ -295,18 +295,7 @@ export default {
     },
 
     requestUpload() {
-      this.$root.openDialog('UploadFilesDialog', {
-        folder: this.item.path,
-        onAcceptance: this.handleUpload,
-      });
-    },
-
-    handleUpload({ folder, paths }) {
-      // Show the uploaded files
-      this.filesStore.openedFolders = [...new Set([...this.filesStore.openedFolders, folder])];
-      this.notificationsStore.success(
-        `Uploaded ${paths.length === 1 ? '1 file' : `${paths.length} files`} to ${folder}`,
-      );
+      this.$root.openDialog('UploadFilesDialog', { folder: this.item.path });
     },
 
     async handleCreate({ type, path, name }) {

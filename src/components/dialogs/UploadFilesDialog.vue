@@ -36,7 +36,7 @@
                 variant="outlined"
                 density="compact"
                 hide-details="auto"
-                @update:model-value="row.error = null"
+                @update:model-value="renamed(row)"
               />
               <v-progress-circular
                 v-if="row.uploading"
@@ -88,6 +88,7 @@
 import DialogMixin from '@/components/DialogMixin';
 import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
+import { workspaceSession } from '@/services/events';
 import { FILE_FORMATS, FORMAT_ERROR, fileFormat, isAllowedFormat } from '@/utils/fileFormats';
 import { mdiClose } from '@mdi/js';
 
@@ -112,8 +113,8 @@ export default {
   data() {
     return {
       rows: [],
-      // Paths uploaded so far, across retries
-      uploaded: [],
+      // The workspace this dialog uploads to; it stops once that one is left
+      session: workspaceSession(),
       uploading: false,
       loadingFolder: true,
       folderError: null,
@@ -214,11 +215,19 @@ export default {
         ? `${Math.max(1, Math.round(bytes / 1024))} KB`
         : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     },
-    // One at a time; uploaded files leave the list and failed ones stay with the reason
+    renamed(row) {
+      row.error = null;
+      row.replace = false; // the confirmation was for the old name
+    },
+    // One at a time; uploaded files leave the list, the others stay with the reason
     async upload() {
       const editor = useEditorStore();
+      const uploaded = [];
       this.uploading = true;
       for (const row of this.uploadable) {
+        if (workspaceSession() !== this.session) {
+          break;
+        }
         const path = this.pathOf(row);
         row.uploading = true;
         row.error = null;
@@ -230,7 +239,7 @@ export default {
         } finally {
           row.uploading = false;
         }
-        this.uploaded.push(path);
+        uploaded.push(path);
         this.remove(row);
         if (editor.changed[path]) {
           this.notifications.warning(`${path} was replaced; its tab keeps its unsaved changes.`);
@@ -242,8 +251,21 @@ export default {
         }
       }
       this.uploading = false;
-      if (!this.rows.some((row) => row.error)) {
-        this.accept({ folder: this.folder, paths: this.uploaded });
+      if (workspaceSession() !== this.session) {
+        this.reject(); // the workspace was left
+        return;
+      }
+      if (uploaded.length) {
+        this.filesStore.openedFolders = [
+          ...new Set([...this.filesStore.openedFolders, this.folder]),
+        ];
+        this.notifications.success(
+          `Uploaded ${uploaded.length === 1 ? '1 file' : `${uploaded.length} files`} to ${this.folder}`,
+        );
+      }
+      // Rows not uploaded (invalid, failed or not confirmed) keep it open
+      if (this.rows.length === 0) {
+        this.accept();
       }
     },
   },
