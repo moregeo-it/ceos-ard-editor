@@ -30,7 +30,7 @@
             variant="outlined"
             label="Name"
             :placeholder="type === 'file' ? 'example.yaml' : 'folder-name'"
-            :hint="type === 'file' ? 'File name must include extension (e.g., .yaml, .json)' : ''"
+            :hint="type === 'file' ? `Formats: ${formats}` : ''"
             :error-messages="nameError"
             persistent-hint
             density="compact"
@@ -51,6 +51,7 @@
 
 <script>
 import DialogMixin from '@/components/DialogMixin';
+import { FILE_FORMATS, FORMAT_ERROR, isAllowedFormat } from '@/utils/fileFormats';
 
 export default {
   name: 'CreateFileDialog',
@@ -66,6 +67,7 @@ export default {
       type: 'file',
       path: '',
       name: '',
+      formats: FILE_FORMATS.join(', '),
     };
   },
   computed: {
@@ -82,8 +84,8 @@ export default {
       if (this.name.length <= 1) {
         return ['Please provide a name with at least 2 characters'];
       }
-      if (this.type === 'file' && !this.hasExtension) {
-        return ['File name must include an extension (e.g., .yaml, .json, .txt)'];
+      if (this.type === 'file' && !isAllowedFormat(this.name)) {
+        return [FORMAT_ERROR];
       }
       if (this.type === 'folder' && this.hasExtension) {
         return ['Folder names should not include file extensions'];

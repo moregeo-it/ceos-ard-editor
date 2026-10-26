@@ -30,6 +30,7 @@
 
 <script>
 import DialogMixin from '@/components/DialogMixin';
+import { FILE_FORMATS, FORMAT_ERROR, isAllowedFormat } from '@/utils/fileFormats';
 export default {
   name: 'RenameFileDialog',
   mixins: [DialogMixin],
@@ -62,15 +63,15 @@ export default {
     },
     hint() {
       return this.isFile
-        ? 'File name must include extension (e.g., .yaml, .json)'
+        ? `Formats: ${FILE_FORMATS.join(', ')}`
         : 'Folder names should not include extensions';
     },
     nameError() {
       if (this.newName.length <= 1) {
         return ['Please provide a name with at least 2 characters'];
       }
-      if (this.isFile && !this.hasExtension) {
-        return ['File name must include an extension'];
+      if (this.isFile && !isAllowedFormat(this.newName)) {
+        return [FORMAT_ERROR];
       }
       if (!this.isFile && this.hasExtension) {
         return ['Folder names should not include extensions'];
