@@ -88,10 +88,10 @@
 import DialogMixin from '@/components/DialogMixin';
 import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
+import { FILE_FORMATS, FORMAT_ERROR, fileFormat, isAllowedFormat } from '@/utils/fileFormats';
 import { mdiClose } from '@mdi/js';
 
 // Mirrors the server's rules for new files (app/utils/validation.py)
-const FORMATS = ['yaml', 'md', 'pdf', 'jpg', 'jpeg', 'png', 'bib'];
 const MAX_SIZE_MB = 1;
 const NAME_PATTERN = /^[\p{L}\p{N}_][\p{L}\p{N}_.-]*[\p{L}\p{N}_]$/u;
 // Spaces only in PDF names: nothing links to a PDF, while a Markdown link to an image breaks on one
@@ -99,11 +99,6 @@ const PDF_NAME_PATTERN = /^[\p{L}\p{N}_][\p{L}\p{N}_. -]*[\p{L}\p{N}_]$/u;
 const IMAGE_FORMATS = ['jpg', 'jpeg', 'png'];
 
 let nextRowId = 0;
-
-function extension(name) {
-  const dot = name.lastIndexOf('.');
-  return dot > 0 ? name.slice(dot + 1).toLowerCase() : '';
-}
 
 export default {
   name: 'UploadFilesDialog',
@@ -122,8 +117,8 @@ export default {
       uploading: false,
       loadingFolder: true,
       folderError: null,
-      extensions: FORMATS.map((format) => `.${format}`).join(','),
-      formatList: FORMATS.join(', '),
+      extensions: FILE_FORMATS.map((format) => `.${format}`).join(','),
+      formatList: FILE_FORMATS.join(', '),
       maxSizeMb: MAX_SIZE_MB,
       icons: {
         remove: mdiClose,
@@ -179,10 +174,10 @@ export default {
     },
     errors(row) {
       const { name } = row;
-      const pattern = extension(name) === 'pdf' ? PDF_NAME_PATTERN : NAME_PATTERN;
+      const pattern = fileFormat(name) === 'pdf' ? PDF_NAME_PATTERN : NAME_PATTERN;
       const errors = [];
-      if (!FORMATS.includes(extension(name))) {
-        errors.push(`Only these formats can be added: ${this.formatList}`);
+      if (!isAllowedFormat(name)) {
+        errors.push(FORMAT_ERROR);
       } else if (name.length < 2 || name.length > 100) {
         errors.push('The name must have 2 to 100 characters');
       } else if (!pattern.test(name) || name.includes('..')) {
@@ -204,7 +199,7 @@ export default {
     },
     // Where the build looks for these files
     hint(row) {
-      const format = extension(row.name);
+      const format = fileFormat(row.name);
       const path = this.pathOf(row);
       if (IMAGE_FORMATS.includes(format) && !path.startsWith('/assets/')) {
         return 'Only images in /assets show in the preview';
