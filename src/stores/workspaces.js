@@ -21,6 +21,8 @@ export const useWorkspacesStore = defineStore('workspaces', {
     isLoading: false,
     // A single workspace being viewed/edited
     currentWorkspace: null,
+    // How its branch compares with ceos-org/ceos-ard, from the owner's last sync
+    upstream: null,
     isCreating: false,
     isWorkspaceLoading: {},
   }),
@@ -201,7 +203,12 @@ export const useWorkspacesStore = defineStore('workspaces', {
     },
 
     async syncWorkspace(workspaceId) {
-      return workspaceService.syncWorkspace(workspaceId);
+      const result = await workspaceService.syncWorkspace(workspaceId);
+      // A late answer must not land in the workspace opened meanwhile
+      if (this.currentWorkspace?.id === workspaceId) {
+        this.upstream = result?.upstream ?? null;
+      }
+      return result;
     },
 
     /**
@@ -213,6 +220,7 @@ export const useWorkspacesStore = defineStore('workspaces', {
         return false;
       }
       startWorkspaceSession();
+      this.upstream = null;
       useEditorStore().reset();
       useFilesStore().reset();
       usePreviewStore().reset();
@@ -224,6 +232,7 @@ export const useWorkspacesStore = defineStore('workspaces', {
     resetCurrentWorkspace() {
       startWorkspaceSession();
       this.currentWorkspace = null;
+      this.upstream = null;
     },
 
     /** Drop every per-workspace store and return to the workspace list. */
