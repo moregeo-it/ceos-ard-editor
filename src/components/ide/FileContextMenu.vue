@@ -4,6 +4,7 @@
       <v-btn
         v-bind="props"
         :icon="icons.menu"
+        :aria-label="`Actions for ${item.name}`"
         size="x-small"
         variant="text"
         @click.stop
