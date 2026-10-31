@@ -36,6 +36,7 @@
           density="compact"
           :icon="isLoading ? undefined : toggleIcon"
           :loading="isLoading"
+          :aria-label="`${isOpen ? 'Collapse' : 'Expand'} ${item.name}`"
           variant="text"
           size="small"
           tabindex="-1"

@@ -93,6 +93,7 @@
                         <v-btn
                           v-bind="props"
                           icon
+                          :aria-label="`Remove access for ${share.invitee_github_username}`"
                           variant="text"
                           size="small"
                           :disabled="shareStore.isMutating"
@@ -160,6 +161,7 @@
                       <v-btn
                         v-bind="props"
                         icon
+                        aria-label="Copy share link"
                         variant="text"
                         size="small"
                         @click="copyLink(link)"
@@ -173,6 +175,7 @@
                       <v-btn
                         v-bind="props"
                         icon
+                        aria-label="Delete share link"
                         variant="text"
                         size="small"
                         :disabled="shareStore.isMutating"
