@@ -45,6 +45,17 @@
             counter
             maxlength="500"
           ></v-textarea>
+
+          <v-alert
+            v-if="createsRepository && !isUpdateMode"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mt-3"
+          >
+            Creating your first workspace also creates a copy (fork) of the CEOS-ARD repository on
+            your GitHub account. All of your workspaces are stored there.
+          </v-alert>
         </v-card-text>
 
         <v-divider></v-divider>
@@ -82,6 +93,11 @@ export default {
     workspace: {
       type: Object,
       default: null,
+    },
+    // The first workspace creates the user's GitHub fork, which the dialog discloses up front
+    createsRepository: {
+      type: Boolean,
+      default: false,
     },
   },
   data() {

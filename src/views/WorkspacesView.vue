@@ -175,10 +175,17 @@ export default {
       }
     },
 
+    // Only owned workspaces count: the list also holds workspaces shared with the user, which live
+    // in someone else's fork.
+    hasOwnedWorkspace() {
+      return this.workspacesStore.workspaces.some((w) => w.viewer_role === 'owner');
+    },
+
     openCreateDialog() {
       const mode = 'create';
       this.$root.openDialog('WorkspaceDialog', {
         mode,
+        createsRepository: !this.hasOwnedWorkspace(),
         onAcceptance: async (data) => await this.handleWorkspaceSubmit(data, mode),
       });
     },
@@ -186,11 +193,8 @@ export default {
     async handleWorkspaceSubmit(data, mode) {
       try {
         if (mode === 'create') {
-          // Read before creating, which adds to the list. Only owned workspaces count: the list
-          // also holds workspaces shared with the user, which live in someone else's fork.
-          const isFirstWorkspace = !this.workspacesStore.workspaces.some(
-            (w) => w.viewer_role === 'owner',
-          );
+          // Read before creating, which adds to the list
+          const isFirstWorkspace = !this.hasOwnedWorkspace();
           const workspace = await this.workspacesStore.createWorkspace(data);
           this.announceFork(workspace, isFirstWorkspace);
           this.handleViewWorkspace(workspace.id);
