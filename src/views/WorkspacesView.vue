@@ -58,7 +58,7 @@
         <v-col cols="12">
           <v-card class="pa-8 text-center text-subtle" variant="outlined">
             <v-icon :icon="icons.folderOff" size="64" class="mb-4"></v-icon>
-            <h3 class="text-h6 mb-2">No workspaces found</h3>
+            <h2 class="text-h6 mb-2">No workspaces found</h2>
             <p class="text-body-2 text-medium-emphasis mb-4">
               {{
                 filter === 'all'
