@@ -72,26 +72,12 @@
         </template>
         -->
 
-        <v-toolbar-title v-if="activeFile?.usage" ref="usage" class="text-body-2 flex-0-1">
-          Used in:
-          <ul class="comma-separated-list">
-            <li v-for="item in activeFile.usage" :key="item">
-              <a href="#" @click.prevent="editorStore.show(`/pfs/${item}/document.yaml`)">{{
-                item
-              }}</a>
-            </li>
-          </ul>
-        </v-toolbar-title>
-        <v-menu v-if="usageOverflows" location="top">
+        <v-menu v-if="activeFile?.usage?.length" location="top">
           <template #activator="{ props }">
-            <v-btn
-              v-bind="props"
-              :icon="icons.showAll"
-              size="x-small"
-              variant="text"
-              title="Show all"
-              aria-label="Show all"
-            />
+            <v-btn v-bind="props" :append-icon="icons.usage">
+              Used in
+              <v-chip size="x-small" class="ml-2">{{ activeFile.usage.length }}</v-chip>
+            </v-btn>
           </template>
           <v-list density="compact" max-height="300">
             <v-list-item
@@ -131,7 +117,7 @@ import { useWorkspacesStore } from '@/stores/workspaces';
 import { defineAsyncComponent } from 'vue';
 import BrowserViewer from './editors/BrowserViewer.vue';
 import UnsupportedViewer from './editors/UnsupportedViewer.vue';
-import { mdiClose, mdiContentSave, mdiContentSaveAll, mdiDotsHorizontal, mdiMenu } from '@mdi/js';
+import { mdiClose, mdiContentSave, mdiContentSaveAll, mdiMenu, mdiMenuUp } from '@mdi/js';
 import { supportVisualEditing } from '@/components/ide/editors/utils';
 
 const supportedBrowserTypes = [
@@ -156,13 +142,11 @@ export default {
 
   data() {
     return {
-      // Whether the "Used in" list is cut off, then a button shows all of them
-      usageOverflows: false,
       icons: {
         close: mdiClose,
         menu: mdiMenu,
         save: mdiContentSave,
-        showAll: mdiDotsHorizontal,
+        usage: mdiMenuUp,
         saveAll: mdiContentSaveAll,
       },
     };
@@ -179,12 +163,6 @@ export default {
             'bg-color': 'grey-lighten-3',
             color: 'primary',
           };
-    },
-    usage() {
-      if (!this.activeFile?.usage) {
-        return null;
-      }
-      return 'Used in: ' + this.activeFile.usage.join(', ');
     },
     model: {
       get() {
@@ -228,26 +206,7 @@ export default {
       return Object.values(this.editorStore.saving).some((isSaving) => isSaving);
     },
   },
-  watch: {
-    'activeFile.usage': {
-      handler() {
-        this.checkUsageOverflow();
-      },
-      flush: 'post',
-    },
-  },
-  mounted() {
-    this.resizeObserver = new ResizeObserver(() => this.checkUsageOverflow());
-    this.resizeObserver.observe(this.$el);
-  },
-  beforeUnmount() {
-    this.resizeObserver.disconnect();
-  },
   methods: {
-    checkUsageOverflow() {
-      const list = this.$refs.usage?.$el.querySelector('.v-toolbar-title__placeholder');
-      this.usageOverflows = !!list && list.scrollWidth > list.clientWidth;
-    },
     getEditorType(file, data, forceSourceCodeEditor = false) {
       if (data instanceof Blob) {
         if (supportedBrowserTypes.includes(data.type)) {

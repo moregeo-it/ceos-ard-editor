@@ -118,19 +118,6 @@ export default {
 .text-subtle {
   color: rgba(0, 0, 0, 0.6);
 }
-.comma-separated-list {
-  display: inline;
-  list-style: none;
-}
-.comma-separated-list li {
-  display: inline;
-}
-.comma-separated-list li::after {
-  content: ', ';
-}
-.comma-separated-list li:last-child::after {
-  content: '';
-}
 
 a {
   color: var(--ceos-primary);
