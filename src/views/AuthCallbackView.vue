@@ -12,7 +12,7 @@
               class="mb-4"
             ></v-progress-circular>
 
-            <v-icon v-else size="64" color="error" class="mb-4"> mdi-alert-circle </v-icon>
+            <v-icon v-else :icon="icons.error" size="64" color="error" class="mb-4" />
 
             <h2 class="text-h5 mb-4">
               {{ error ? 'Authentication Failed' : 'Completing Authentication' }}
@@ -37,6 +37,7 @@
 </template>
 
 <script>
+import { mdiAlertCircle } from '@mdi/js';
 import { useAuthStore } from '@/stores/auth';
 
 import { useNotificationsStore } from '@/stores/notifications';
@@ -50,6 +51,9 @@ export default {
   data() {
     return {
       error: null,
+      icons: {
+        error: mdiAlertCircle,
+      },
     };
   },
 

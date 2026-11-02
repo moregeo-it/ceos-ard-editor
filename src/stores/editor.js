@@ -187,7 +187,7 @@ export const useEditorStore = defineStore('editor', {
             skipped.push(path);
           }
           // Also repopulates the files store, which the tabs read their state from
-          const context = await files.loadFileContext(path, true);
+          const context = await files.loadFileContext(path);
           if (started !== workspaceSession()) {
             return skipped; // The workspace was left meanwhile
           }

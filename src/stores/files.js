@@ -81,12 +81,7 @@ export const useFilesStore = defineStore('files', {
   },
 
   actions: {
-    async loadFileContext(path, force = false) {
-      // File context endpoint adds an additional usage property, which means if it's already
-      // there, we have already loaded the context
-      if (Array.isArray(this.all[path]) && typeof this.all[path].usage !== 'undefined' && !force) {
-        return this.all[path]; // Already loaded
-      }
+    async loadFileContext(path) {
       const started = workspaceSession();
       this.isPathLoading.push(path);
       try {
@@ -167,9 +162,7 @@ export const useFilesStore = defineStore('files', {
     async updateFilesAfterCommit() {
       // Refresh every file that had a pending status. Capture paths first — reloading clears them.
       const changedPaths = Object.keys(this.all).filter((path) => this.all[path].status !== null);
-      const results = await Promise.all(
-        changedPaths.map((path) => this.loadFileContext(path, true)),
-      );
+      const results = await Promise.all(changedPaths.map((path) => this.loadFileContext(path)));
       // Mirror the cleared status into any matching search rows.
       changedPaths.forEach((path) => {
         if (this.all[path]) {
