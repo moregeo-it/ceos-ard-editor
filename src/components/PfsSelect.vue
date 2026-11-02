@@ -6,7 +6,7 @@
     :multiple="multiple"
     :chips="chips"
     :prepend-inner-icon="icon"
-    item-title="title"
+    :item-title="(item) => item.title ?? ''"
     item-value="id"
     variant="outlined"
     density="compact"
