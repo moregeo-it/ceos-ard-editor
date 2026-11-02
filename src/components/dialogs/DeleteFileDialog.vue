@@ -10,6 +10,15 @@
           Are you sure you want to delete <strong>{{ name }}</strong
           >?
         </p>
+        <v-alert
+          v-if="usage.length > 0"
+          type="warning"
+          variant="tonal"
+          density="compact"
+          class="mb-3"
+        >
+          Used in {{ usage.join(', ') }}.
+        </v-alert>
         <v-alert v-if="isFolder" type="warning" variant="tonal" density="compact">
           This will delete the folder and all files inside it. If under version control, the
           deletion can be reverted. For files that are not under version control, the delete is
@@ -31,6 +40,7 @@
 
 <script>
 import DialogMixin from '@/components/DialogMixin';
+import { useFilesStore } from '@/stores/files';
 import { mdiAlertCircle } from '@mdi/js';
 
 export default {
@@ -46,9 +56,15 @@ export default {
       default: 'file',
       validator: (value) => ['file', 'folder'].includes(value),
     },
+    path: {
+      type: String,
+      default: null,
+    },
   },
   data() {
     return {
+      // The PFS that use the file, e.g. for a requirement
+      usage: [],
       icons: {
         alert: mdiAlertCircle,
       },
@@ -58,6 +74,16 @@ export default {
     isFolder() {
       return this.type === 'folder';
     },
+  },
+  async created() {
+    if (this.isFolder || !this.path) {
+      return;
+    }
+    try {
+      this.usage = (await useFilesStore().loadFileContext(this.path))?.usage ?? [];
+    } catch {
+      // The usage is only a hint, deleting works without it
+    }
   },
 };
 </script>
