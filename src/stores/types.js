@@ -12,13 +12,17 @@ export const useTypesStore = defineStore('types', {
   getters: {
     byId: (state) => (id) => state.types.find((type) => type.id === id) ?? null,
 
-    // The type of the open workspace; workspaces from before the types existed are CEOS-ARD ones
+    // The types offered for new workspaces; the others are listed for their existing workspaces
+    availableTypes: (state) => state.types.filter((type) => type.available),
+
     currentType() {
       const workspace = useWorkspacesStore().currentWorkspace;
-      return workspace ? this.byId(workspace.type ?? 'ceos-ard') : null;
+      return workspace ? this.byId(workspace.type) : null;
     },
 
-    hasMultipleTypes: (state) => state.types.length > 1,
+    hasMultipleTypes() {
+      return this.availableTypes.length > 1;
+    },
   },
 
   actions: {

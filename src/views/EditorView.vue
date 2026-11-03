@@ -116,7 +116,7 @@ export default {
     },
     // The name of what the workspace's repository holds, e.g. CEOS-ARD
     projectName() {
-      return useTypesStore().currentType?.title ?? 'CEOS-ARD';
+      return useTypesStore().currentType?.title;
     },
     loading() {
       return this.workspacesStore.isWorkspaceLoading[this.workspaceId];

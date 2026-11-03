@@ -103,6 +103,7 @@ test.describe('Workspace types', () => {
     id: 'other',
     title: 'Other Specification',
     description: 'A repository without PFS',
+    available: true,
     color: '#00796b',
     upstream: { owner: 'ceos-org', repo: 'other', branch: 'main', url: '' },
     pfs: false,
@@ -111,6 +112,31 @@ test.describe('Workspace types', () => {
     actions: [],
     file_menu: [],
   };
+
+  test('settings wait for the types before loading the PFS of the workspace', async ({
+    page,
+    api,
+  }) => {
+    await page.route('http://localhost:8099/types', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await route.fallback();
+    });
+    await page.goto('/workspaces');
+    await page.locator('.v-card').filter({ hasText: 'NRB review' }).getByText('Settings').click();
+
+    await expect(page.locator('.v-dialog .v-card')).toBeVisible();
+    await expect.poll(() => api.requests.some((r) => r.path === '/workspaces/ws-1/pfs')).toBe(true);
+  });
+
+  test('types that are not available are not offered', async ({ page, api }) => {
+    api.types.push({ ...OTHER_TYPE, available: false });
+    api.workspaces.push({ ...api.workspaces[0], id: 'ws-2', title: 'Old review', type: 'other' });
+    const dialog = await openCreateDialog(page);
+
+    await expect(dialog.getByLabel('What do you want to edit?')).toHaveCount(0);
+    await expect(dialog).toContainText('Product Format Specification');
+    await expect(page.locator('.v-card').filter({ hasText: 'Old review' })).toBeVisible();
+  });
 
   test('a single type is not shown', async ({ page }) => {
     const dialog = await openCreateDialog(page);

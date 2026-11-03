@@ -65,7 +65,7 @@ export default {
   },
   computed: {
     projectName() {
-      return useTypesStore().byId(this.workspace.type ?? 'ceos-ard')?.title ?? 'CEOS-ARD';
+      return useTypesStore().byId(this.workspace.type)?.title;
     },
     conflicts() {
       return this.upstream.conflicting_files.length > 0;

@@ -13,7 +13,7 @@
           <v-select
             v-if="!isUpdateMode && typesStore.hasMultipleTypes"
             v-model="formData.type"
-            :items="typesStore.types"
+            :items="typesStore.availableTypes"
             item-title="title"
             item-value="id"
             label="What do you want to edit?"
@@ -83,8 +83,8 @@
             class="mt-3"
           >
             Creating your first workspace also creates a copy (fork) of the
-            {{ selectedType?.title ?? 'CEOS-ARD' }} repository on your GitHub account. All of your
-            workspaces for it are stored there.
+            {{ selectedType?.title }} repository on your GitHub account. All of your workspaces for
+            it are stored there.
           </v-alert>
         </v-card-text>
 
@@ -151,7 +151,7 @@ export default {
         type: mdiShapeOutline,
       },
       formData: {
-        type: useTypesStore().types[0]?.id ?? 'ceos-ard',
+        type: useTypesStore().availableTypes[0]?.id,
         title: '',
         pfs: [],
         description: '',
@@ -206,7 +206,7 @@ export default {
           ? [this.workspace.pfs]
           : [];
       this.formData = {
-        type: this.workspace.type ?? 'ceos-ard',
+        type: this.workspace.type,
         title: this.workspace.title || '',
         pfs: pfsIds,
         description: this.workspace.description || '',

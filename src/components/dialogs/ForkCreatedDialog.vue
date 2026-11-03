@@ -56,7 +56,7 @@ export default {
   },
   computed: {
     projectName() {
-      return useTypesStore().byId(this.workspace?.type ?? 'ceos-ard')?.title ?? 'CEOS-ARD';
+      return useTypesStore().byId(this.workspace.type)?.title;
     },
     forkFullName() {
       const { fork_repo_owner, fork_repo_name } = this.workspace;

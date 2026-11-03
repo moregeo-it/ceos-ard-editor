@@ -1,0 +1,93 @@
+{
+  "id": "ceos-ard",
+  "title": "CEOS-ARD",
+  "description": "Product Family Specifications for CEOS Analysis Ready Data",
+  "available": true,
+  "color": "#3e5265",
+  "upstream": {
+    "owner": "ceos-org",
+    "repo": "ceos-ard",
+    "branch": "main",
+    "url": "https://github.com/ceos-org/ceos-ard"
+  },
+  "pfs": true,
+  "labels": {},
+  "editors": [
+    {
+      "match": "glossary/*.yaml",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "term": {
+            "type": "string",
+            "minLength": 2
+          },
+          "description": {
+            "type": "string",
+            "minLength": 2,
+            "description": "Markdown is supported for formatting."
+          }
+        }
+      },
+      "ui_schema": {
+        "type": "VerticalLayout",
+        "elements": [
+          {
+            "type": "Control",
+            "scope": "#/properties/term",
+            "options": {
+              "clearable": false
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/description",
+            "options": {
+              "clearable": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "create-pfs",
+      "title": "Add New PFS",
+      "folder": "/pfs",
+      "dialog": "CreatePfsDialog"
+    }
+  ],
+  "file_menu": [
+    {
+      "match": "**",
+      "kind": "folder",
+      "ops": ["create", "rename", "delete"],
+      "ops_if_new": []
+    },
+    {
+      "match": "**",
+      "kind": "file",
+      "ops": ["open_source", "download", "diff", "revert", "rename", "delete"],
+      "ops_if_new": []
+    },
+    {
+      "match": "pfs",
+      "kind": "folder",
+      "ops": [],
+      "ops_if_new": []
+    },
+    {
+      "match": "pfs/*",
+      "kind": "folder",
+      "ops": [],
+      "ops_if_new": ["rename", "delete"]
+    },
+    {
+      "match": "pfs/**",
+      "kind": "file",
+      "ops": ["open_source", "download", "diff", "revert"],
+      "ops_if_new": []
+    }
+  ]
+}

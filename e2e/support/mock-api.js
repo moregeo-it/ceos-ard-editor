@@ -1,5 +1,7 @@
 import { test as base, expect } from '@playwright/test';
 import { expectNoRawData } from './ui';
+// Exported from the server, see README.md
+import CEOS_ARD_TYPE from './types/ceos-ard.json' with { type: 'json' };
 
 export const API = 'http://localhost:8099';
 
@@ -24,53 +26,6 @@ const USAGE = {
     { label: 'SR', path: '/pfs/SR/document.yaml' },
   ],
   '/requirements/general/unused.yaml': [],
-};
-
-// As configured on the server (app/workspace_types/ceos_ard.py)
-const CEOS_ARD_TYPE = {
-  id: 'ceos-ard',
-  title: 'CEOS-ARD',
-  description: 'Product Family Specifications for CEOS Analysis Ready Data',
-  color: '#3e5265',
-  upstream: {
-    owner: 'ceos-org',
-    repo: 'ceos-ard',
-    branch: 'main',
-    url: 'https://github.com/ceos-org/ceos-ard',
-  },
-  pfs: true,
-  labels: {},
-  editors: [
-    {
-      match: 'glossary/*.yaml',
-      schema: {
-        type: 'object',
-        properties: {
-          term: { type: 'string', minLength: 2 },
-          description: { type: 'string', minLength: 2 },
-        },
-      },
-      ui_schema: {
-        type: 'VerticalLayout',
-        elements: [
-          { type: 'Control', scope: '#/properties/term' },
-          { type: 'Control', scope: '#/properties/description' },
-        ],
-      },
-    },
-  ],
-  actions: [{ id: 'create-pfs', title: 'Add New PFS', folder: '/pfs', dialog: 'CreatePfsDialog' }],
-  file_menu: [
-    { match: '**', kind: 'folder', ops: ['create', 'rename', 'delete'] },
-    {
-      match: '**',
-      kind: 'file',
-      ops: ['open_source', 'download', 'diff', 'revert', 'rename', 'delete'],
-    },
-    { match: 'pfs', kind: 'folder', ops: [] },
-    { match: 'pfs/*', kind: 'folder', ops: [], ops_if_new: ['rename', 'delete'] },
-    { match: 'pfs/**', kind: 'file', ops: ['open_source', 'download', 'diff', 'revert'] },
-  ],
 };
 
 const PFS_TYPES = [

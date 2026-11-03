@@ -185,15 +185,22 @@ export default {
     ownedTypes() {
       return this.workspacesStore.workspaces
         .filter((w) => w.viewer_role === 'owner')
-        .map((w) => w.type ?? 'ceos-ard');
+        .map((w) => w.type);
+    },
+
+    // The workspace dialog reads the types when it opens, e.g. its initial type
+    async loadTypes() {
+      try {
+        await useTypesStore().fetchTypes();
+        return true;
+      } catch (error) {
+        this.notificationsStore.error(`Failed to load the workspace types: ${error.message}`);
+        return false;
+      }
     },
 
     async openCreateDialog() {
-      // The dialog picks its initial type when it opens
-      try {
-        await useTypesStore().fetchTypes();
-      } catch (error) {
-        this.notificationsStore.error(`Failed to load the workspace types: ${error.message}`);
+      if (!(await this.loadTypes())) {
         return;
       }
       const mode = 'create';
@@ -240,7 +247,7 @@ export default {
 
       this.notificationsStore.success(
         forkName
-          ? `Workspace created successfully in your ${useTypesStore().byId(workspace.type)?.title ?? 'CEOS-ARD'} repository ${forkName}`
+          ? `Workspace created successfully in your ${useTypesStore().byId(workspace.type)?.title} repository ${forkName}`
           : 'Workspace created successfully',
       );
     },
@@ -252,10 +259,10 @@ export default {
       });
     },
 
-    handleEditWorkspace(workspaceId) {
+    async handleEditWorkspace(workspaceId) {
       const workspace = this.workspacesStore.workspaces.find((w) => w.id === workspaceId);
       const mode = 'update';
-      if (workspace) {
+      if (workspace && (await this.loadTypes())) {
         this.$root.openDialog('WorkspaceDialog', {
           mode,
           workspace,

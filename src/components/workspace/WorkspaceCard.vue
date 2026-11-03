@@ -129,7 +129,7 @@ export default {
       return useTypesStore();
     },
     type() {
-      return this.typesStore.byId(this.workspace.type ?? 'ceos-ard');
+      return this.typesStore.byId(this.workspace.type);
     },
     typeTitle() {
       return this.type?.title ?? this.workspace.type;
