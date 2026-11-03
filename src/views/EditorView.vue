@@ -1,6 +1,11 @@
 <template>
   <template v-if="workspace">
-    <HeaderBar :title="workspace.title" :icon="icons.title">
+    <HeaderBar
+      :title="workspace.title"
+      :icon="icons.title"
+      :subtitle="headerType?.title"
+      :color="headerType?.color"
+    >
       <template #central-actions>
         <HeaderSwitch />
       </template>
@@ -15,7 +20,7 @@
           :prepend-icon="upstreamConflicts ? icons.conflicts : icons.behind"
           @click="openOutdatedBranchDialog"
         >
-          {{ upstreamConflicts ? 'Conflicts with CEOS-ARD' : 'Behind CEOS-ARD' }}
+          {{ upstreamConflicts ? `Conflicts with ${projectName}` : `Behind ${projectName}` }}
         </v-btn>
         <v-btn v-if="workspacesStore.isOwner" :prepend-icon="icons.share" @click="openShareDialog">
           Share
@@ -55,6 +60,7 @@ import { useNotificationsStore } from '@/stores/notifications';
 import { usePreviewStore } from '@/stores/preview';
 import { useRealtimeStore } from '@/stores/realtime';
 import { useWorkspacesStore } from '@/stores/workspaces';
+import { useTypesStore } from '@/stores/types';
 import { mdiAlertOutline, mdiNotebookEdit, mdiShareVariant, mdiSourceBranchSync } from '@mdi/js';
 import HeaderBar from '@/components/HeaderBar.vue';
 import HeaderSwitch from '@/components/HeaderSwitch.vue';
@@ -103,6 +109,15 @@ export default {
   },
 
   computed: {
+    // Distinguishes what is edited, only needed with more than one workspace type
+    headerType() {
+      const typesStore = useTypesStore();
+      return typesStore.hasMultipleTypes ? typesStore.currentType : null;
+    },
+    // The name of what the workspace's repository holds, e.g. CEOS-ARD
+    projectName() {
+      return useTypesStore().currentType?.title ?? 'CEOS-ARD';
+    },
     loading() {
       return this.workspacesStore.isWorkspaceLoading[this.workspaceId];
     },
@@ -179,7 +194,11 @@ export default {
     /** Whether the workspace loaded and this view is still open */
     async loadWorkspace() {
       try {
-        await this.workspacesStore.getWorkspace(this.workspaceId);
+        // The panes need the workspace type, e.g. for the form editors and the preview mode
+        await Promise.all([
+          this.workspacesStore.getWorkspace(this.workspaceId),
+          useTypesStore().fetchTypes(),
+        ]);
         return !this.unmounted;
       } catch (error) {
         if (!this.unmounted) {
@@ -225,7 +244,7 @@ export default {
         // in someone's GitHub account should never be silent, even when it is a restoration.
         if (result?.repaired) {
           this.notificationsStore.success(
-            'Your CEOS-ARD repository was missing on GitHub, so it was recreated and your work was pushed ' +
+            `Your ${this.projectName} repository was missing on GitHub, so it was recreated and your work was pushed ` +
               'back to it. No changes were lost.',
           );
         }
@@ -260,7 +279,7 @@ export default {
           // and deleting the branch was probably deliberate
           case 'remote_missing':
             this.notificationsStore.warning(
-              'The GitHub branch for this workspace no longer exists on your CEOS-ARD repository. ' +
+              `The GitHub branch for this workspace no longer exists on your ${this.projectName} repository. ` +
                 'It will be recreated with your next commit.',
             );
             break;
@@ -279,8 +298,8 @@ export default {
         // The proposal can't be merged as it is; being behind alone only shows in the header
         if (this.upstreamConflicts) {
           this.notificationsStore.warning(
-            'Some of your changes conflict with newer changes in the CEOS-ARD repository. ' +
-              'See "Conflicts with CEOS-ARD" at the top for the files.',
+            `Some of your changes conflict with newer changes in the ${this.projectName} repository. ` +
+              `See "Conflicts with ${this.projectName}" at the top for the files.`,
           );
         }
       } catch (error) {

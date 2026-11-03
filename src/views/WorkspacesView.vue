@@ -105,6 +105,7 @@
 </template>
 
 <script>
+import { useTypesStore } from '@/stores/types';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
 import HeaderBar from '@/components/HeaderBar.vue';
@@ -166,10 +167,13 @@ export default {
   methods: {
     async loadData() {
       try {
-        await Promise.all([
+        const [types] = await Promise.all([
+          useTypesStore().fetchTypes(),
           this.workspacesStore.fetchWorkspaces(),
-          this.workspacesStore.fetchPfs(),
         ]);
+        if (types.some((type) => type.pfs)) {
+          await this.workspacesStore.fetchPfs();
+        }
       } catch (error) {
         this.notificationsStore.error(`Failed to load data: ${error.message}`);
       }
@@ -177,15 +181,25 @@ export default {
 
     // Only owned workspaces count: the list also holds workspaces shared with the user, which live
     // in someone else's fork.
-    hasOwnedWorkspace() {
-      return this.workspacesStore.workspaces.some((w) => w.viewer_role === 'owner');
+    // Every workspace type has its own repository, so the first workspace of a type creates a fork
+    ownedTypes() {
+      return this.workspacesStore.workspaces
+        .filter((w) => w.viewer_role === 'owner')
+        .map((w) => w.type ?? 'ceos-ard');
     },
 
-    openCreateDialog() {
+    async openCreateDialog() {
+      // The dialog picks its initial type when it opens
+      try {
+        await useTypesStore().fetchTypes();
+      } catch (error) {
+        this.notificationsStore.error(`Failed to load the workspace types: ${error.message}`);
+        return;
+      }
       const mode = 'create';
       this.$root.openDialog('WorkspaceDialog', {
         mode,
-        createsRepository: !this.hasOwnedWorkspace(),
+        ownedTypes: this.ownedTypes(),
         onAcceptance: async (data) => await this.handleWorkspaceSubmit(data, mode),
       });
     },
@@ -194,7 +208,7 @@ export default {
       try {
         if (mode === 'create') {
           // Read before creating, which adds to the list
-          const isFirstWorkspace = !this.hasOwnedWorkspace();
+          const isFirstWorkspace = !this.ownedTypes().includes(data.type);
           const workspace = await this.workspacesStore.createWorkspace(data);
           this.announceFork(workspace, isFirstWorkspace);
           this.handleViewWorkspace(workspace.id);
@@ -226,7 +240,7 @@ export default {
 
       this.notificationsStore.success(
         forkName
-          ? `Workspace created successfully in your CEOS-ARD repository ${forkName}`
+          ? `Workspace created successfully in your ${useTypesStore().byId(workspace.type)?.title ?? 'CEOS-ARD'} repository ${forkName}`
           : 'Workspace created successfully',
       );
     },

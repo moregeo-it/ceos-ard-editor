@@ -1,5 +1,5 @@
 <template>
-  <v-menu v-if="shouldShowMenu" location="end">
+  <v-menu v-if="entries.length > 0" location="end">
     <template v-slot:activator="{ props }">
       <v-btn
         v-bind="props"
@@ -13,124 +13,14 @@
       />
     </template>
     <v-list density="compact">
-      <template v-if="isPfsRootFolder && !workspacesStore.isReadOnly">
-        <v-list-item @click="requestNewPfs">
-          <template v-slot:prepend>
-            <v-icon :icon="icons.add" size="small" />
-          </template>
-          <v-list-item-title>Add New PFS</v-list-item-title>
-        </v-list-item>
-      </template>
-
-      <template v-else-if="isNewPfsFolder">
-        <v-list-item v-if="!workspacesStore.isReadOnly" @click="requestRename">
-          <template v-slot:prepend>
-            <v-icon :icon="icons.rename" size="small" />
-          </template>
-          <v-list-item-title>Rename</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item v-if="!workspacesStore.isReadOnly" @click="requestDelete">
-          <template v-slot:prepend>
-            <v-icon :icon="icons.delete" size="small" color="error" />
-          </template>
-          <v-list-item-title class="text-error">Delete</v-list-item-title>
-        </v-list-item>
-      </template>
-
-      <template v-else-if="isPfsFile">
-        <v-list-item @click="openFile(item.path, true)">
-          <template v-slot:prepend>
-            <v-icon :icon="icons.codeeditor" size="small" />
-          </template>
-          <v-list-item-title>Open in Source Code Editor</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item @click="handleDownload">
-          <template v-slot:prepend>
-            <v-icon :icon="icons.download" size="small" />
-          </template>
-          <v-list-item-title>Download</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item
-          v-if="item.status === 'modified' || item.status === 'added'"
-          @click="requestDiff"
-        >
-          <template v-slot:prepend>
-            <v-icon :icon="icons.diff" size="small" />
-          </template>
-          <v-list-item-title>Show Changes</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item
-          v-if="item.status === 'modified' && !workspacesStore.isReadOnly"
-          @click="handleRevert"
-        >
-          <template v-slot:prepend>
-            <v-icon :icon="icons.revert" size="small" />
-          </template>
-          <v-list-item-title>Revert</v-list-item-title>
-        </v-list-item>
-      </template>
-
-      <template v-else-if="item.type === 'file'">
-        <v-list-item v-if="item.status !== 'deleted'" @click="openFile(item.path, true)">
-          <template v-slot:prepend>
-            <v-icon :icon="icons.codeeditor" size="small" />
-          </template>
-          <v-list-item-title>Open in Source Code Editor</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item v-if="item.status && item.status !== 'deleted'" @click="requestDiff">
-          <template v-slot:prepend>
-            <v-icon :icon="icons.diff" size="small" />
-          </template>
-          <v-list-item-title>Show Changes</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item v-if="item.status !== 'deleted'" @click="handleDownload">
-          <template v-slot:prepend>
-            <v-icon :icon="icons.download" size="small" />
-          </template>
-          <v-list-item-title>Download</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item
-          v-if="item.status && item.status !== 'added' && !workspacesStore.isReadOnly"
-          @click="handleRevert"
-        >
-          <template v-slot:prepend>
-            <v-icon :icon="icons.revert" size="small" />
-          </template>
-          <v-list-item-title>Revert</v-list-item-title>
-        </v-list-item>
-      </template>
-
-      <template v-else>
-        <v-list-item v-if="!workspacesStore.isReadOnly" @click="requestNewFile">
-          <template v-slot:prepend>
-            <v-icon :icon="icons.add" size="small" />
-          </template>
-          <v-list-item-title>Create</v-list-item-title>
-        </v-list-item>
-      </template>
-
-      <template v-if="item.status !== 'deleted' && !isPfsItem && !workspacesStore.isReadOnly">
-        <v-list-item @click="requestRename">
-          <template v-slot:prepend>
-            <v-icon :icon="icons.rename" size="small" />
-          </template>
-          <v-list-item-title>Rename</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item @click="requestDelete">
-          <template v-slot:prepend>
-            <v-icon :icon="icons.delete" size="small" color="error" />
-          </template>
-          <v-list-item-title class="text-error">Delete</v-list-item-title>
-        </v-list-item>
-      </template>
+      <v-list-item v-for="entry in entries" :key="entry.id" @click="entry.handler">
+        <template v-slot:prepend>
+          <v-icon :icon="entry.icon" size="small" :color="entry.color" />
+        </template>
+        <v-list-item-title :class="entry.color ? `text-${entry.color}` : null">{{
+          entry.title
+        }}</v-list-item-title>
+      </v-list-item>
     </v-list>
   </v-menu>
 </template>
@@ -150,7 +40,9 @@ import {
   mdiCodeJson,
 } from '@mdi/js';
 import { downloadBlob } from '@/utils/api';
+import { useTypesStore } from '@/stores/types';
 import { useWorkspacesStore } from '@/stores/workspaces';
+import { matchesGlob } from '@/utils/glob';
 
 export default {
   name: 'FileContextMenu',
@@ -190,59 +82,111 @@ export default {
     workspacesStore() {
       return useWorkspacesStore();
     },
-    shouldShowMenu() {
-      if (this.isPfsRootFolder) {
-        return !this.workspacesStore.isReadOnly;
-      }
-
-      if (this.isPfsFolder) {
-        return this.isNewPfsFolder && !this.workspacesStore.isReadOnly;
-      }
-
-      if (this.workspacesStore.isReadOnly) {
-        // Read-only/comment collaborators only keep read-safe actions (open/download/diff),
-        // which only ever apply to non-deleted files. Everything else has no items to show.
-        return (this.item.type === 'file' || this.isPfsFile) && this.item.status !== 'deleted';
-      }
-
-      return true;
-    },
-    isPfsRootFolder() {
-      return this.item.type === 'folder' && this.item.path === '/pfs';
-    },
-    isPfsFolder() {
-      return (
-        this.item.type === 'folder' &&
-        this.item.path.startsWith('/pfs/') &&
-        this.item.path !== '/pfs'
+    // The file menu rules of the workspace type: the last rule matching the path decides
+    operations() {
+      const kind = this.item.type === 'folder' ? 'folder' : 'file';
+      const rules = useTypesStore().currentType?.file_menu ?? [];
+      const rule = rules.findLast(
+        (rule) => (rule.kind ?? kind) === kind && matchesGlob(this.item.path, rule.match),
       );
-    },
-    isNewPfsFolder() {
-      if (!this.isPfsFolder) {
-        return false;
+      const operations = new Set(rule?.ops ?? []);
+      if (this.isNew) {
+        (rule?.ops_if_new ?? []).forEach((operation) => operations.add(operation));
       }
-
-      const documentPath = `${this.item.path}/document.yaml`;
-      if (this.filesStore.all[documentPath]?.status === 'added') {
-        return true;
+      return operations;
+    },
+    // Not committed yet: a new file, or a folder with only new files (as far as loaded)
+    isNew() {
+      if (this.item.type !== 'folder') {
+        return this.item.status === 'added';
       }
-
-      const documentFile = this.item.children?.find((child) => child.path === documentPath);
-      return documentFile?.status === 'added';
+      const prefix = `${this.item.path}/`;
+      const files = Object.values(this.filesStore.all).filter(
+        (file) => !file.is_directory && file.path.startsWith(prefix),
+      );
+      return files.length > 0 && files.every((file) => file.status === 'added');
     },
-    isPfsFile() {
-      return this.item.type === 'file' && this.isPfsPath(this.item.path);
-    },
-    isPfsItem() {
-      return this.isPfsPath(this.item.path);
+    entries() {
+      const { status, type } = this.item;
+      const isFile = type === 'file';
+      const editable = !this.workspacesStore.isReadOnly;
+      const exists = status !== 'deleted';
+      const allows = (operation) => this.operations.has(operation);
+      const actions = useTypesStore().currentType?.actions ?? [];
+      return [
+        ...actions
+          .filter((action) => editable && !isFile && action.folder === this.item.path)
+          .map((action) => ({
+            id: `action-${action.id}`,
+            title: action.title,
+            icon: this.icons.add,
+            handler: () => this.requestAction(action),
+          })),
+        allows('open_source') &&
+          isFile &&
+          exists && {
+            id: 'open_source',
+            title: 'Open in Source Code Editor',
+            icon: this.icons.codeeditor,
+            handler: () => this.openFile(this.item.path, true),
+          },
+        allows('diff') &&
+          isFile &&
+          status &&
+          exists && {
+            id: 'diff',
+            title: 'Show Changes',
+            icon: this.icons.diff,
+            handler: this.requestDiff,
+          },
+        allows('download') &&
+          isFile &&
+          exists && {
+            id: 'download',
+            title: 'Download',
+            icon: this.icons.download,
+            handler: this.handleDownload,
+          },
+        allows('revert') &&
+          editable &&
+          isFile &&
+          status &&
+          status !== 'added' && {
+            id: 'revert',
+            title: 'Revert',
+            icon: this.icons.revert,
+            handler: this.handleRevert,
+          },
+        allows('create') &&
+          editable &&
+          !isFile && {
+            id: 'create',
+            title: 'Create',
+            icon: this.icons.add,
+            handler: this.requestNewFile,
+          },
+        allows('rename') &&
+          editable &&
+          exists && {
+            id: 'rename',
+            title: 'Rename',
+            icon: this.icons.rename,
+            handler: this.requestRename,
+          },
+        allows('delete') &&
+          editable &&
+          exists && {
+            id: 'delete',
+            title: 'Delete',
+            icon: this.icons.delete,
+            color: 'error',
+            handler: this.requestDelete,
+          },
+      ].filter(Boolean);
     },
   },
 
   methods: {
-    isPfsPath(path) {
-      return path === '/pfs' || path.startsWith('/pfs/');
-    },
-
     getPfsFolderId(path) {
       if (typeof path !== 'string') {
         return null;
@@ -275,6 +219,13 @@ export default {
         initialPath: this.item.path,
         onAcceptance: this.handleCreate,
       });
+    },
+
+    requestAction(action) {
+      // CEOS-ARD creates PFS with its own dialog and endpoint
+      if (action.dialog === 'CreatePfsDialog') {
+        this.requestNewPfs();
+      }
     },
 
     requestNewPfs() {

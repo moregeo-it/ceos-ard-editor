@@ -1,12 +1,12 @@
 <template>
   <v-dialog v-model="show" :max-width="sizes.medium" persistent>
     <v-card>
-      <v-card-title>A CEOS-ARD repository was created on your GitHub account</v-card-title>
+      <v-card-title>A {{ projectName }} repository was created on your GitHub account</v-card-title>
       <v-card-text>
         <p class="mb-3">
           Your work is stored in
           <strong>{{ forkFullName }}</strong>
-          on your GitHub account, and proposed to CEOS-ARD from there.
+          on your GitHub account, and proposed to {{ projectName }} from there.
         </p>
         <v-alert type="warning" variant="tonal" density="compact" class="mb-3">
           <p class="mb-2 font-weight-bold">Please don't delete this repository on GitHub.</p>
@@ -35,6 +35,7 @@
 
 <script>
 import DialogMixin from '@/components/DialogMixin';
+import { useTypesStore } from '@/stores/types';
 import { mdiGithub } from '@mdi/js';
 
 export default {
@@ -54,6 +55,9 @@ export default {
     };
   },
   computed: {
+    projectName() {
+      return useTypesStore().byId(this.workspace?.type ?? 'ceos-ard')?.title ?? 'CEOS-ARD';
+    },
     forkFullName() {
       const { fork_repo_owner, fork_repo_name } = this.workspace;
       return `${fork_repo_owner}/${fork_repo_name}`;

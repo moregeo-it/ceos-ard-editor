@@ -10,10 +10,19 @@
       </v-chip>
     </v-card-title>
 
-    <v-card-subtitle class="mt-2">
+    <div class="px-4 mt-2 d-flex flex-wrap align-center ga-1 text-body-2 text-medium-emphasis">
+      <v-chip
+        v-if="typesStore.hasMultipleTypes"
+        :color="type?.color"
+        size="small"
+        variant="flat"
+        class="me-1"
+      >
+        {{ typeTitle }}
+      </v-chip>
       <PfsBadges v-if="workspace.pfs" :pfs="workspace.pfs" />
-      <p v-else>No PFS assigned</p>
-    </v-card-subtitle>
+      <span v-else-if="type?.pfs">No PFS assigned</span>
+    </div>
 
     <v-card-text class="d-flex flex-column flex-grow-1">
       <p class="description text-body-2 text-medium-emphasis flex-grow-1 overflow-auto">
@@ -69,6 +78,7 @@
 </template>
 
 <script>
+import { useTypesStore } from '@/stores/types';
 import PfsBadges from './PfsBadges.vue';
 import ShareModeChip from './ShareModeChip.vue';
 import {
@@ -115,6 +125,15 @@ export default {
   },
 
   computed: {
+    typesStore() {
+      return useTypesStore();
+    },
+    type() {
+      return this.typesStore.byId(this.workspace.type ?? 'ceos-ard');
+    },
+    typeTitle() {
+      return this.type?.title ?? this.workspace.type;
+    },
     statusColor() {
       return this.workspace.status === 'active' ? 'success' : 'grey';
     },

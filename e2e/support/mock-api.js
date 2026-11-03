@@ -19,8 +19,58 @@ const FILES = {
 };
 
 const USAGE = {
-  '/requirements/general/metadata-machine-readable.yaml': ['NRB', 'SR'],
+  '/requirements/general/metadata-machine-readable.yaml': [
+    { label: 'NRB', path: '/pfs/NRB/document.yaml' },
+    { label: 'SR', path: '/pfs/SR/document.yaml' },
+  ],
   '/requirements/general/unused.yaml': [],
+};
+
+// As configured on the server (app/workspace_types/ceos_ard.py)
+const CEOS_ARD_TYPE = {
+  id: 'ceos-ard',
+  title: 'CEOS-ARD',
+  description: 'Product Family Specifications for CEOS Analysis Ready Data',
+  color: '#3e5265',
+  upstream: {
+    owner: 'ceos-org',
+    repo: 'ceos-ard',
+    branch: 'main',
+    url: 'https://github.com/ceos-org/ceos-ard',
+  },
+  pfs: true,
+  labels: {},
+  editors: [
+    {
+      match: 'glossary/*.yaml',
+      schema: {
+        type: 'object',
+        properties: {
+          term: { type: 'string', minLength: 2 },
+          description: { type: 'string', minLength: 2 },
+        },
+      },
+      ui_schema: {
+        type: 'VerticalLayout',
+        elements: [
+          { type: 'Control', scope: '#/properties/term' },
+          { type: 'Control', scope: '#/properties/description' },
+        ],
+      },
+    },
+  ],
+  actions: [{ id: 'create-pfs', title: 'Add New PFS', folder: '/pfs', dialog: 'CreatePfsDialog' }],
+  file_menu: [
+    { match: '**', kind: 'folder', ops: ['create', 'rename', 'delete'] },
+    {
+      match: '**',
+      kind: 'file',
+      ops: ['open_source', 'download', 'diff', 'revert', 'rename', 'delete'],
+    },
+    { match: 'pfs', kind: 'folder', ops: [] },
+    { match: 'pfs/*', kind: 'folder', ops: [], ops_if_new: ['rename', 'delete'] },
+    { match: 'pfs/**', kind: 'file', ops: ['open_source', 'download', 'diff', 'revert'] },
+  ],
 };
 
 const PFS_TYPES = [
@@ -43,6 +93,10 @@ function workspace(overrides = {}) {
     fork_repo_owner: 'jdoe',
     fork_repo_name: 'ceos-ard',
     branch_name: `workspace/${id}`,
+    type: 'ceos-ard',
+    upstream_owner: 'ceos-org',
+    upstream_repo: 'ceos-ard',
+    upstream_branch: 'main',
     status: 'active',
     pull_request_number: null,
     pull_request_status: null,
@@ -85,6 +139,7 @@ export class MockApi {
   constructor() {
     this.files = new Map(Object.entries(FILES).map(([path, content]) => [path, { content }]));
     this.status = new Map();
+    this.types = [CEOS_ARD_TYPE];
     this.workspaces = [workspace()];
     this.upstream = null;
     this.diffs = [];
@@ -182,6 +237,9 @@ export class MockApi {
     if (path === '/auth/user') {
       const expires = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
       return json(route, { ...USER, expires_at: expires });
+    }
+    if (path === '/types') {
+      return json(route, this.types);
     }
     if (path === '/pfs') {
       // GitHub only provides the folder names of the PFS

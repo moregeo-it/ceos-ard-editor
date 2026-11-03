@@ -10,10 +10,26 @@
         <v-divider></v-divider>
 
         <v-card-text class="pt-6">
+          <v-select
+            v-if="!isUpdateMode && typesStore.hasMultipleTypes"
+            v-model="formData.type"
+            :items="typesStore.types"
+            item-title="title"
+            item-value="id"
+            label="What do you want to edit?"
+            variant="outlined"
+            :prepend-inner-icon="icons.type"
+            class="mb-3"
+          >
+            <template #item="{ props, item }">
+              <v-list-item v-bind="props" :subtitle="item.raw.description" />
+            </template>
+          </v-select>
+
           <v-text-field
             v-model="formData.title"
             label="Workspace Title"
-            placeholder="My CEOS-ARD Workspace"
+            placeholder="My Workspace"
             :rules="rules.title"
             variant="outlined"
             :prepend-inner-icon="icons.folder"
@@ -23,6 +39,7 @@
           ></v-text-field>
 
           <PfsSelect
+            v-if="selectedType?.pfs"
             v-model="formData.pfs"
             :items="pfsItems"
             :loading="loadingPfs"
@@ -36,7 +53,13 @@
             class="mb-3"
           />
 
-          <v-alert v-if="pfsError" type="warning" variant="tonal" density="compact" class="mb-3">
+          <v-alert
+            v-if="selectedType?.pfs && pfsError"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+          >
             Couldn't load PFSes of this workspace, so newly added PFS are missing currently.
           </v-alert>
 
@@ -53,14 +76,15 @@
           ></v-textarea>
 
           <v-alert
-            v-if="createsRepository && !isUpdateMode"
+            v-if="!ownedTypes.includes(formData.type) && !isUpdateMode"
             type="info"
             variant="tonal"
             density="compact"
             class="mt-3"
           >
-            Creating your first workspace also creates a copy (fork) of the CEOS-ARD repository on
-            your GitHub account. All of your workspaces are stored there.
+            Creating your first workspace also creates a copy (fork) of the
+            {{ selectedType?.title ?? 'CEOS-ARD' }} repository on your GitHub account. All of your
+            workspaces for it are stored there.
           </v-alert>
         </v-card-text>
 
@@ -82,7 +106,15 @@
 import DialogMixin from '@/components/DialogMixin';
 import workspaceService from '@/services/workspace.service';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import { mdiFolderPlus, mdiFolderEdit, mdiFolder, mdiFileDocument, mdiText } from '@mdi/js';
+import { useTypesStore } from '@/stores/types';
+import {
+  mdiFolderPlus,
+  mdiFolderEdit,
+  mdiFolder,
+  mdiFileDocument,
+  mdiShapeOutline,
+  mdiText,
+} from '@mdi/js';
 import PfsSelect from '@/components/PfsSelect.vue';
 
 export default {
@@ -101,10 +133,11 @@ export default {
       type: Object,
       default: null,
     },
-    // The first workspace creates the user's GitHub fork, which the dialog discloses up front
-    createsRepository: {
-      type: Boolean,
-      default: false,
+    // The types the user has workspaces of; the first workspace of a type creates the user's
+    // GitHub fork, which the dialog discloses up front
+    ownedTypes: {
+      type: Array,
+      default: () => [],
     },
   },
   data() {
@@ -115,8 +148,10 @@ export default {
         folder: mdiFolder,
         fileDocument: mdiFileDocument,
         text: mdiText,
+        type: mdiShapeOutline,
       },
       formData: {
+        type: useTypesStore().types[0]?.id ?? 'ceos-ard',
         title: '',
         pfs: [],
         description: '',
@@ -137,6 +172,12 @@ export default {
   computed: {
     workspacesStore() {
       return useWorkspacesStore();
+    },
+    typesStore() {
+      return useTypesStore();
+    },
+    selectedType() {
+      return this.typesStore.byId(this.formData.type);
     },
     isUpdateMode() {
       return this.mode === 'update';
@@ -165,12 +206,13 @@ export default {
           ? [this.workspace.pfs]
           : [];
       this.formData = {
+        type: this.workspace.type ?? 'ceos-ard',
         title: this.workspace.title || '',
         pfs: pfsIds,
         description: this.workspace.description || '',
       };
     }
-    if (this.isUpdateMode && this.workspace) {
+    if (this.isUpdateMode && this.workspace && this.selectedType?.pfs) {
       this.loadWorkspacePfs();
     }
   },
@@ -190,10 +232,13 @@ export default {
       if (!valid) return;
 
       const payload = {
+        type: this.formData.type,
         title: this.formData.title,
         description: this.formData.description || null,
-        pfs: this.formData.pfs,
       };
+      if (this.selectedType?.pfs) {
+        payload.pfs = this.formData.pfs;
+      }
 
       // Include workspace ID for update mode
       if (this.isUpdateMode && this.workspace) {

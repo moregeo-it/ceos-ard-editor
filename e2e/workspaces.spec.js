@@ -63,7 +63,12 @@ test.describe('Workspaces', () => {
 
     await expect(page).toHaveURL(/\/workspaces\/ws-2$/);
     const post = api.requests.find((r) => r.method === 'POST' && r.path === '/workspaces');
-    expect(JSON.parse(post.body)).toEqual({ title: 'SR review', description: null, pfs: ['SR'] });
+    expect(JSON.parse(post.body)).toEqual({
+      type: 'ceos-ard',
+      title: 'SR review',
+      description: null,
+      pfs: ['SR'],
+    });
     await expect(
       page.getByText('Workspace created successfully in your CEOS-ARD repository jdoe/ceos-ard'),
     ).toBeVisible();
@@ -90,5 +95,81 @@ test.describe('Workspaces', () => {
     const dialog = await openCreateDialog(page);
 
     await expect(dialog).not.toContainText('creates a copy (fork)');
+  });
+});
+
+test.describe('Workspace types', () => {
+  const OTHER_TYPE = {
+    id: 'other',
+    title: 'Other Specification',
+    description: 'A repository without PFS',
+    color: '#00796b',
+    upstream: { owner: 'ceos-org', repo: 'other', branch: 'main', url: '' },
+    pfs: false,
+    labels: {},
+    editors: [],
+    actions: [],
+    file_menu: [],
+  };
+
+  test('a single type is not shown', async ({ page }) => {
+    const dialog = await openCreateDialog(page);
+
+    await expect(dialog.getByLabel('What do you want to edit?')).toHaveCount(0);
+    await expect(page.locator('.v-card').filter({ hasText: 'NRB review' })).not.toContainText(
+      'CEOS-ARD',
+    );
+  });
+
+  test('the dialog waits for the types before choosing one', async ({ page, api }) => {
+    api.types = [OTHER_TYPE];
+    await page.route('http://localhost:8099/types', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await route.fallback();
+    });
+    await page.goto('/workspaces');
+    await page.getByRole('button', { name: 'Create Workspace' }).first().click();
+
+    const dialog = page.locator('.v-dialog .v-card');
+    await dialog.getByLabel('Workspace Title').fill('Other review');
+    await dialog.getByRole('button', { name: 'Create' }).click();
+
+    await expect(page).toHaveURL(/\/workspaces\/ws-2$/);
+    const post = api.requests.find((r) => r.method === 'POST' && r.path === '/workspaces');
+    expect(JSON.parse(post.body).type).toBe('other');
+  });
+
+  test('with several types, workspaces show and choose their type', async ({ page, api }) => {
+    api.types.push(OTHER_TYPE);
+    const dialog = await openCreateDialog(page);
+
+    const badge = page
+      .locator('.v-card')
+      .filter({ hasText: 'NRB review' })
+      .locator('.v-chip')
+      .filter({ hasText: 'CEOS-ARD' });
+    await expect(badge).toHaveCSS('background-color', 'rgb(62, 82, 101)');
+    const typeSelect = dialog.locator('.v-select').filter({ hasText: 'What do you want to edit?' });
+    expect(await optionTexts(page, typeSelect)).toEqual([
+      'CEOS-ARD Product Family Specifications for CEOS Analysis Ready Data',
+      'Other Specification A repository without PFS',
+    ]);
+    await typeSelect.click();
+    await page.locator('.v-overlay--active .v-list-item').filter({ hasText: 'Other' }).click();
+
+    await expect(dialog.getByText('Product Format Specification')).toHaveCount(0);
+    await expect(dialog).toContainText(
+      'creates a copy (fork) of the Other Specification repository',
+    );
+    await dialog.getByLabel('Workspace Title').fill('Other review');
+    await dialog.getByRole('button', { name: 'Create' }).click();
+
+    await expect(page).toHaveURL(/\/workspaces\/ws-2$/);
+    const post = api.requests.find((r) => r.method === 'POST' && r.path === '/workspaces');
+    expect(JSON.parse(post.body)).toEqual({
+      type: 'other',
+      title: 'Other review',
+      description: null,
+    });
   });
 });

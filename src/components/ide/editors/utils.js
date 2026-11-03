@@ -1,27 +1,20 @@
-import { GLOSSARY_SCHEMA, GLOSSARY_UI_SCHEMA } from './schemas';
+import { useTypesStore } from '@/stores/types';
+import { matchesGlob } from '@/utils/glob';
 
-export function isGlossary(file /*, data*/) {
-  return file.path.startsWith('/glossary/') && file.path.endsWith('.yaml');
+/** The form editor rule of the workspace type that applies to the file, if any. */
+export function getEditorRule(file) {
+  const rules = useTypesStore().currentType?.editors ?? [];
+  return rules.find((rule) => matchesGlob(file.path, rule.match)) ?? null;
 }
 
-export function supportVisualEditing(file, data) {
-  if (isGlossary(file, data)) {
-    return true;
-  } else {
-    return false;
-  }
+export function supportVisualEditing(file) {
+  return Boolean(getEditorRule(file)?.schema);
 }
 
-export function getEditingSchema(file, data) {
-  if (isGlossary(file, data)) {
-    return GLOSSARY_SCHEMA;
-  }
-  return {};
+export function getEditingSchema(file) {
+  return getEditorRule(file)?.schema ?? {};
 }
 
-export function getUiSchema(file, data) {
-  if (isGlossary(file, data)) {
-    return GLOSSARY_UI_SCHEMA;
-  }
-  return undefined;
+export function getUiSchema(file) {
+  return getEditorRule(file)?.ui_schema;
 }
