@@ -60,14 +60,17 @@ in the ceos-ard-server README). The editor loads the types from `GET /types` int
 (`src/stores/types.js`) and doesn't hardcode any of it:
 
 - `src/components/ide/FileContextMenu.vue` builds the file menu from the type's `file_menu` rules and
-  `actions`. An action with a `dialog` opens that dialog, which must exist in the editor
-  (`src/components/DialogControl.vue`).
+  `actions`. An action with a `dialog` opens that dialog. Its `requestAction` only runs `CreatePfsDialog`,
+  which is also the only dialog the server accepts; a new dialog needs both.
 - `src/components/ide/editors/utils.js` picks the form editor of a file from the type's `editors`.
 - Globs are matched by `src/utils/glob.js`, like the server's `match_glob`; both have the same test cases.
 - Texts name the type instead of CEOS-ARD, e.g. "Behind CEOS-ARD", and the type's `labels` replace
   default texts, e.g. "Used in".
 - With more than one type available for new workspaces, the workspace dialog asks for the type, and the
   workspace cards and the header show it.
+
+So the editor has no configuration per type: a new type needs no change in the editor, unless it uses a
+dialog the editor doesn't have yet.
 
 ### Compile and Hot-Reload for Development
 
