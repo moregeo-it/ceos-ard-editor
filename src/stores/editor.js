@@ -3,6 +3,8 @@ import { defineStore } from 'pinia';
 import { useFilesStore } from './files';
 import { useNotificationsStore } from './notifications';
 
+import { supportVisualEditing } from '@/components/ide/editors/utils';
+
 import { EVENTS, on, workspaceSession } from '@/services/events';
 
 // The latest save per file path, which the next save of that file waits for
@@ -46,12 +48,27 @@ export const useEditorStore = defineStore('editor', {
       ) {
         return;
       }
-      if (!this.opened.find((f) => f.path === path)) {
+      const index = this.opened.findIndex((f) => f.path === path);
+      if (index === -1) {
         file = Object.assign({}, file);
         if (forceSourceCodeEditor) {
           file.forceSourceCodeEditor = true;
         }
         this.opened.push(file);
+      } else {
+        file = Object.assign({}, this.opened[index], file);
+        const isVisual = !file.forceSourceCodeEditor && supportVisualEditing(file, this.data[path]);
+        if (forceSourceCodeEditor && isVisual) {
+          if (this.changed[path]) {
+            useNotificationsStore().warning(
+              `${path} is open in the visual editor with unsaved changes. ` +
+                'Save or discard them first, then open it in the source code editor again.',
+            );
+          } else {
+            file.forceSourceCodeEditor = true;
+          }
+        }
+        this.opened[index] = file;
       }
       this.active = file;
       if (this.original[path] === undefined) {
