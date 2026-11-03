@@ -184,7 +184,8 @@ export class MockApi {
       return json(route, { ...USER, expires_at: expires });
     }
     if (path === '/pfs') {
-      return json(route, { pfs_types: PFS_TYPES });
+      // GitHub only provides the folder names of the PFS
+      return json(route, { pfs_types: PFS_TYPES.map(({ id }) => ({ id, title: null })) });
     }
     if (path === '/workspaces') {
       if (method === 'POST') {

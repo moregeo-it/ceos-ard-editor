@@ -19,7 +19,7 @@ async function selectPfs(page, dialog, id) {
   await dialog.locator('.v-select').filter({ hasText: 'Product Format Specification' }).click();
   await page
     .locator('.v-overlay .v-list-item')
-    .filter({ hasText: `${id}:` })
+    .filter({ hasText: new RegExp(`^${id}$`) })
     .click();
   await page.keyboard.press('Escape');
 }
@@ -43,15 +43,11 @@ test.describe('Workspaces', () => {
     );
   });
 
-  test('offers the PFS of CEOS-ARD with their titles', async ({ page }) => {
+  test('offers the PFS of CEOS-ARD', async ({ page }) => {
     const dialog = await openCreateDialog(page);
 
     const select = dialog.locator('.v-select').filter({ hasText: 'Product Format Specification' });
-    expect(await optionTexts(page, select)).toEqual([
-      'NRB: SAR Normalised Radar Backscatter',
-      'SR: Optical Surface Reflectance',
-      'AR: Aquatic Reflectance',
-    ]);
+    expect(await optionTexts(page, select)).toEqual(['NRB', 'SR', 'AR']);
   });
 
   test('creating a workspace requires a PFS', async ({ page, api }) => {
