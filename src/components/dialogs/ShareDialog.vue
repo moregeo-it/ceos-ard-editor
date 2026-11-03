@@ -161,7 +161,7 @@
                       <v-btn
                         v-bind="props"
                         icon
-                        aria-label="Copy share link"
+                        :aria-label="`Copy share link ${link.url}`"
                         variant="text"
                         size="small"
                         @click="copyLink(link)"
