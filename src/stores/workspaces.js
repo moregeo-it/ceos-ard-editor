@@ -203,9 +203,10 @@ export const useWorkspacesStore = defineStore('workspaces', {
     },
 
     async syncWorkspace(workspaceId) {
+      const started = workspaceSession();
       const result = await workspaceService.syncWorkspace(workspaceId);
-      // A late answer must not land in the workspace opened meanwhile
-      if (this.currentWorkspace?.id === workspaceId) {
+      // A late answer must not land in a workspace opened meanwhile, not even the same one reopened
+      if (started === workspaceSession()) {
         this.upstream = result?.upstream ?? null;
       }
       return result;
