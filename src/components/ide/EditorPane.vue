@@ -73,16 +73,22 @@
         </template>
         -->
 
-        <v-toolbar-title v-if="activeFile?.usage" class="text-body-2">
-          Used in:
-          <ul class="comma-separated-list">
-            <li v-for="item in activeFile.usage" :key="item">
-              <a href="#" @click.prevent="editorStore.show(`/pfs/${item}/document.yaml`)">{{
-                item
-              }}</a>
-            </li>
-          </ul>
-        </v-toolbar-title>
+        <v-menu v-if="activeFile?.usage?.length" location="top">
+          <template #activator="{ props }">
+            <v-btn v-bind="props" :append-icon="icons.usage">
+              Used in
+              <v-chip size="x-small" class="ml-2">{{ activeFile.usage.length }}</v-chip>
+            </v-btn>
+          </template>
+          <v-list density="compact" max-height="300">
+            <v-list-item
+              v-for="item in activeFile.usage"
+              :key="item"
+              :title="item"
+              @click="editorStore.show(`/pfs/${item}/document.yaml`)"
+            />
+          </v-list>
+        </v-menu>
 
         <template v-slot:append v-if="!workspacesStore.isReadOnly">
           <v-btn
@@ -112,7 +118,7 @@ import { useWorkspacesStore } from '@/stores/workspaces';
 import { defineAsyncComponent } from 'vue';
 import BrowserViewer from './editors/BrowserViewer.vue';
 import UnsupportedViewer from './editors/UnsupportedViewer.vue';
-import { mdiClose, mdiContentSave, mdiContentSaveAll, mdiMenu } from '@mdi/js';
+import { mdiClose, mdiContentSave, mdiContentSaveAll, mdiMenu, mdiMenuUp } from '@mdi/js';
 import { supportVisualEditing } from '@/components/ide/editors/utils';
 
 const supportedBrowserTypes = [
@@ -141,6 +147,7 @@ export default {
         close: mdiClose,
         menu: mdiMenu,
         save: mdiContentSave,
+        usage: mdiMenuUp,
         saveAll: mdiContentSaveAll,
       },
     };
@@ -157,12 +164,6 @@ export default {
             'bg-color': 'grey-lighten-3',
             color: 'primary',
           };
-    },
-    usage() {
-      if (!this.activeFile?.usage) {
-        return null;
-      }
-      return 'Used in: ' + this.activeFile.usage.join(', ');
     },
     model: {
       get() {

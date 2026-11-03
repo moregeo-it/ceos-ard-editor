@@ -319,6 +319,7 @@ export default {
       this.$root.openDialog('DeleteFileDialog', {
         name: this.item.name,
         type: this.item.type,
+        path: this.item.path,
         onAcceptance: async () => await this.handleDelete(),
       });
     },
