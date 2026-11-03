@@ -1,8 +1,14 @@
 import { test, expect } from './support/mock-api';
 import { optionTexts } from './support/ui';
 
-async function openCreateDialog(page) {
+async function openWorkspaces(page) {
   await page.goto('/workspaces');
+  // The dialog reads whether the user has workspaces already when it opens
+  await expect(page.locator('.v-skeleton-loader')).toHaveCount(0);
+}
+
+async function openCreateDialog(page) {
+  await openWorkspaces(page);
   await page.getByRole('button', { name: 'Create Workspace' }).first().click();
   const dialog = page.locator('.v-dialog .v-card');
   await expect(dialog.getByLabel('Workspace Title')).toBeVisible();
@@ -20,12 +26,15 @@ async function selectPfs(page, dialog, id) {
 
 test.describe('Workspaces', () => {
   test('lists the workspaces with their PFS', async ({ page, api }) => {
-    await page.goto('/workspaces');
+    await openWorkspaces(page);
 
     await expect(page.locator('h1')).toHaveText('My PFS Workspaces');
     const card = page.locator('.v-card').filter({ hasText: 'NRB review' });
     await expect(card).toBeVisible();
     await expect(card.locator('.v-chip').filter({ hasText: /^NRB$/ })).toBeVisible();
+    await expect(card).toContainText('Created:');
+    await expect(card).toContainText('Updated:');
+    await expect(card).not.toContainText('n/a');
 
     api.workspaces[0].pfs = null;
     await page.reload();

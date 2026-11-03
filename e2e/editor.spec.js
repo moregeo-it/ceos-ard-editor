@@ -232,6 +232,10 @@ test.describe('Upstream', () => {
     const dialog = page.locator('.v-dialog .v-card');
     await expect(dialog.locator('.v-card-title')).toHaveText('Behind CEOS-ARD');
     await expect(dialog).toContainText('The official CEOS-ARD repository has 3 new commits');
+    await expect(dialog.getByRole('link', { name: 'Open on GitHub' })).toHaveAttribute(
+      'href',
+      'https://github.com/jdoe/ceos-ard/tree/workspace/ws-1',
+    );
   });
 
   test('shows conflicts with CEOS-ARD', async ({ page, api }) => {

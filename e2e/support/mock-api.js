@@ -31,26 +31,29 @@ const PFS_TYPES = [
 
 export const PREVIEW_HTML = '<!doctype html><html><body><h1>NRB preview</h1></body></html>';
 
+// As the server returns it (WorkspaceResponse in app/schemas/workspace.py)
 function workspace(overrides = {}) {
+  const id = overrides.id ?? 'ws-1';
   return {
-    id: 'ws-1',
+    id,
     title: 'NRB review',
+    user_id: USER.id,
+    pfs: ['NRB'],
     description: 'Review of the NRB PFS',
-    repository: 'https://github.com/jdoe/ceos-ard',
-    branch: 'nrb-review',
     fork_repo_owner: 'jdoe',
     fork_repo_name: 'ceos-ard',
-    pfs: ['NRB'],
-    created: '2026-10-01T10:00:00Z',
+    branch_name: `workspace/${id}`,
     status: 'active',
+    pull_request_number: null,
+    pull_request_status: null,
+    pull_request_status_last_updated_at: null,
+    created_at: '2026-10-01T10:00:00Z',
+    updated_at: '2026-10-02T12:00:00Z',
     archived_at: null,
     deletion_at: null,
-    pr: null,
-    pr_status: null,
-    user_id: USER.id,
+    viewer_role: 'owner',
     owner_username: USER.username,
     owner_full_name: USER.full_name,
-    viewer_role: 'owner',
     ...overrides,
   };
 }
