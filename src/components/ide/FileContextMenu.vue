@@ -81,10 +81,7 @@
           <v-list-item-title>Open in Source Code Editor</v-list-item-title>
         </v-list-item>
 
-        <v-list-item
-          v-if="item.status && !['added', 'deleted'].includes(item.status)"
-          @click="requestDiff"
-        >
+        <v-list-item v-if="item.status && item.status !== 'deleted'" @click="requestDiff">
           <template v-slot:prepend>
             <v-icon :icon="icons.diff" size="small" />
           </template>
