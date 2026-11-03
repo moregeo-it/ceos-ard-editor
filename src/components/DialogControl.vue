@@ -27,6 +27,9 @@ const components = {
   ForkCreatedDialog: defineAsyncComponent(
     () => import('@/components/dialogs/ForkCreatedDialog.vue'),
   ),
+  OutdatedBranchDialog: defineAsyncComponent(
+    () => import('@/components/dialogs/OutdatedBranchDialog.vue'),
+  ),
   ReauthenticationDialog: defineAsyncComponent(
     () => import('@/components/dialogs/ReauthenticationDialog.vue'),
   ),

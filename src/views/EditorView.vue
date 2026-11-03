@@ -9,6 +9,14 @@
           v-if="!workspacesStore.isOwner && workspacesStore.viewerRole"
           :mode="workspacesStore.viewerRole"
         />
+        <v-btn
+          v-if="workspacesStore.isOwner && upstream?.behind_commits"
+          :color="upstreamConflicts ? 'warning' : undefined"
+          :prepend-icon="upstreamConflicts ? icons.conflicts : icons.behind"
+          @click="openOutdatedBranchDialog"
+        >
+          {{ upstreamConflicts ? 'Conflicts with CEOS-ARD' : 'Behind CEOS-ARD' }}
+        </v-btn>
         <v-btn v-if="workspacesStore.isOwner" :prepend-icon="icons.share" @click="openShareDialog">
           Share
         </v-btn>
@@ -47,7 +55,7 @@ import { useNotificationsStore } from '@/stores/notifications';
 import { usePreviewStore } from '@/stores/preview';
 import { useRealtimeStore } from '@/stores/realtime';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import { mdiNotebookEdit, mdiShareVariant } from '@mdi/js';
+import { mdiAlertOutline, mdiNotebookEdit, mdiShareVariant, mdiSourceBranchSync } from '@mdi/js';
 import HeaderBar from '@/components/HeaderBar.vue';
 import HeaderSwitch from '@/components/HeaderSwitch.vue';
 import EditorPane from '@/components/ide/EditorPane.vue';
@@ -78,6 +86,8 @@ export default {
       icons: {
         title: mdiNotebookEdit,
         share: mdiShareVariant,
+        behind: mdiSourceBranchSync,
+        conflicts: mdiAlertOutline,
       },
       panelSizeDefaults: panelSizeDefaults,
       panelSizes: {
@@ -101,6 +111,12 @@ export default {
     },
     workspaceId() {
       return this.$route.params.id;
+    },
+    upstream() {
+      return this.workspacesStore.upstream;
+    },
+    upstreamConflicts() {
+      return this.upstream?.conflicting_files.length > 0;
     },
     workspacesStore() {
       return useWorkspacesStore();
@@ -178,6 +194,13 @@ export default {
       this.$root.openDialog('ShareDialog', { workspace: this.workspace });
     },
 
+    openOutdatedBranchDialog() {
+      this.$root.openDialog('OutdatedBranchDialog', {
+        workspace: this.workspace,
+        upstream: this.upstream,
+      });
+    },
+
     async handleToggleStatus() {
       try {
         await this.workspacesStore.toggleWorkspaceStatus(this.workspaceId);
@@ -251,6 +274,14 @@ export default {
               );
             }
             break;
+        }
+
+        // The proposal can't be merged as it is; being behind alone only shows in the header
+        if (this.upstreamConflicts) {
+          this.notificationsStore.warning(
+            'Some of your changes conflict with newer changes in the CEOS-ARD repository. ' +
+              'See "Conflicts with CEOS-ARD" at the top for the files.',
+          );
         }
       } catch (error) {
         if (this.unmounted) {
