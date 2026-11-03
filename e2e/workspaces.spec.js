@@ -1,4 +1,5 @@
 import { test, expect } from './support/mock-api';
+import { optionTexts } from './support/ui';
 
 async function openCreateDialog(page) {
   await page.goto('/workspaces');
@@ -31,6 +32,17 @@ test.describe('Workspaces', () => {
     await expect(page.locator('.v-card').filter({ hasText: 'NRB review' })).toContainText(
       'No PFS assigned',
     );
+  });
+
+  test('offers the PFS of CEOS-ARD with their titles', async ({ page }) => {
+    const dialog = await openCreateDialog(page);
+
+    const select = dialog.locator('.v-select').filter({ hasText: 'Product Format Specification' });
+    expect(await optionTexts(page, select)).toEqual([
+      'NRB: SAR Normalised Radar Backscatter',
+      'SR: Optical Surface Reflectance',
+      'AR: Aquatic Reflectance',
+    ]);
   });
 
   test('creating a workspace requires a PFS', async ({ page, api }) => {

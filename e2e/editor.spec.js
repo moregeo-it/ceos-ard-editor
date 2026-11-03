@@ -1,4 +1,5 @@
 import { test, expect } from './support/mock-api';
+import { fieldLabels, optionTexts } from './support/ui';
 
 const row = (page, name) =>
   page
@@ -86,6 +87,13 @@ test.describe('File tree', () => {
     await chooseMenuEntry(page, 'pfs', 'Add New PFS');
 
     const dialog = page.locator('.v-dialog .v-card');
+    expect(await fieldLabels(dialog)).toEqual(['ID', 'Title', 'Type', 'Applies To', 'Base PFS']);
+    expect(
+      await optionTexts(page, dialog.locator('.v-select').filter({ hasText: 'Type' }).first()),
+    ).toEqual(['SAR', 'Optical']);
+    expect(
+      await optionTexts(page, dialog.locator('.v-select').filter({ hasText: 'Base PFS' })),
+    ).toEqual(['NRB: SAR Normalised Radar Backscatter', 'SR: Optical Surface Reflectance']);
     await dialog.getByLabel('ID').fill('ST');
     await dialog.getByLabel('Title').fill('Surface Temperature');
     await dialog.locator('.v-select').filter({ hasText: 'Type' }).first().click();
@@ -148,7 +156,9 @@ test.describe('Editor', () => {
 
     const form = page.locator('.v-window-item--active .json-schema-editor');
     await expect(form).toBeVisible();
+    expect(await fieldLabels(form)).toEqual(['Term', 'Description']);
     await expect(form.locator('input').first()).toHaveValue('Accuracy');
+    await expect(form.locator('input').nth(1)).toHaveValue('Closeness of agreement.');
   });
 
   test('other YAML files open in the source code editor', async ({ page }) => {
@@ -178,6 +188,10 @@ test.describe('Preview', () => {
     await openWorkspace(page);
 
     await expect(page.locator('.preview-select .v-chip')).toHaveText(['NRB']);
+    expect(await optionTexts(page, page.locator('.preview-select'))).toEqual([
+      'NRB: SAR Normalised Radar Backscatter',
+      'SR: Optical Surface Reflectance',
+    ]);
     const frame = page.frameLocator('.preview-iframe');
     await expect(frame.locator('h1')).toHaveText('NRB preview');
     expect(

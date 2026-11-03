@@ -1,4 +1,5 @@
 import { test as base, expect } from '@playwright/test';
+import { expectNoRawData } from './ui';
 
 export const API = 'http://localhost:8099';
 
@@ -300,6 +301,10 @@ export const test = base.extend({
       const api = new MockApi();
       await api.install(page);
       await use(api);
+      // Whatever a test leaves on screen, e.g. config or API data shown as text
+      if (!page.isClosed()) {
+        await expectNoRawData(page);
+      }
     },
     { auto: true },
   ],
