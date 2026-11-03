@@ -72,3 +72,10 @@ export default {
 <style>
 @import '@jsonforms/vue-vuetify/lib/jsonforms-vue-vuetify.css';
 </style>
+
+<style scoped>
+.json-schema-editor {
+  height: 100%;
+  overflow-y: auto;
+}
+</style>
