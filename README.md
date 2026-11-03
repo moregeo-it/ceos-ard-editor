@@ -67,18 +67,19 @@ npm run build
 # Install browsers for the first run
 npx playwright install
 
-# When testing on CI, must build the project first
-npm run build
-
-# Runs the end-to-end tests
+# Runs the end-to-end tests (headless)
 npm run test:e2e
 # Runs the tests only on Chromium
 npm run test:e2e -- --project=chromium
 # Runs the tests of a specific file
-npm run test:e2e -- tests/example.spec.ts
+npm run test:e2e -- e2e/editor.spec.js
+# Shows the browser windows
+npm run test:e2e -- --headed
 # Runs the tests in debug mode
 npm run test:e2e -- --debug
 ```
+
+The tests mock the API (see `e2e/support/mock-api.js`), so no server is needed.
 
 ### Lint with [ESLint](https://eslint.org/)
 
