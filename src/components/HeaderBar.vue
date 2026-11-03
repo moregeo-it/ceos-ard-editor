@@ -1,6 +1,6 @@
 <template>
   <v-app-bar color="primary" elevation="2">
-    <v-app-bar-title>
+    <v-app-bar-title tag="h1">
       <v-icon v-if="icon" :icon="icon" start />
       {{ title }}
     </v-app-bar-title>

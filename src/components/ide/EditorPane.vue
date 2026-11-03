@@ -28,6 +28,7 @@
           </span>
           <v-btn
             :icon="icons.close"
+            :aria-label="`Close ${file.name}`"
             :loading="editorStore.saving[file.path]"
             size="x-small"
             variant="text"

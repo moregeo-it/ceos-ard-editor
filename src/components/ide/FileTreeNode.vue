@@ -20,13 +20,23 @@
       @click="handleClick"
       @keydown.enter.prevent="handleClick"
       @keydown.space.prevent="handleClick"
+      @mouseenter="checkTruncated"
+      @focus="checkTruncated"
     >
+      <v-tooltip
+        activator="parent"
+        location="top"
+        open-delay="100"
+        :disabled="!isTruncated"
+        :text="item.name"
+      />
       <!-- Toggle button (folders only) -->
       <div class="file-tree-toggle" v-if="item.type === 'folder'">
         <v-btn
           density="compact"
           :icon="isLoading ? undefined : toggleIcon"
           :loading="isLoading"
+          :aria-label="`${isOpen ? 'Collapse' : 'Expand'} ${item.name}`"
           variant="text"
           size="small"
           tabindex="-1"
@@ -45,7 +55,7 @@
       <!-- Title area -->
       <div class="file-tree-title flex-grow-1 overflow-hidden">
         <div class="d-flex align-center justify-space-between">
-          <span class="file-tree-name">{{ item.name }}</span>
+          <span ref="nameEl" class="file-tree-name">{{ item.name }}</span>
           <FileStatusBadge v-if="item.status" :status="item.status" class="ml-2" />
         </div>
         <div v-if="item.excerpt" class="text-caption text-pre-wrap text-subtle">
@@ -109,6 +119,12 @@ export default {
 
   emits: ['toggle', 'activate'],
 
+  data() {
+    return {
+      isTruncated: false,
+    };
+  },
+
   computed: {
     isOpen() {
       return this.openedSet.has(this.item.path);
@@ -147,6 +163,10 @@ export default {
     },
     handleToggle() {
       this.$emit('toggle', this.item);
+    },
+    checkTruncated() {
+      const el = this.$refs.nameEl;
+      this.isTruncated = !!el && el.scrollWidth > el.clientWidth;
     },
   },
 };

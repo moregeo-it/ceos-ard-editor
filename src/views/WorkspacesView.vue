@@ -58,7 +58,7 @@
         <v-col cols="12">
           <v-card class="pa-8 text-center text-subtle" variant="outlined">
             <v-icon :icon="icons.folderOff" size="64" class="mb-4"></v-icon>
-            <h3 class="text-h6 mb-2">No workspaces found</h3>
+            <h2 class="text-h6 mb-2">No workspaces found</h2>
             <p class="text-body-2 text-medium-emphasis mb-4">
               {{
                 filter === 'all'
@@ -175,10 +175,17 @@ export default {
       }
     },
 
+    // Only owned workspaces count: the list also holds workspaces shared with the user, which live
+    // in someone else's fork.
+    hasOwnedWorkspace() {
+      return this.workspacesStore.workspaces.some((w) => w.viewer_role === 'owner');
+    },
+
     openCreateDialog() {
       const mode = 'create';
       this.$root.openDialog('WorkspaceDialog', {
         mode,
+        createsRepository: !this.hasOwnedWorkspace(),
         onAcceptance: async (data) => await this.handleWorkspaceSubmit(data, mode),
       });
     },
@@ -186,11 +193,8 @@ export default {
     async handleWorkspaceSubmit(data, mode) {
       try {
         if (mode === 'create') {
-          // Read before creating, which adds to the list. Only owned workspaces count: the list
-          // also holds workspaces shared with the user, which live in someone else's fork.
-          const isFirstWorkspace = !this.workspacesStore.workspaces.some(
-            (w) => w.viewer_role === 'owner',
-          );
+          // Read before creating, which adds to the list
+          const isFirstWorkspace = !this.hasOwnedWorkspace();
           const workspace = await this.workspacesStore.createWorkspace(data);
           this.announceFork(workspace, isFirstWorkspace);
           this.handleViewWorkspace(workspace.id);
