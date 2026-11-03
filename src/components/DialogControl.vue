@@ -15,6 +15,7 @@ import { defineAsyncComponent } from 'vue';
 
 // Import all dialog components asynchronously
 const components = {
+  ActionDialog: defineAsyncComponent(() => import('@/components/dialogs/ActionDialog.vue')),
   ArchivedDialog: defineAsyncComponent(() => import('@/components/dialogs/ArchivedDialog.vue')),
   ArchiveWorkspaceDialog: defineAsyncComponent(
     () => import('@/components/dialogs/ArchiveWorkspaceDialog.vue'),

@@ -1,5 +1,8 @@
 <template>
-  <HeaderBar title="My PFS Workspaces" :icon="icons.folderMultiple" />
+  <HeaderBar
+    :title="typesStore.hasMultipleTypes ? 'My Workspaces' : 'My PFS Workspaces'"
+    :icon="icons.folderMultiple"
+  />
 
   <!-- Main Content -->
   <v-main>
@@ -132,6 +135,10 @@ export default {
   },
 
   computed: {
+    typesStore() {
+      return useTypesStore();
+    },
+
     workspacesStore() {
       return useWorkspacesStore();
     },

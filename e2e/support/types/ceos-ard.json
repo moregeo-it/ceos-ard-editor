@@ -11,10 +11,13 @@
     "url": "https://github.com/ceos-org/ceos-ard"
   },
   "pfs": true,
+  "preview": "pfs",
+  "expanded_folders": [],
   "labels": {},
   "editors": [
     {
       "match": "glossary/*.yaml",
+      "codec": "yaml",
       "schema": {
         "type": "object",
         "properties": {
@@ -50,6 +53,7 @@
       }
     }
   ],
+  "search_filters": [],
   "actions": [
     {
       "id": "create-pfs",
