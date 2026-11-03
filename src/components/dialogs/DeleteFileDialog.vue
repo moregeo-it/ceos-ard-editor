@@ -40,7 +40,8 @@
 
 <script>
 import DialogMixin from '@/components/DialogMixin';
-import { useFilesStore } from '@/stores/files';
+import fileService from '@/services/file.service';
+import { useWorkspacesStore } from '@/stores/workspaces';
 import { mdiAlertCircle } from '@mdi/js';
 
 export default {
@@ -80,7 +81,9 @@ export default {
       return;
     }
     try {
-      this.usage = (await useFilesStore().loadFileContext(this.path))?.usage ?? [];
+      // Not through the files store, which would write a late response over a deleted or renamed file
+      const workspaceId = useWorkspacesStore().currentWorkspace?.id;
+      this.usage = (await fileService.loadFileContext(workspaceId, this.path))?.usage ?? [];
     } catch {
       // The usage is only a hint, deleting works without it
     }
