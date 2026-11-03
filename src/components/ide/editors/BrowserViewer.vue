@@ -2,6 +2,7 @@
   <iframe v-if="isPdf" :src="url" width="100%" height="100%" class="iframe fill-height"></iframe>
   <div v-else class="d-flex align-center justify-center fill-height overflow-auto">
     <img v-if="url" :src="url" :alt="file.name" class="image" />
+    <p v-else-if="failed" class="text-subtle">This file can't be displayed.</p>
   </div>
 </template>
 
@@ -16,6 +17,7 @@ export default {
   data() {
     return {
       url: null,
+      failed: false,
     };
   },
 
@@ -33,6 +35,7 @@ export default {
       handler(value) {
         this.revoke();
         this.url = null;
+        this.failed = false;
         if (!(value instanceof Blob)) {
           return;
         }
@@ -43,6 +46,11 @@ export default {
           reader.onload = () => {
             if (this.value === value) {
               this.url = reader.result;
+            }
+          };
+          reader.onerror = () => {
+            if (this.value === value) {
+              this.failed = true;
             }
           };
           reader.readAsDataURL(value);
