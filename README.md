@@ -49,6 +49,26 @@ under the same registrable domain (e.g. `editor.ceos-ard.moregeo.it` and `api.ce
 in development both on `localhost` (use `localhost` for both, not `127.0.0.1` for one of them).
 Developing in Safari over plain HTTP needs `SESSION_COOKIE_SECURE=false` on the server.
 
+`VITE_APP_TITLE` and `VITE_APP_SUBTITLE` set the name and tagline of a deployment, shown on the landing
+page and as the page title.
+
+### Workspace types
+
+What differs between the repositories the editor works with, e.g. which files are shown, what the file
+menu offers or which files open in a form, is a workspace type defined on the server (see "Workspace Types"
+in the ceos-ard-server README). The editor loads the types from `GET /types` into the types store
+(`src/stores/types.js`) and doesn't hardcode any of it:
+
+- `src/components/ide/FileContextMenu.vue` builds the file menu from the type's `file_menu` rules and
+  `actions`. An action with a `dialog` opens that dialog, which must exist in the editor
+  (`src/components/DialogControl.vue`).
+- `src/components/ide/editors/utils.js` picks the form editor of a file from the type's `editors`.
+- Globs are matched by `src/utils/glob.js`, like the server's `match_glob`; both have the same test cases.
+- Texts name the type instead of CEOS-ARD, e.g. "Behind CEOS-ARD", and the type's `labels` replace
+  default texts, e.g. "Used in".
+- With more than one type available for new workspaces, the workspace dialog asks for the type, and the
+  workspace cards and the header show it.
+
 ### Compile and Hot-Reload for Development
 
 ```sh
@@ -79,7 +99,19 @@ npm run test:e2e -- --headed
 npm run test:e2e -- --debug
 ```
 
-The tests mock the API (see `e2e/support/mock-api.js`), so no server is needed.
+The tests mock the API (see `e2e/support/mock-api.js`), so no server is needed. The workspace types of the
+mock are exported from the server; update them when the server's types change:
+
+```sh
+# In ceos-ard-server
+pixi run python scripts/export_types.py ceos-ard > ../ceos-ard-editor/e2e/support/types/ceos-ard.json
+```
+
+### Run Unit Tests
+
+```sh
+npm run test:unit
+```
 
 ### Lint with [ESLint](https://eslint.org/)
 
