@@ -25,6 +25,8 @@ export async function optionTexts(page, select) {
 export async function fieldLabels(form) {
   await expect(form.locator('.v-field').first()).toBeVisible();
   // A filled field shows its label only in the floating copy, so read both regardless of visibility
-  const labels = await form.locator('.v-field-label:not(.v-field-label--floating)').allTextContents();
+  const labels = await form
+    .locator('.v-field-label:not(.v-field-label--floating)')
+    .allTextContents();
   return labels.map((label) => label.trim());
 }
