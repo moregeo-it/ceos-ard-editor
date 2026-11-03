@@ -6,6 +6,12 @@ test.describe('CEOS-ARD Editor', () => {
 
     await expect(page).toHaveTitle('CEOS-ARD Editor');
     await expect(page.locator('h1')).toHaveText('CEOS-ARD Editor');
+    await expect(page.getByText('Collaborative Product Specification Editor for')).toContainText(
+      'CEOS Analysis Ready Data',
+    );
+    await expect(page.getByRole('alert')).toContainText(
+      'This is a prototype version of the CEOS-ARD Editor.',
+    );
   });
 
   test('home page offers the GitHub login', async ({ page }) => {
