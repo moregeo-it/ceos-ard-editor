@@ -220,7 +220,8 @@ export default {
     // Read from the editor, as WebKit runs no listeners in the preview
     saveScrollPosition() {
       const win = this.$refs.iframe?.contentWindow;
-      if (win && this.previewHtml) {
+      // Until restored, a recreated iframe reads as unscrolled
+      if (win && this.previewHtml && !this.restoringScroll) {
         this.previewStore.setScrollPosition(win.scrollX, win.scrollY);
       }
     },
@@ -234,32 +235,36 @@ export default {
 
       // Restore the scroll position once stylesheets and images have loaded. Listen before
       // writing: without any, it loads during close()
+      this.restoringScroll = true;
       iframe.addEventListener(
         'load',
         () => {
           if (iframe.contentWindow) {
             iframe.contentWindow.scrollTo(...oldPosition);
           }
+          this.restoringScroll = false;
         },
         { once: true },
       );
 
-      // Write content to iframe
+      // Rewritten in an inert document: once written, closed shadow roots are out of reach
+      const parsed = new DOMParser().parseFromString(this.previewHtml, 'text/html');
+      this.enhanceHtml(parsed);
+      const doctype = parsed.doctype ? '<!doctype html>' : '';
+
       const doc = iframe.contentWindow.document;
       doc.open();
-      doc.write(this.previewHtml);
+      doc.write(doctype + parsed.documentElement.outerHTML);
       doc.close();
-
-      // Fix relative URLs in the iframe content
-      this.enhanceHtml(doc);
     },
     isAbsoluteUrl(url) {
       return URL.parse(url) !== null;
     },
     enhanceHtml(doc) {
-      // These could retarget links (<base>, SVG animations) or escape the rewriting below (frames)
+      // These could retarget links (<base>, SVG animations) or escape the rewriting below (frames,
+      // templates that become shadow roots)
       doc
-        .querySelectorAll('base, animate, set, iframe, frame, object, embed')
+        .querySelectorAll('base, animate, set, iframe, frame, object, embed, template')
         .forEach((element) => {
           element.remove();
         });

@@ -307,6 +307,7 @@ test.describe('Preview', () => {
       '<iframe srcdoc="<a href=/workspaces target=_top>Nested</a>"></iframe>' +
       '<a href="/workspaces" target="_top">Relative</a>' +
       '<a href="//example.com/workspaces" target="_top">Network</a>' +
+      '<div><template shadowrootmode="open"><a href="/workspaces" target="_top">Shadow</a></template></div>' +
       '<a href="#top" target="_top">Fragment</a></body></html>';
     await openWorkspace(page);
     const frame = page.frameLocator('.preview-iframe');
@@ -314,6 +315,7 @@ test.describe('Preview', () => {
     const title = await page.title();
 
     await expect(frame.locator('iframe, base, set')).toHaveCount(0);
+    await expect(frame.getByText('Shadow')).toHaveCount(0);
     for (const name of ['Vector', 'Relative', 'Network']) {
       await expect(frame.locator('a', { hasText: name })).toHaveAttribute('target', '_blank');
     }
@@ -351,6 +353,52 @@ test.describe('Preview', () => {
     );
 
     await expect(frame.locator('h1')).toHaveText('Second build');
+    await expect.poll(() => iframe.evaluate((element) => element.contentWindow.scrollY)).toBe(1200);
+  });
+
+  test('keeps the scroll position when a rebuild follows before the last one loaded', async ({
+    page,
+    api,
+  }) => {
+    let socket;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    let releaseImage;
+    const imageRequested = new Promise((resolve) => {
+      page.route('**/previews/slow.png', async (route) => {
+        resolve();
+        await new Promise((release) => (releaseImage = release));
+        await route.fulfill({ status: 404 });
+      });
+    });
+    const tallPreview = (title, extra = '') =>
+      `<!doctype html><html><head></head><body><h1 style="height: 5000px">${title}</h1>${extra}</body></html>`;
+    const rebuilt = () =>
+      socket.send(
+        JSON.stringify({
+          type: 'preview.generated',
+          ts: new Date().toISOString(),
+          actor_user_id: 'user-1',
+          pfs: ['NRB'],
+        }),
+      );
+    api.previewHtml = tallPreview('First build');
+    await openWorkspace(page);
+    const frame = page.frameLocator('.preview-iframe');
+    await expect(frame.locator('h1')).toHaveText('First build');
+    const iframe = page.locator('.preview-iframe');
+    await iframe.evaluate((element) => element.contentWindow.scrollTo(0, 1200));
+
+    // The second build's image holds back its load event, so its position is not restored yet
+    api.previewHtml = tallPreview('Second build', '<img src="slow.png">');
+    await expect.poll(() => socket).toBeTruthy();
+    rebuilt();
+    await expect(frame.locator('h1')).toHaveText('Second build');
+    await imageRequested;
+
+    api.previewHtml = tallPreview('Third build');
+    rebuilt();
+    await expect(frame.locator('h1')).toHaveText('Third build');
+    releaseImage();
     await expect.poll(() => iframe.evaluate((element) => element.contentWindow.scrollY)).toBe(1200);
   });
 
