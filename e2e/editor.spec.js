@@ -409,4 +409,51 @@ test.describe('Propose', () => {
     await page.getByRole('button', { name: 'Editor' }).click();
     await expect(row(page, 'notes.md')).toBeVisible();
   });
+
+  test("shows the proposal opened in the owner's other tab", async ({ page, api }) => {
+    let socket;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    const send = (proposal) =>
+      socket.send(
+        JSON.stringify({
+          type: 'proposal.updated',
+          ts: new Date().toISOString(),
+          actor_user_id: 'user-1',
+          target_user_id: 'user-1',
+          proposal,
+        }),
+      );
+    api.commits = [
+      {
+        sha: 'abc1234',
+        message: 'Update NRB',
+        timestamp: '2026-11-04T10:00:00Z',
+        author: 'Jane Doe',
+      },
+    ];
+    await page.goto('/workspaces/ws-1/propose');
+    const pullRequest = page.locator('.pull-request');
+    await expect(pullRequest).toContainText('You can propose your changes to CEOS-ARD now.');
+    await expect.poll(() => socket).toBeTruthy();
+
+    const proposal = {
+      number: 7,
+      url: 'https://github.com/ceos-org/ceos-ard/pull/7',
+      title: 'Update NRB',
+      description: 'Details',
+      state: 'open',
+      draft: false,
+      detached: false,
+    };
+    send(proposal);
+    await expect(pullRequest).toContainText('Proposal: Update NRB');
+    const title = pullRequest.getByLabel('Title of the Proposal');
+    await expect(title).toHaveValue('Update NRB');
+
+    // Unsaved edits stay
+    await title.fill('My title');
+    send({ ...proposal, description: 'More details' });
+    await expect(pullRequest.getByLabel('Description of the Proposal')).toHaveValue('Details');
+    await expect(title).toHaveValue('My title');
+  });
 });

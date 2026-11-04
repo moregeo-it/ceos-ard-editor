@@ -291,8 +291,12 @@ export default {
   watch: {
     proposal: {
       immediate: true,
-      handler(newProposal) {
-        if (newProposal) {
+      handler(newProposal, oldProposal) {
+        // Unsaved edits stay when the owner's other tab changes the proposal
+        const edited =
+          oldProposal &&
+          (this.title !== oldProposal.title || this.description !== oldProposal.description);
+        if (newProposal && !edited) {
           this.title = newProposal.title || '';
           this.description = newProposal.description || '';
         }

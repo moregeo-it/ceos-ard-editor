@@ -127,9 +127,13 @@ export default {
     });
 
     useRealtimeStore().connect(this.workspaceId);
-    this.stopListening = ['file.*', EVENTS.WORKSPACE_SYNCED, EVENTS.REALTIME_RESYNCED].map(
-      (pattern) => on(pattern, this.changedElsewhere),
-    );
+    this.stopListening = [
+      ...['file.*', EVENTS.WORKSPACE_SYNCED, EVENTS.REALTIME_RESYNCED].map((pattern) =>
+        on(pattern, this.changedElsewhere),
+      ),
+      // Opened or changed in the owner's other tab
+      on(EVENTS.PROPOSAL_UPDATED, (event) => this.proposalStore.updateProposal(event.proposal)),
+    ];
   },
 
   beforeUnmount() {
