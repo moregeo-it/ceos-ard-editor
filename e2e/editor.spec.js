@@ -356,4 +356,57 @@ test.describe('Propose', () => {
       'You can propose your changes to CEOS-ARD now.',
     );
   });
+
+  test('keeps the realtime connection on the way to Propose and back', async ({ page }) => {
+    let opened = 0;
+    let closed = 0;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => {
+      opened++;
+      ws.onClose(() => closed++);
+    });
+    await openWorkspace(page);
+    await expect.poll(() => opened).toBe(1);
+
+    await page.getByRole('button', { name: 'Propose' }).click();
+    await expect(page.locator('.changes-overview')).toBeVisible();
+    await page.getByRole('button', { name: 'Editor' }).click();
+    await expect(row(page, 'pfs')).toBeVisible();
+
+    expect(opened).toBe(1);
+    expect(closed).toBe(0);
+  });
+
+  test("shows the changes of the owner's other tab", async ({ page, api }) => {
+    let socket;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    const send = (event) =>
+      socket.send(
+        JSON.stringify({ ts: new Date().toISOString(), actor_user_id: 'user-1', ...event }),
+      );
+    await openWorkspace(page);
+    await page.getByRole('button', { name: 'Propose' }).click();
+    await expect(page.locator('.changes-overview')).toBeVisible();
+
+    // The other tab adds a file, then commits it
+    api.files.set('/notes.md', { content: '' });
+    api.status.set('/notes.md', 'added');
+    api.diffs = [{ path: '/notes.md', status: 'added' }];
+    send({ type: 'file.created', path: '/notes.md', file: api.item('/notes.md', false) });
+    await expect(page.locator('.changes')).toContainText('notes.md');
+
+    const commit = {
+      sha: 'abc1234',
+      message: 'Add notes',
+      timestamp: '2026-11-04T10:00:00Z',
+      author: 'Jane Doe',
+    };
+    api.status.delete('/notes.md');
+    api.diffs = [];
+    api.commits = [commit];
+    send({ type: 'file.committed', commit, changes: [{ path: '/notes.md', status: 'added' }] });
+    await expect(page.getByText('Add notes')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Editor' }).click();
+    await expect(row(page, 'notes.md')).toBeVisible();
+  });
 });

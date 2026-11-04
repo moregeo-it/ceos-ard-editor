@@ -21,6 +21,9 @@ const getDefaults = () => ({
   prDescription: null,
 });
 
+const byPath = (diffs) =>
+  diffs.sort((a, b) => a.path.localeCompare(b.path, 'en', { sensitivity: 'base' }));
+
 export const useProposalStore = defineStore('proposal', {
   state: () => getDefaults(),
 
@@ -66,11 +69,29 @@ export const useProposalStore = defineStore('proposal', {
       this.isDiffLoading = true;
       try {
         const diffs = await proposalService.fetchDiffList(workspaceId);
-        this.diffList = diffs.sort((a, b) =>
-          a.path.localeCompare(b.path, 'en', { sensitivity: 'base' }),
-        );
+        this.diffList = byPath(diffs);
       } finally {
         this.isDiffLoading = false;
+      }
+    },
+
+    /**
+     * After changes made elsewhere, e.g. in the owner's other tab: without the loading states, so
+     * the page doesn't flicker
+     */
+    async refreshChanges(workspaceId, { commits = false } = {}) {
+      const started = workspaceSession();
+      const [diffs, commitList] = await Promise.all([
+        proposalService.fetchDiffList(workspaceId),
+        commits ? proposalService.fetchCommits(workspaceId) : null,
+      ]);
+      // A commit of this tab running meanwhile updates both itself
+      if (started !== workspaceSession() || this.isCommitting) {
+        return;
+      }
+      this.diffList = byPath(diffs);
+      if (commits) {
+        this.commits = Array.isArray(commitList) ? commitList : [];
       }
     },
 

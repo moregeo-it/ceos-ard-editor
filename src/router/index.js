@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { useRealtimeStore } from '@/stores/realtime';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -58,6 +59,14 @@ router.beforeEach(async (to, from, next) => {
     next({ name: 'workspaces' });
   } else {
     next();
+  }
+});
+
+// A workspace's stream stays open between its Editor and Propose pages, so nothing is missed (#166)
+router.afterEach((to, from, failure) => {
+  const realtime = useRealtimeStore();
+  if (!failure && realtime.workspaceId && realtime.workspaceId !== to.params.id) {
+    realtime.disconnect();
   }
 });
 
