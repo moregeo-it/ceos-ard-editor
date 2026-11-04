@@ -224,6 +224,7 @@ export default {
     async upload() {
       const editor = useEditorStore();
       const uploaded = [];
+      const unsaved = [];
       this.uploading = true;
       for (const row of this.uploadable) {
         if (workspaceSession() !== this.session) {
@@ -247,7 +248,7 @@ export default {
         uploaded.push(path);
         this.remove(row);
         if (editor.changed[path]) {
-          this.notifications.warning(`${path} was replaced; its tab keeps its unsaved changes.`);
+          unsaved.push(path);
         } else {
           // A replaced file open in a tab shows the new content; the upload succeeded either way
           await editor
@@ -264,9 +265,15 @@ export default {
         this.filesStore.openedFolders = [
           ...new Set([...this.filesStore.openedFolders, this.folder]),
         ];
-        this.notifications.success(
-          `Uploaded ${uploaded.length === 1 ? '1 file' : `${uploaded.length} files`} to ${this.folder}`,
-        );
+        const message = `Uploaded ${uploaded.length === 1 ? '1 file' : `${uploaded.length} files`} to ${this.folder}`;
+        // One message at a time, so the warning about unsaved tabs replaces the success
+        if (unsaved.length) {
+          this.notifications.warning(
+            `${message}. Your unsaved changes to ${unsaved.join(', ')} are kept in the editor; saving them replaces the upload.`,
+          );
+        } else {
+          this.notifications.success(message);
+        }
       }
       // Rows not uploaded (invalid, failed or not confirmed) keep it open
       if (this.rows.length === 0) {

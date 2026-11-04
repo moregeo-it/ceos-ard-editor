@@ -243,8 +243,8 @@ export class MockApi {
         return fulfill(route, { status: 200, contentType: 'text/yaml', body: file.content });
       }
       if (method === 'PUT') {
-        this.files.get(path).content = request.postData();
-        this.status.set(path, 'modified');
+        this.status.set(path, this.files.has(path) ? 'modified' : 'added');
+        this.files.set(path, { content: request.postData() });
         return json(route, this.item(path, false));
       }
       if (method === 'DELETE') {
