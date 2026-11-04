@@ -29,7 +29,11 @@ const PFS_TYPES = [
   { id: 'AR', title: 'Aquatic Reflectance' },
 ];
 
-export const PREVIEW_HTML = '<!doctype html><html><body><h1>NRB preview</h1></body></html>';
+// With an edit button as the server renders `<!-- edit: path -->`
+export const PREVIEW_HTML =
+  '<!doctype html><html><head></head><body><h1>NRB preview</h1>' +
+  '<a name="/requirements/general/unused.yaml"></a>' +
+  '<button class="edit" value="/requirements/general/unused.yaml">Edit</button></body></html>';
 
 // As the server returns it (WorkspaceResponse in app/schemas/workspace.py)
 function workspace(overrides = {}) {
@@ -87,6 +91,7 @@ export class MockApi {
     this.status = new Map();
     this.workspaces = [workspace()];
     this.upstream = null;
+    this.previewHtml = PREVIEW_HTML;
     this.diffs = [];
     // Unified diffs by path
     this.fileDiffs = new Map();
@@ -278,7 +283,7 @@ export class MockApi {
       return json(route, this.item(document, false), 201);
     }
     if (sub === '/previews' || sub === '/previews/current') {
-      return fulfill(route, { status: 200, contentType: 'text/html', body: PREVIEW_HTML });
+      return fulfill(route, { status: 200, contentType: 'text/html', body: this.previewHtml });
     }
     if (sub === '/download') {
       return fulfill(route, { status: 200, contentType: 'application/pdf', body: '%PDF-1.4' });

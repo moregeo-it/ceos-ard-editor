@@ -71,7 +71,7 @@
           frameborder="0"
           width="100%"
           height="100%"
-          sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+          sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
         ></iframe>
       </div>
     </div>
@@ -90,6 +90,10 @@ import PfsSelect from '@/components/PfsSelect.vue';
 import { workspaceSession } from '@/services/events';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+// Edit links set this on the editor's URL: WebKit runs no listeners in the sandboxed preview (#192)
+const EDIT_HASH = '#edit=';
+const SAFE_PROTOCOLS = ['http:', 'https:', 'mailto:'];
+const XLINK_NS = 'http://www.w3.org/1999/xlink';
 
 function sameList(a, b) {
   return a.length === b.length && a.every((item, i) => item === b[i]);
@@ -172,7 +176,36 @@ export default {
       await this.previewStore.requestPreviewRefresh();
     }
   },
+  beforeUnmount() {
+    // While generating, the iframe is hidden and reads as unscrolled
+    if (!this.isGenerating) {
+      this.saveScrollPosition();
+    }
+  },
   watch: {
+    // Before the iframe is hidden and recreated
+    isGenerating(generating) {
+      if (generating) {
+        this.saveScrollPosition();
+      }
+    },
+    '$route.hash': {
+      // Also when an Edit link was opened in a new tab
+      immediate: true,
+      handler(hash) {
+        if (!hash.startsWith(EDIT_HASH)) {
+          return;
+        }
+        const path = hash.slice(EDIT_HASH.length);
+        const { path: routePath, query } = this.$route;
+        this.$router.replace({ path: routePath, query, hash: '' });
+        if (path.startsWith('/')) {
+          this.editorStore
+            .show(path)
+            .catch((error) => console.error('Error opening file in editor:', error));
+        }
+      },
+    },
     // The iframe is keyed by previewGeneration so each regeneration gets a fresh
     // document, forcing images to revalidate (304/404). Reusing the document via
     // doc.write() would reuse already-loaded images ignoring HTTP caching,
@@ -184,32 +217,23 @@ export default {
     },
   },
   methods: {
+    // Read from the editor, as WebKit runs no listeners in the preview
+    saveScrollPosition() {
+      const win = this.$refs.iframe?.contentWindow;
+      if (win && this.previewHtml) {
+        this.previewStore.setScrollPosition(win.scrollX, win.scrollY);
+      }
+    },
     updateIframeContent() {
       const iframe = this.$refs.iframe;
       if (!iframe) {
         return;
       }
 
-      // Save old scroll position to ensure scrollend event doesn't override it
       const oldPosition = this.previewStore.scrollPosition.slice(0);
 
-      // Write content to iframe
-      const doc = iframe.contentWindow.document;
-      doc.open();
-      doc.write(this.previewHtml);
-      doc.close();
-
-      // Add scrollend listener to track scroll position for restoration after regeneration
-      doc.addEventListener('scrollend', () => {
-        if (iframe.contentWindow) {
-          this.previewStore.setScrollPosition(
-            iframe.contentWindow.scrollX,
-            iframe.contentWindow.scrollY,
-          );
-        }
-      });
-
-      // Restore scroll position after all resources (stylesheets, images) are loaded
+      // Restore the scroll position once stylesheets and images have loaded. Listen before
+      // writing: without any, it loads during close()
       iframe.addEventListener(
         'load',
         () => {
@@ -220,6 +244,12 @@ export default {
         { once: true },
       );
 
+      // Write content to iframe
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(this.previewHtml);
+      doc.close();
+
       // Fix relative URLs in the iframe content
       this.enhanceHtml(doc);
     },
@@ -227,15 +257,30 @@ export default {
       return URL.parse(url) !== null;
     },
     enhanceHtml(doc) {
-      // Fix relative links and target
-      const links = doc.querySelectorAll('a[href]');
-      links.forEach((link) => {
-        const href = link.getAttribute('href');
-        const url = URL.parse(href);
-        if (url !== null) {
-          // Valid absolute URL (or mailto: link for example)
+      // These could retarget links (<base>, SVG animations) or escape the rewriting below (frames)
+      doc
+        .querySelectorAll('base, animate, set, iframe, frame, object, embed')
+        .forEach((element) => {
+          element.remove();
+        });
+
+      // Only edit links may navigate the editor, and only fragments stay in the preview, as a page
+      // loaded there keeps the sandbox's permissions. Others open in a new tab, javascript: etc.
+      // are dropped
+      doc.querySelectorAll('a, area').forEach((link) => {
+        const href = link.getAttribute('href') ?? link.getAttributeNS(XLINK_NS, 'href');
+        if (href === null || href.startsWith('#')) {
+          link.setAttribute('target', '_self');
+          return;
+        }
+        const url = URL.parse(href, doc.baseURI);
+        if (url && SAFE_PROTOCOLS.includes(url.protocol)) {
           link.setAttribute('target', '_blank');
           link.setAttribute('rel', 'noopener noreferrer');
+        } else {
+          link.removeAttribute('href');
+          link.removeAttributeNS(XLINK_NS, 'href');
+          link.removeAttribute('target');
         }
       });
 
@@ -260,39 +305,30 @@ export default {
         }
       });
 
-      // Make Edit buttons clickable
-      const editBtns = doc.querySelectorAll('button[class="edit"]');
-      editBtns.forEach((btn) => {
-        const href = btn.getAttribute('value');
-        if (href) {
-          btn.addEventListener('click', () => {
-            this.editorStore
-              .show(href)
-              .catch((error) => console.error('Error opening file in editor:', error));
-          });
-          btn.addEventListener('mouseover', () => {
-            btn.style.backgroundColor = '#0069d9';
-          });
-          btn.addEventListener('focus', () => {
-            btn.style.backgroundColor = '#0069d9';
-          });
-          btn.addEventListener('mouseout', () => {
-            btn.style.backgroundColor = '#007bff';
-          });
-          btn.addEventListener('blur', () => {
-            btn.style.backgroundColor = '#007bff';
-          });
-          btn.style.float = 'right';
-          btn.style.margin = `0 0 0.5rem 0.5rem`;
-          btn.style.padding = '0.3rem 0.8rem';
-          btn.style.backgroundColor = '#007bff';
-          btn.style.color = 'white';
-          btn.style.border = 0;
-          btn.style.borderRadius = '4px';
-          btn.style.cursor = 'pointer';
-          btn.style.transition = 'all 0.2s ease';
+      // The server's Edit buttons become links that open the file through the editor's URL
+      const { pathname, search } = window.location;
+      doc.querySelectorAll('button[class="edit"]').forEach((btn) => {
+        const path = btn.getAttribute('value');
+        if (!path) {
+          return;
         }
+        const link = doc.createElement('a');
+        link.className = 'edit';
+        link.textContent = btn.textContent;
+        link.href = `${pathname}${search}${EDIT_HASH}${encodeURIComponent(path)}`;
+        link.target = '_top';
+        // The browser's button font keeps the button's size; the last supported keyword wins
+        link.style.cssText =
+          'float: right; display: inline-block; margin: 0 0 0.5rem 0.5rem;' +
+          'padding: 0.3rem 0.8rem; background-color: #007bff; color: white; border-radius: 4px;' +
+          'text-decoration: none; transition: background-color 0.2s ease;' +
+          'font: 13.3333px sans-serif; font: -moz-button; font: -webkit-small-control;';
+        btn.replaceWith(link);
       });
+      const style = doc.createElement('style');
+      style.textContent =
+        'a.edit:hover, a.edit:focus-visible { background-color: #0069d9 !important; }';
+      doc.head.append(style);
     },
     // Save and regenerate once the menu closes, not on every toggled item of the multi-select
     async handleMenuToggle(open) {
