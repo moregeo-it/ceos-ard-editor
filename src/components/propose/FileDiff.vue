@@ -58,25 +58,45 @@ export default {
     },
   },
 
-  async created() {
-    if (!this.mightHaveDiff) {
-      this.loading = false;
-      return;
-    }
-    try {
-      this.loading = true;
-      this.diff = await diffService.fetchDiff(
-        this.workspacesStore.currentWorkspace.id,
-        this.file.path,
-      );
-    } catch (error) {
-      this.diff = '';
-      this.notificationsStore.error(
-        `Error loading diff for file ${this.file.path}: ${error.message}`,
-      );
-    } finally {
-      this.loading = false;
-    }
+  watch: {
+    // The list was refreshed after changes made elsewhere: no spinner, so the panel doesn't jump
+    file() {
+      this.loadDiff();
+    },
+  },
+
+  created() {
+    this.loadDiff();
+  },
+
+  methods: {
+    async loadDiff() {
+      const request = (this.request = (this.request ?? 0) + 1);
+      if (!this.mightHaveDiff) {
+        this.loading = false;
+        return;
+      }
+      try {
+        const diff = await diffService.fetchDiff(
+          this.workspacesStore.currentWorkspace.id,
+          this.file.path,
+        );
+        if (request === this.request) {
+          this.diff = diff;
+        }
+      } catch (error) {
+        if (request === this.request) {
+          this.diff = '';
+          this.notificationsStore.error(
+            `Error loading diff for file ${this.file.path}: ${error.message}`,
+          );
+        }
+      } finally {
+        if (request === this.request) {
+          this.loading = false;
+        }
+      }
+    },
   },
 };
 </script>

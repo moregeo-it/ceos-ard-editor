@@ -164,7 +164,6 @@ export default {
 
   beforeUnmount() {
     this.unmounted = true;
-    this.realtimeStore.disconnect();
   },
 
   methods: {

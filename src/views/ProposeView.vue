@@ -30,6 +30,8 @@
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useProposalStore } from '@/stores/proposal';
+import { useRealtimeStore } from '@/stores/realtime';
+import { EVENTS, on } from '@/services/events';
 
 import { mdiCheckCircle } from '@mdi/js';
 import { Splitpanes, Pane } from 'splitpanes';
@@ -37,6 +39,9 @@ import HeaderBar from '@/components/HeaderBar.vue';
 import HeaderSwitch from '@/components/HeaderSwitch.vue';
 import ChangeList from '@/components/propose/ChangeList.vue';
 import PullRequest from '@/components/propose/PullRequest.vue';
+
+// Changes made elsewhere that also add commits
+const COMMIT_EVENTS = [EVENTS.FILE_COMMITTED, EVENTS.WORKSPACE_SYNCED, EVENTS.REALTIME_RESYNCED];
 
 export default {
   name: 'ProposeView',
@@ -120,10 +125,27 @@ export default {
     this.proposalStore.fetchCommits(this.workspaceId).catch((error) => {
       this.notificationsStore.error(`Failed to load commits: ${error.message}`);
     });
+
+    useRealtimeStore().connect(this.workspaceId);
+    this.stopListening = [
+      ...['file.*', EVENTS.WORKSPACE_SYNCED, EVENTS.REALTIME_RESYNCED].map((pattern) =>
+        on(pattern, this.changedElsewhere),
+      ),
+      // Opened or changed in the owner's other tab
+      on(EVENTS.PROPOSAL_UPDATED, (event) => this.proposalStore.updateProposal(event.proposal)),
+      // An update missed while disconnected
+      on(EVENTS.REALTIME_RESYNCED, () =>
+        this.proposalStore
+          .refreshProposal(this.workspaceId)
+          .catch((error) => console.error('Error refreshing the proposal:', error)),
+      ),
+    ];
   },
 
   beforeUnmount() {
     this.unmounted = true;
+    this.stopListening?.forEach((stop) => stop());
+    clearTimeout(this.refreshTimer);
   },
 
   methods: {
@@ -132,6 +154,22 @@ export default {
         localStorage.changesPanelSize = panes[0].size;
         localStorage.prPanelSize = panes[1].size;
       }
+    },
+
+    // A burst of changes, such as saving all files in another tab, refreshes once
+    changedElsewhere(event) {
+      if (event.source !== 'remote' && event.type !== EVENTS.REALTIME_RESYNCED) {
+        return;
+      }
+      this.refreshCommits ||= COMMIT_EVENTS.includes(event.type);
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = setTimeout(() => {
+        const commits = this.refreshCommits;
+        this.refreshCommits = false;
+        this.proposalStore
+          .refreshChanges(this.workspaceId, { commits })
+          .catch((error) => console.error('Error refreshing the changes:', error));
+      }, 300);
     },
 
     async loadProposal() {
