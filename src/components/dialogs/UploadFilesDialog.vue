@@ -28,6 +28,7 @@
             <div class="d-flex align-start">
               <v-text-field
                 v-model.trim="row.name"
+                label="Name"
                 :error-messages="row.error ? [...errors(row), row.error] : errors(row)"
                 :hint="hint(row)"
                 :persistent-hint="!!hint(row)"
@@ -227,6 +228,10 @@ export default {
       for (const row of this.uploadable) {
         if (workspaceSession() !== this.session) {
           break;
+        }
+        // A file created meanwhile, e.g. in another tab, needs its own confirmation
+        if (!this.uploadable.includes(row)) {
+          continue;
         }
         const path = this.pathOf(row);
         row.uploading = true;
