@@ -1,5 +1,7 @@
 import { test as base, expect } from '@playwright/test';
 import { expectNoRawData } from './ui';
+// Exported from the server, see README.md
+import CEOS_ARD_TYPE from './types/ceos-ard.json' with { type: 'json' };
 
 export const API = 'http://localhost:8099';
 
@@ -19,7 +21,10 @@ const FILES = {
 };
 
 const USAGE = {
-  '/requirements/general/metadata-machine-readable.yaml': ['NRB', 'SR'],
+  '/requirements/general/metadata-machine-readable.yaml': [
+    { label: 'NRB', path: '/pfs/NRB/document.yaml' },
+    { label: 'SR', path: '/pfs/SR/document.yaml' },
+  ],
   '/requirements/general/unused.yaml': [],
 };
 
@@ -47,6 +52,10 @@ function workspace(overrides = {}) {
     fork_repo_owner: 'jdoe',
     fork_repo_name: 'ceos-ard',
     branch_name: `workspace/${id}`,
+    type: 'ceos-ard',
+    upstream_owner: 'ceos-org',
+    upstream_repo: 'ceos-ard',
+    upstream_branch: 'main',
     status: 'active',
     pull_request_number: null,
     pull_request_status: null,
@@ -89,6 +98,7 @@ export class MockApi {
   constructor() {
     this.files = new Map(Object.entries(FILES).map(([path, content]) => [path, { content }]));
     this.status = new Map();
+    this.types = [CEOS_ARD_TYPE];
     this.workspaces = [workspace()];
     this.upstream = null;
     this.previewHtml = PREVIEW_HTML;
@@ -190,6 +200,9 @@ export class MockApi {
     if (path === '/auth/user') {
       const expires = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
       return json(route, { ...USER, expires_at: expires });
+    }
+    if (path === '/types') {
+      return json(route, this.types);
     }
     if (path === '/pfs') {
       // GitHub only provides the folder names of the PFS

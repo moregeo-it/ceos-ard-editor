@@ -4,8 +4,8 @@
       <v-row justify="center" class="flex-grow-0">
         <v-col>
           <v-alert type="warning">
-            This is a prototype version of the CEOS-ARD Editor. Functionality may be limited and
-            data may be reset periodically.
+            This is a prototype version of the {{ appTitle }}. Functionality may be limited and data
+            may be reset periodically.
           </v-alert>
         </v-col>
       </v-row>
@@ -18,12 +18,9 @@
                 <!-- CEOS Logo -->
                 <img :src="ceosLogo" alt="CEOS Analysis Ready Data" class="logo" />
 
-                <h1 class="text-h4 font-weight-bold mt-6 mb-3">CEOS-ARD Editor</h1>
+                <h1 class="text-h4 font-weight-bold mt-6 mb-3">{{ appTitle }}</h1>
 
-                <p class="text-body-1 text-medium-emphasis">
-                  Collaborative Product Specification Editor for<br class="d-none d-md-inline" />
-                  CEOS Analysis Ready Data
-                </p>
+                <p class="text-body-1 text-medium-emphasis">{{ appSubtitle }}</p>
               </v-col>
 
               <!-- Right side - Login buttons -->
@@ -99,6 +96,7 @@
 import { useAuthStore } from '@/stores/auth';
 import LoginButton from '@/components/landing/LoginButton.vue';
 import ceosLogo from '@/assets/ceos-ard-logo.png';
+import { APP_SUBTITLE, APP_TITLE } from '@/utils/branding';
 import { mdiGithub, mdiWeb, mdiFileDocument } from '@mdi/js';
 
 export default {
@@ -110,6 +108,8 @@ export default {
 
   data() {
     return {
+      appTitle: APP_TITLE,
+      appSubtitle: APP_SUBTITLE,
       ceosLogo,
       icons: {
         github: mdiGithub,

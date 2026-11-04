@@ -51,6 +51,13 @@ export default {
   },
 
   /**
+   * Fetch the workspace types users can create workspaces for
+   */
+  async fetchTypes() {
+    return api.get('/types');
+  },
+
+  /**
    * Fetch available PFS types (Product Format Specifications)
    */
   async fetchPfs(workspaceId) {

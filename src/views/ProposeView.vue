@@ -1,6 +1,11 @@
 <template>
   <template v-if="workspace">
-    <HeaderBar :title="workspace.title" :icon="icons.title">
+    <HeaderBar
+      :title="workspace.title"
+      :icon="icons.title"
+      :subtitle="headerType?.title"
+      :color="headerType?.color"
+    >
       <template #central-actions>
         <HeaderSwitch />
       </template>
@@ -28,6 +33,7 @@
 
 <script>
 import { useNotificationsStore } from '@/stores/notifications';
+import { useTypesStore } from '@/stores/types';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useProposalStore } from '@/stores/proposal';
 import { useRealtimeStore } from '@/stores/realtime';
@@ -72,6 +78,11 @@ export default {
   },
 
   computed: {
+    // Distinguishes what is edited, only needed with more than one workspace type
+    headerType() {
+      const typesStore = useTypesStore();
+      return typesStore.hasMultipleTypes ? typesStore.currentType : null;
+    },
     loading() {
       return (
         this.workspacesStore.isWorkspaceLoading[this.workspaceId] ||
@@ -99,7 +110,10 @@ export default {
     this.workspacesStore.enterWorkspace(this.workspaceId);
     // The Propose view is owner-only - collaborators (any share mode) never see it, not even read-only.
     try {
-      await this.workspacesStore.getWorkspace(this.workspaceId);
+      await Promise.all([
+        this.workspacesStore.getWorkspace(this.workspaceId),
+        useTypesStore().fetchTypes(),
+      ]);
     } catch (error) {
       if (this.unmounted) {
         return;

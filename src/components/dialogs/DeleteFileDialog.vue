@@ -17,7 +17,7 @@
           density="compact"
           class="mb-3"
         >
-          Used in {{ usage.join(', ') }}.
+          {{ usageLabel }} {{ usage.map((item) => item.label).join(', ') }}.
         </v-alert>
         <v-alert v-if="isFolder" type="warning" variant="tonal" density="compact">
           This will delete the folder and all files inside it. If under version control, the
@@ -41,6 +41,7 @@
 <script>
 import DialogMixin from '@/components/DialogMixin';
 import fileService from '@/services/file.service';
+import { useTypesStore } from '@/stores/types';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { mdiAlertCircle } from '@mdi/js';
 
@@ -74,6 +75,9 @@ export default {
   computed: {
     isFolder() {
       return this.type === 'folder';
+    },
+    usageLabel() {
+      return useTypesStore().currentType?.labels?.usage ?? 'Used in';
     },
   },
   async created() {

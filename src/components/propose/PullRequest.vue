@@ -25,9 +25,8 @@
              be reopened, so it must not fall into the withdrawn/rejected branch below. -->
         <template v-if="isDetached">
           <p class="mb-2 font-weight-bold">
-            Your CEOS-ARD repository was deleted on GitHub, so GitHub closed Pull Request #{{
-              proposal.number
-            }}.
+            Your {{ projectName }} repository was deleted on GitHub, so GitHub closed Pull Request
+            #{{ proposal.number }}.
           </p>
           <p class="mb-2">
             None of your work is lost — every change is still in this workspace, and the repository
@@ -80,12 +79,12 @@
         <template v-else-if="proposal && proposal.state === 'closed'">
           <p class="mb-2 font-weight-bold">
             A Pull Request has been created on GitHub, but it has been withdrawn by you or was
-            rejected by members of the CEOS-ARD community.
+            rejected by members of the {{ projectName }} community.
           </p>
           <p class="mb-2">
             You can try to reopen the Pull Request, but it might not be possible when rejected by a
-            CEOS-ARD community. Please add a comment on the Pull Request on GitHub to discuss the
-            reasons for rejection.
+            {{ projectName }} community. Please add a comment on the Pull Request on GitHub to
+            discuss the reasons for rejection.
           </p>
 
           <v-btn
@@ -109,7 +108,7 @@
         <template v-else-if="proposal && proposal.state === 'merged'">
           <p class="mb-2 font-weight-bold">
             A Pull Request has been created on GitHub and it has been <strong>accepted</strong> by
-            the CEOS-ARD community. Thank you for your contribution!
+            the {{ projectName }} community. Thank you for your contribution!
           </p>
 
           <v-btn
@@ -123,9 +122,9 @@
           </v-btn>
         </template>
         <template v-else>
-          You can propose your changes to CEOS-ARD now. This will create a new
-          <em>Pull Request</em> on the CEOS-ARD GitHub repository. You can add more changes to the
-          <em>Pull Request</em> later as well.
+          You can propose your changes to {{ projectName }} now. This will create a new
+          <em>Pull Request</em> on the {{ projectName }} GitHub repository. You can add more changes
+          to the <em>Pull Request</em> later as well.
         </template>
       </v-alert>
 
@@ -186,6 +185,7 @@
 import { useProposalStore } from '@/stores/proposal';
 import diffService from '@/services/proposal.service';
 import { useWorkspacesStore } from '@/stores/workspaces';
+import { useTypesStore } from '@/stores/types';
 import { useNotificationsStore } from '@/stores/notifications';
 import {
   mdiInformation,
@@ -213,6 +213,10 @@ export default {
     };
   },
   computed: {
+    // The name of what the workspace's repository holds, e.g. CEOS-ARD
+    projectName() {
+      return useTypesStore().currentType?.title;
+    },
     alertIcon() {
       if (this.proposal?.state) {
         return this.icons[this.proposal.state];

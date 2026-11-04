@@ -76,16 +76,16 @@
         <v-menu v-if="activeFile?.usage?.length" location="top">
           <template #activator="{ props }">
             <v-btn v-bind="props" :append-icon="icons.usage">
-              Used in
+              {{ usageLabel }}
               <v-chip size="x-small" class="ml-2">{{ activeFile.usage.length }}</v-chip>
             </v-btn>
           </template>
           <v-list density="compact" max-height="300">
             <v-list-item
               v-for="item in activeFile.usage"
-              :key="item"
-              :title="item"
-              @click="editorStore.show(`/pfs/${item}/document.yaml`)"
+              :key="item.path"
+              :title="item.label"
+              @click="editorStore.show(item.path)"
             />
           </v-list>
         </v-menu>
@@ -120,6 +120,7 @@ import BrowserViewer from './editors/BrowserViewer.vue';
 import UnsupportedViewer from './editors/UnsupportedViewer.vue';
 import { mdiClose, mdiContentSave, mdiContentSaveAll, mdiMenu, mdiMenuUp } from '@mdi/js';
 import { supportVisualEditing } from '@/components/ide/editors/utils';
+import { useTypesStore } from '@/stores/types';
 
 const supportedBrowserTypes = [
   'image/png',
@@ -164,6 +165,9 @@ export default {
             'bg-color': 'grey-lighten-3',
             color: 'primary',
           };
+    },
+    usageLabel() {
+      return useTypesStore().currentType?.labels?.usage ?? 'Used in';
     },
     model: {
       get() {

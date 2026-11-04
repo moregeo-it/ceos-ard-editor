@@ -1,10 +1,13 @@
 <template>
   <v-dialog v-model="show" :max-width="sizes.medium">
     <v-card>
-      <v-card-title>{{ conflicts ? 'Conflicts with CEOS-ARD' : 'Behind CEOS-ARD' }}</v-card-title>
+      <v-card-title>
+        {{ conflicts ? `Conflicts with ${projectName}` : `Behind ${projectName}` }}
+      </v-card-title>
       <v-card-text>
         <div class="mt-2">
-          The official CEOS-ARD repository has {{ commits }} that this workspace doesn't have yet.
+          The official {{ projectName }} repository has {{ commits }} that this workspace doesn't
+          have yet.
           <template v-if="conflicts">
             Its changes touch the same parts of these files as this workspace, so your proposal
             can't be merged until the conflicts are resolved:
@@ -36,6 +39,7 @@
 
 <script>
 import DialogMixin from '@/components/DialogMixin';
+import { useTypesStore } from '@/stores/types';
 import { mdiGithub } from '@mdi/js';
 
 export default {
@@ -46,7 +50,7 @@ export default {
       type: Object,
       required: true,
     },
-    // The sync's comparison with ceos-org/ceos-ard
+    // The sync's comparison with the upstream repository
     upstream: {
       type: Object,
       required: true,
@@ -60,6 +64,9 @@ export default {
     };
   },
   computed: {
+    projectName() {
+      return useTypesStore().byId(this.workspace.type)?.title;
+    },
     conflicts() {
       return this.upstream.conflicting_files.length > 0;
     },

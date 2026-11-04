@@ -8,8 +8,9 @@
     <div v-else-if="diffs.length > 0">
       <p class="mb-4">
         Below you can see a list of changes that you have currently stored in your personal
-        workspace, but have <strong>not</strong> been sent to the CEOS-ARD GitHub repository yet.
-        Please review the changes and provide a summary message before committing them to GitHub.
+        workspace, but have <strong>not</strong> been sent to the {{ projectName }} GitHub
+        repository yet. Please review the changes and provide a summary message before committing
+        them to GitHub.
       </p>
       <v-expansion-panels multiple class="mb-6" v-model="proposalStore.expandedFiles">
         <v-expansion-panel v-for="file in diffs" :key="file.path">
@@ -60,6 +61,7 @@ import { useEditorStore } from '@/stores/editor';
 import { usePreviewStore } from '@/stores/preview';
 import { useProposalStore } from '@/stores/proposal';
 import { useWorkspacesStore } from '@/stores/workspaces';
+import { useTypesStore } from '@/stores/types';
 import { useNotificationsStore } from '@/stores/notifications';
 import FileStatusBadge from '@/components/FileStatusBadge.vue';
 import FileDiff from './FileDiff.vue';
@@ -83,6 +85,10 @@ export default {
   },
 
   computed: {
+    // The name of what the workspace's repository holds, e.g. CEOS-ARD
+    projectName() {
+      return useTypesStore().currentType?.title;
+    },
     editorStore() {
       return useEditorStore();
     },

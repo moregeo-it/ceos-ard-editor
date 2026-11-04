@@ -11,6 +11,7 @@ import { registerEditorEventListeners } from './stores/editor';
 import { registerPreviewEventListeners } from './stores/preview';
 import { registerWorkspacesEventListeners } from './stores/workspaces';
 import { useNotificationsStore } from './stores/notifications';
+import { APP_TITLE } from '@/utils/branding';
 
 const app = createApp(App);
 
@@ -29,4 +30,5 @@ registerPreviewEventListeners();
 registerWorkspacesEventListeners();
 useAuthStore().listenForOtherTabs();
 
+document.title = APP_TITLE;
 app.mount('body');
