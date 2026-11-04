@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { test, expect } from './support/mock-api';
 import { fieldLabels, optionTexts } from './support/ui';
 
@@ -76,10 +77,15 @@ test.describe('File tree', () => {
     ]);
   });
 
-  test('folders allow creating, renaming and deleting', async ({ page }) => {
+  test('folders allow creating, uploading, renaming and deleting', async ({ page }) => {
     await openWorkspace(page);
 
-    expect(await menuEntries(page, 'requirements')).toEqual(['Create', 'Rename', 'Delete']);
+    expect(await menuEntries(page, 'requirements')).toEqual([
+      'Create',
+      'Upload',
+      'Rename',
+      'Delete',
+    ]);
   });
 
   test('a new PFS can be renamed and deleted', async ({ page, api }) => {
@@ -121,6 +127,84 @@ test.describe('File tree', () => {
     await chooseMenuEntry(page, 'unused.yaml', 'Delete');
     await expect(dialog).toContainText('unused.yaml');
     await expect(dialog).not.toContainText('Used in');
+  });
+});
+
+test.describe('Upload', () => {
+  const yaml = (name) => ({ name, mimeType: 'text/yaml', buffer: Buffer.from('term: x\n') });
+
+  test('uploads files to a folder', async ({ page, api }) => {
+    await openWorkspace(page);
+    await chooseMenuEntry(page, 'glossary', 'Upload');
+
+    const dialog = page.locator('.v-dialog .v-card');
+    await dialog.locator('input[type=file]').setInputFiles([yaml('new.yaml')]);
+    await expect(dialog.getByRole('textbox', { name: 'Name' })).toHaveValue('new.yaml');
+    await dialog.getByRole('button', { name: 'Upload 1 file' }).click();
+
+    await expect(dialog).toBeHidden();
+    expect(api.files.has('/glossary/new.yaml')).toBe(true);
+    await expect(row(page, 'new.yaml')).toBeVisible();
+  });
+
+  test('warns when a replaced file has unsaved changes', async ({ page }) => {
+    await openWorkspace(page);
+    await expand(page, 'glossary', 'accuracy.yaml');
+    const form = page.locator('.v-window-item--active .json-schema-editor');
+    await form.locator('input').first().fill('Precision');
+
+    await chooseMenuEntry(page, 'glossary', 'Upload');
+    const dialog = page.locator('.v-dialog .v-card');
+    await dialog.locator('input[type=file]').setInputFiles([yaml('accuracy.yaml')]);
+    await dialog.getByLabel('A file with this name exists. Replace it').check();
+    await dialog.getByRole('button', { name: 'Upload 1 file' }).click();
+
+    await expect(dialog).toBeHidden();
+    await expect(page.locator('.v-snackbar')).toContainText(
+      'Your unsaved changes to /glossary/accuracy.yaml are kept in the editor',
+    );
+    await expect(form.locator('input').first()).toHaveValue('Precision');
+  });
+
+  test('asks before replacing a file created during the upload', async ({ page, api }) => {
+    let socket;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    let release;
+    const held = new Promise((resolve) => (release = resolve));
+    await page.route(
+      (url) => decodeURIComponent(url.pathname).endsWith('/glossary/a.yaml'),
+      async (route) => {
+        await held;
+        await route.fallback();
+      },
+    );
+    await openWorkspace(page);
+    await chooseMenuEntry(page, 'glossary', 'Upload');
+
+    const dialog = page.locator('.v-dialog .v-card');
+    await dialog.locator('input[type=file]').setInputFiles([yaml('a.yaml'), yaml('b.yaml')]);
+    await dialog.getByRole('button', { name: 'Upload 2 files' }).click();
+    // Another tab of the owner creates b.yaml while a.yaml uploads
+    await expect.poll(() => socket).toBeTruthy();
+    api.files.set('/glossary/b.yaml', { content: '' });
+    api.status.set('/glossary/b.yaml', 'added');
+    const file = api.item('/glossary/b.yaml', false);
+    socket.send(
+      JSON.stringify({
+        type: 'file.created',
+        ts: new Date().toISOString(),
+        actor_user_id: 'user-1',
+        path: file.path,
+        file,
+      }),
+    );
+    await expect(dialog.getByText('A file with this name exists. Replace it')).toBeVisible();
+    release();
+
+    await expect(page.locator('.v-snackbar')).toContainText('Uploaded 1 file to /glossary');
+    await expect(dialog.getByRole('textbox', { name: 'Name' })).toHaveValue('b.yaml');
+    expect(api.files.has('/glossary/a.yaml')).toBe(true);
+    expect(api.requests.some((r) => r.method === 'PUT' && r.path.endsWith('/b.yaml'))).toBe(false);
   });
 });
 

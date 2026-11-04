@@ -38,6 +38,7 @@ import {
   mdiUndoVariant,
   mdiDownload,
   mdiCodeJson,
+  mdiUpload,
 } from '@mdi/js';
 import { downloadBlob } from '@/utils/api';
 import { useTypesStore } from '@/stores/types';
@@ -65,6 +66,7 @@ export default {
         revert: mdiUndoVariant,
         download: mdiDownload,
         codeeditor: mdiCodeJson,
+        upload: mdiUpload,
       },
     };
   },
@@ -165,6 +167,15 @@ export default {
             icon: this.icons.add,
             handler: this.requestNewFile,
           },
+        // An upload creates files, so it is offered where creating is
+        allows('create') &&
+          editable &&
+          !isFile && {
+            id: 'upload',
+            title: 'Upload',
+            icon: this.icons.upload,
+            handler: this.requestUpload,
+          },
         allows('rename') &&
           editable &&
           exists && {
@@ -232,6 +243,10 @@ export default {
       this.$root.openDialog('CreatePfsDialog', {
         onAcceptance: this.handleCreatePfs,
       });
+    },
+
+    requestUpload() {
+      this.$root.openDialog('UploadFilesDialog', { folder: this.item.path });
     },
 
     async handleCreate({ type, path, name }) {
