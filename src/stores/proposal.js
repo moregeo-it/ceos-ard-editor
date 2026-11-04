@@ -21,6 +21,9 @@ const getDefaults = () => ({
   prDescription: null,
 });
 
+// This tab's commits, so a refresh that overlapped one doesn't undo it
+let localCommits = 0;
+
 const byPath = (diffs) =>
   diffs.sort((a, b) => a.path.localeCompare(b.path, 'en', { sensitivity: 'base' }));
 
@@ -46,6 +49,14 @@ export const useProposalStore = defineStore('proposal', {
         }
       } finally {
         this.isProposalLoading = false;
+      }
+    },
+    // Without the loading state, so the form keeps its unsaved inputs
+    async refreshProposal(workspaceId) {
+      const started = workspaceSession();
+      const proposal = await proposalService.fetchProposal(workspaceId);
+      if (started === workspaceSession()) {
+        this.proposal = proposal && Object.keys(proposal).length > 0 ? proposal : null;
       }
     },
     async fetchCommits(workspaceId) {
@@ -81,12 +92,13 @@ export const useProposalStore = defineStore('proposal', {
      */
     async refreshChanges(workspaceId, { commits = false } = {}) {
       const started = workspaceSession();
+      const commitsBefore = localCommits;
       const [diffs, commitList] = await Promise.all([
         proposalService.fetchDiffList(workspaceId),
         commits ? proposalService.fetchCommits(workspaceId) : null,
       ]);
       // A commit of this tab running meanwhile updates both itself
-      if (started !== workspaceSession() || this.isCommitting) {
+      if (started !== workspaceSession() || commitsBefore !== localCommits || this.isCommitting) {
         return;
       }
       this.diffList = byPath(diffs);
@@ -99,6 +111,7 @@ export const useProposalStore = defineStore('proposal', {
       const started = workspaceSession();
       // The pre-commit diff list is exactly what the commit contained ({path, status, source?}).
       const changes = this.diffList;
+      localCommits++;
       this.isCommitting = true;
       try {
         const commit = await proposalService.commitChanges(workspaceId, commitMessage);

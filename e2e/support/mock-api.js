@@ -88,7 +88,10 @@ export class MockApi {
     this.workspaces = [workspace()];
     this.upstream = null;
     this.diffs = [];
+    // Unified diffs by path
+    this.fileDiffs = new Map();
     this.commits = [];
+    this.proposal = null;
     this.requests = [];
   }
 
@@ -280,17 +283,31 @@ export class MockApi {
     if (sub === '/download') {
       return fulfill(route, { status: 200, contentType: 'application/pdf', body: '%PDF-1.4' });
     }
+    if (sub === '/diffs' && method === 'PUT') {
+      const { message } = JSON.parse(request.postData());
+      const commit = {
+        sha: `c${this.commits.length + 1}`,
+        message,
+        timestamp: new Date().toISOString(),
+        author: USER.full_name,
+      };
+      this.commits.unshift(commit);
+      this.diffs = [];
+      this.status.clear();
+      return json(route, commit);
+    }
     if (sub === '/diffs') {
       return json(route, { files: this.diffs });
     }
     if (sub.startsWith('/diffs/')) {
-      return fulfill(route, { status: 200, contentType: 'text/plain', body: '' });
+      const body = this.fileDiffs.get(sub.slice('/diffs/'.length)) ?? '';
+      return fulfill(route, { status: 200, contentType: 'text/plain', body });
     }
     if (sub === '/commits') {
       return json(route, this.commits);
     }
     if (sub === '/proposal') {
-      return json(route, null);
+      return json(route, this.proposal);
     }
     if (sub === '/collaborators' || sub === '/shares') {
       return json(route, []);

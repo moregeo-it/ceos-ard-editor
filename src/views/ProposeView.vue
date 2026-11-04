@@ -133,6 +133,12 @@ export default {
       ),
       // Opened or changed in the owner's other tab
       on(EVENTS.PROPOSAL_UPDATED, (event) => this.proposalStore.updateProposal(event.proposal)),
+      // An update missed while disconnected
+      on(EVENTS.REALTIME_RESYNCED, () =>
+        this.proposalStore
+          .refreshProposal(this.workspaceId)
+          .catch((error) => console.error('Error refreshing the proposal:', error)),
+      ),
     ];
   },
 

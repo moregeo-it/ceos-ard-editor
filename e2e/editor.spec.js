@@ -456,4 +456,113 @@ test.describe('Propose', () => {
     await expect(pullRequest.getByLabel('Description of the Proposal')).toHaveValue('Details');
     await expect(title).toHaveValue('My title');
   });
+
+  test("refreshes an open diff after the owner's other tab saved the file", async ({
+    page,
+    api,
+  }) => {
+    let socket;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    const diff = (line) => `--- a/notes.md\n+++ b/notes.md\n@@ -1 +1 @@\n-Old line\n+${line}\n`;
+    api.files.set('/notes.md', { content: 'First version' });
+    api.status.set('/notes.md', 'modified');
+    api.diffs = [{ path: '/notes.md', status: 'modified' }];
+    api.fileDiffs.set('/notes.md', diff('First version'));
+    await page.goto('/workspaces/ws-1/propose');
+    await page.locator('.changes-overview').getByText('/notes.md').click();
+    const changes = page.locator('.diff2html-container');
+    await expect(changes).toContainText('First version');
+    await expect.poll(() => socket).toBeTruthy();
+
+    api.files.set('/notes.md', { content: 'Second version' });
+    api.fileDiffs.set('/notes.md', diff('Second version'));
+    socket.send(
+      JSON.stringify({
+        type: 'file.saved',
+        ts: new Date().toISOString(),
+        actor_user_id: 'user-1',
+        path: '/notes.md',
+        file: api.item('/notes.md', false),
+      }),
+    );
+    await expect(changes).toContainText('Second version');
+  });
+
+  test('a refresh that started before a commit does not undo it', async ({ page, api }) => {
+    let socket;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    api.files.set('/notes.md', { content: '' });
+    api.status.set('/notes.md', 'added');
+    api.diffs = [{ path: '/notes.md', status: 'added' }];
+    await page.goto('/workspaces/ws-1/propose');
+    const overview = page.locator('.changes-overview');
+    await expect(overview).toContainText('/notes.md');
+    await expect.poll(() => socket).toBeTruthy();
+
+    // The refresh after the other tab's change gets the list from before the commit, but late
+    let releaseList;
+    const listRequested = new Promise((resolve) => {
+      page.route('**/workspaces/ws-1/diffs', async (route) => {
+        if (route.request().method() !== 'GET') {
+          return route.fallback();
+        }
+        const files = api.diffs;
+        resolve();
+        await new Promise((release) => (releaseList = release));
+        await route.fulfill({ json: { files } });
+      });
+    });
+    socket.send(
+      JSON.stringify({
+        type: 'file.saved',
+        ts: new Date().toISOString(),
+        actor_user_id: 'user-1',
+        path: '/notes.md',
+        file: api.item('/notes.md', false),
+      }),
+    );
+    await listRequested;
+
+    await overview.getByLabel('Summary for the changes above').fill('Add notes');
+    await overview.getByRole('button', { name: 'Commit Changes' }).click();
+    await expect(overview).toContainText('Add notes');
+    await expect(overview).toContainText('There is nothing to send to GitHub.');
+
+    releaseList();
+    await page.waitForResponse('**/workspaces/ws-1/diffs');
+    await expect(overview).toContainText('There is nothing to send to GitHub.');
+    await expect(overview).toContainText('Add notes');
+  });
+
+  test('reloads the proposal after reconnecting', async ({ page, api }) => {
+    let socket;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    api.commits = [
+      {
+        sha: 'abc1234',
+        message: 'Update NRB',
+        timestamp: '2026-11-04T10:00:00Z',
+        author: 'Jane Doe',
+      },
+    ];
+    await page.goto('/workspaces/ws-1/propose');
+    const pullRequest = page.locator('.pull-request');
+    await expect(pullRequest).toContainText('You can propose your changes to CEOS-ARD now.');
+    await expect.poll(() => socket).toBeTruthy();
+
+    // Opened in the owner's other tab while this one was disconnected
+    api.proposal = {
+      number: 7,
+      url: 'https://github.com/ceos-org/ceos-ard/pull/7',
+      title: 'Update NRB',
+      description: 'Details',
+      state: 'open',
+      draft: false,
+      detached: false,
+    };
+    const first = socket;
+    first.close({ code: 4009, reason: 'resync' });
+    await expect.poll(() => socket !== first).toBe(true);
+    await expect(pullRequest).toContainText('Proposal: Update NRB');
+  });
 });
