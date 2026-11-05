@@ -8,6 +8,8 @@ import { EVENTS, on, workspaceSession } from '@/services/events';
 
 // A refresh requested while one is running; a queued build wins over queued fetches
 let queued = null; // 'build' | 'fetch' | null
+// This tab's running previews and downloads of the current workspace session, see track()
+let running = { session: null, count: 0 };
 
 const getDefaults = () => ({
   previewHtml: '',
@@ -15,6 +17,8 @@ const getDefaults = () => ({
   // (e.g. only an asset was deleted). Watch this instead of previewHtml.
   previewGeneration: 0,
   isGenerating: false,
+  // The toolchain this tab's preview or download waits for, from `preview.preparing`; null when none
+  preparing: null,
   scrollPosition: [0, 0], // x, y
 });
 
@@ -25,6 +29,9 @@ export const usePreviewStore = defineStore('preview', {
     hasPreview: (state) => !!state.previewHtml,
     // The workspace's PFS list is the preview selection: the owner saves it, everyone follows it
     hasSelectedPfs: () => (useWorkspacesStore().currentWorkspace?.pfs?.length ?? 0) > 0,
+    // e.g. "CEOS-ARD CLI 0.5.9" for the toolchain `ceos-ard-cli-0.5.9`
+    preparingLabel: (state) =>
+      state.preparing?.replace(/^ceos-ard-cli-(.+)$/, 'CEOS-ARD CLI $1') ?? null,
   },
 
   actions: {
@@ -35,6 +42,28 @@ export const usePreviewStore = defineStore('preview', {
     setPreviewHtml(html) {
       this.previewHtml = html;
       this.previewGeneration++;
+    },
+
+    /**
+     * Run a preview or download request of this tab. `preview.preparing` reaches every tab, so it
+     * only counts while such a request runs, and is forgotten once the last one ends.
+     */
+    async track(request) {
+      const session = workspaceSession();
+      if (running.session !== session) {
+        running = { session, count: 0 };
+      }
+      if (running.count === 0) {
+        this.preparing = null;
+      }
+      running.count++;
+      try {
+        return await request();
+      } finally {
+        if (running.session === session && --running.count === 0) {
+          this.preparing = null;
+        }
+      }
     },
 
     /**
@@ -61,9 +90,11 @@ export const usePreviewStore = defineStore('preview', {
       const started = workspaceSession();
       this.isGenerating = true;
       try {
-        const html = shouldBuild
-          ? await previewService.generatePreview(workspace.id)
-          : await previewService.fetchCurrentPreview(workspace.id);
+        const html = await this.track(() =>
+          shouldBuild
+            ? previewService.generatePreview(workspace.id)
+            : previewService.fetchCurrentPreview(workspace.id),
+        );
         if (started === workspaceSession()) {
           this.setPreviewHtml(html);
         }
@@ -108,6 +139,7 @@ export const usePreviewStore = defineStore('preview', {
 
     reset() {
       queued = null;
+      running = { session: null, count: 0 };
       Object.assign(this, getDefaults());
     },
   },
@@ -138,6 +170,13 @@ export function registerPreviewEventListeners() {
 
   on(EVENTS.PREVIEW_GENERATED, () => {
     usePreviewStore().requestPreviewRefresh({ fetchOnly: true });
+  });
+
+  // A build waits for an install; only for this tab if it waits too, see track()
+  on(EVENTS.PREVIEW_PREPARING, (event) => {
+    if (running.session === workspaceSession() && running.count > 0) {
+      usePreviewStore().preparing = event.toolchain;
+    }
   });
 
   on(EVENTS.REALTIME_RESYNCED, () => {

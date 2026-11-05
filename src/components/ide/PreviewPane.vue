@@ -47,8 +47,21 @@
     </div>
 
     <div class="flex-grow-1">
+      <v-alert
+        v-if="previewStore.preparingLabel && !isGenerating && isAnyDownloading"
+        type="info"
+        variant="tonal"
+        class="ma-4"
+      >
+        Preparing {{ previewStore.preparingLabel }} for the download. This happens once per version
+        and can take a few minutes.
+      </v-alert>
       <div v-if="isGenerating" class="text-center pa-8 ma-4">
         <v-progress-circular indeterminate color="primary" size="64" />
+        <p v-if="previewStore.preparingLabel" class="mt-4 text-medium-emphasis">
+          Preparing {{ previewStore.preparingLabel }}. This happens once per version and can take a
+          few minutes.
+        </p>
       </div>
 
       <v-alert v-else-if="!previewHtml" type="info" variant="tonal" class="ma-4">
@@ -160,6 +173,9 @@ export default {
     },
     isGenerating() {
       return this.previewStore.isGenerating;
+    },
+    isAnyDownloading() {
+      return Object.values(this.isDownloading).some(Boolean);
     },
   },
   async created() {
@@ -370,10 +386,8 @@ export default {
       }
       this.isDownloading[documentType] = true;
       try {
-        const response = await previewService.downloadPreviewFile(
-          this.workspaceId,
-          this.selectedPfs,
-          documentType,
+        const response = await this.previewStore.track(() =>
+          previewService.downloadPreviewFile(this.workspaceId, this.selectedPfs, documentType),
         );
         const blob = new Blob([response], { type: response.type });
         const filename = `CEOS-ARD-${this.selectedPfs.join('-')}.${documentType}`;

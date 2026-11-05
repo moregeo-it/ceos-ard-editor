@@ -42,6 +42,8 @@
  *   changed workspace fields; refetch the workspace.
  * @property {string[]} [pfs] `preview.generated` only: the PFS list the owner built the preview
  *   for; fetch the current preview instead of building.
+ * @property {string} [toolchain] `preview.preparing` only: the toolchain a preview or download waits
+ *   for, e.g. `ceos-ard-cli-0.5.9`. Sent to every client, the waiting one included.
  * @property {number} [seq] Present iff the event was published by the server broker.
  * @property {string} [target_user_id] `collaborator.revoked` and `collaborator.updated` only.
  * @property {string} [mode] `collaborator.updated` only: this user's new access mode; refetch the workspace.
@@ -62,6 +64,7 @@ export const EVENTS = Object.freeze({
   WORKSPACE_SYNCED: 'workspace.synced',
   WORKSPACE_UPDATED: 'workspace.updated',
   PREVIEW_GENERATED: 'preview.generated',
+  PREVIEW_PREPARING: 'preview.preparing',
   PROPOSAL_UPDATED: 'proposal.updated',
   // Client-only events — never sent over the wire.
   REALTIME_RESYNCED: 'realtime.resynced',

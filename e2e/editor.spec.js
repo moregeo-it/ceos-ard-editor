@@ -12,6 +12,16 @@ async function openWorkspace(page, path = '/workspaces/ws-1') {
   await expect(row(page, 'pfs')).toBeVisible();
 }
 
+// What the server sends while a request waits for a toolchain to be installed
+function preparing(toolchain) {
+  return {
+    type: 'preview.preparing',
+    ts: new Date().toISOString(),
+    actor_user_id: null,
+    toolchain,
+  };
+}
+
 async function expand(page, ...names) {
   for (const name of names) {
     await row(page, name).click();
@@ -400,6 +410,82 @@ test.describe('Preview', () => {
     await expect(frame.locator('h1')).toHaveText('Third build');
     releaseImage();
     await expect.poll(() => iframe.evaluate((element) => element.contentWindow.scrollY)).toBe(1200);
+  });
+
+  test('tells while a CLI version is being prepared', async ({ page }) => {
+    let socket;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    let release;
+    const held = new Promise((resolve) => (release = resolve));
+    await page.route(
+      (url) => url.pathname.endsWith('/workspaces/ws-1/previews'),
+      async (route) => {
+        if (route.request().method() === 'POST') {
+          await held;
+        }
+        await route.fallback();
+      },
+    );
+    await openWorkspace(page);
+
+    // The server installs the toolchain before it builds, and says so to every tab
+    await expect.poll(() => socket).toBeTruthy();
+    socket.send(JSON.stringify(preparing('ceos-ard-cli-0.5.9')));
+    await expect(page.getByText('Preparing CEOS-ARD CLI 0.5.9')).toBeVisible();
+
+    release();
+    await expect(page.frameLocator('.preview-iframe').locator('h1')).toHaveText('NRB preview');
+    await expect(page.getByText('Preparing CEOS-ARD CLI 0.5.9')).toHaveCount(0);
+  });
+
+  test('tells while a download waits for a CLI version', async ({ page }) => {
+    let socket;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    let release;
+    const held = new Promise((resolve) => (release = resolve));
+    await page.route(
+      (url) => url.pathname.endsWith('/workspaces/ws-1/download'),
+      async (route) => {
+        await held;
+        await route.fallback();
+      },
+    );
+    await openWorkspace(page);
+    await expect(page.frameLocator('.preview-iframe').locator('h1')).toBeVisible();
+
+    await page.getByRole('button', { name: 'PDF', exact: true }).click();
+    await expect.poll(() => socket).toBeTruthy();
+    socket.send(JSON.stringify(preparing('ceos-ard-cli-0.5.9')));
+    await expect(page.getByText('Preparing CEOS-ARD CLI 0.5.9 for the download')).toBeVisible();
+
+    release();
+    await expect(page.getByText('Preparing CEOS-ARD CLI 0.5.9')).toHaveCount(0);
+  });
+
+  test("ignores the preparation of other tabs' requests", async ({ page }) => {
+    let socket;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    let release;
+    const held = new Promise((resolve) => (release = resolve));
+    await page.route(
+      (url) => url.pathname.endsWith('/workspaces/ws-1/download'),
+      async (route) => {
+        await held;
+        await route.fallback();
+      },
+    );
+    await openWorkspace(page);
+    await expect(page.frameLocator('.preview-iframe').locator('h1')).toBeVisible();
+
+    // Another user's download waits while this tab is idle, then this tab downloads
+    await expect.poll(() => socket).toBeTruthy();
+    socket.send(JSON.stringify(preparing('ceos-ard-cli-0.5.9')));
+    await page.getByRole('button', { name: 'PDF', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'PDF', exact: true })).toHaveClass(
+      /v-btn--loading/,
+    );
+    await expect(page.getByText('Preparing CEOS-ARD CLI')).toHaveCount(0);
+    release();
   });
 
   test('offers PDF and Word downloads', async ({ page, api }) => {
