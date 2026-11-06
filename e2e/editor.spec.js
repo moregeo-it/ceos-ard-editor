@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import { test, expect } from './support/mock-api';
+import { test, expect, WORKSPACE_EVENTS } from './support/mock-api';
 import { fieldLabels, optionTexts } from './support/ui';
 
 const row = (page, name) =>
@@ -178,7 +178,7 @@ test.describe('Upload', () => {
 
   test('asks before replacing a file created during the upload', async ({ page, api }) => {
     let socket;
-    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    await page.routeWebSocket(WORKSPACE_EVENTS, (ws) => (socket = ws));
     let release;
     const held = new Promise((resolve) => (release = resolve));
     await page.route(
@@ -340,7 +340,7 @@ test.describe('Preview', () => {
 
   test('keeps the scroll position when the preview is rebuilt', async ({ page, api }) => {
     let socket;
-    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    await page.routeWebSocket(WORKSPACE_EVENTS, (ws) => (socket = ws));
     const tallPreview = (title) =>
       `<!doctype html><html><head></head><body><h1 style="height: 5000px">${title}</h1></body></html>`;
     api.previewHtml = tallPreview('First build');
@@ -371,7 +371,7 @@ test.describe('Preview', () => {
     api,
   }) => {
     let socket;
-    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    await page.routeWebSocket(WORKSPACE_EVENTS, (ws) => (socket = ws));
     let releaseImage;
     const imageRequested = new Promise((resolve) => {
       page.route('**/previews/slow.png', async (route) => {
@@ -414,7 +414,7 @@ test.describe('Preview', () => {
 
   test('tells while the tools for the preview are set up', async ({ page }) => {
     let socket;
-    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    await page.routeWebSocket(WORKSPACE_EVENTS, (ws) => (socket = ws));
     let release;
     const held = new Promise((resolve) => (release = resolve));
     await page.route(
@@ -440,7 +440,7 @@ test.describe('Preview', () => {
 
   test('tells while a download waits for the tools', async ({ page }) => {
     let socket;
-    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    await page.routeWebSocket(WORKSPACE_EVENTS, (ws) => (socket = ws));
     let release;
     const held = new Promise((resolve) => (release = resolve));
     await page.route(
@@ -464,7 +464,7 @@ test.describe('Preview', () => {
 
   test("ignores the preparation of other tabs' requests", async ({ page }) => {
     let socket;
-    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    await page.routeWebSocket(WORKSPACE_EVENTS, (ws) => (socket = ws));
     let release;
     const held = new Promise((resolve) => (release = resolve));
     await page.route(
@@ -541,6 +541,27 @@ test.describe('Upstream', () => {
   });
 });
 
+test.describe('Realtime', () => {
+  test('resyncs when the first connection failed', async ({ page, api }) => {
+    let attempts = 0;
+    await page.routeWebSocket(WORKSPACE_EVENTS, (ws) => {
+      if (++attempts === 1) {
+        ws.close({ code: 1011 });
+      }
+    });
+    await openWorkspace(page);
+    await expect.poll(() => attempts, { timeout: 10000 }).toBe(2);
+
+    // The resync reloads the workspace after the initial load
+    await expect
+      .poll(
+        () =>
+          api.requests.filter((r) => r.method === 'GET' && r.path === '/workspaces/ws-1').length,
+      )
+      .toBeGreaterThan(1);
+  });
+});
+
 test.describe('Propose', () => {
   test('names CEOS-ARD as the target', async ({ page, api }) => {
     api.diffs = [{ path: '/pfs/NRB/document.yaml', status: 'modified' }];
@@ -565,7 +586,7 @@ test.describe('Propose', () => {
   test('keeps the realtime connection on the way to Propose and back', async ({ page }) => {
     let opened = 0;
     let closed = 0;
-    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => {
+    await page.routeWebSocket(WORKSPACE_EVENTS, (ws) => {
       opened++;
       ws.onClose(() => closed++);
     });
@@ -583,7 +604,7 @@ test.describe('Propose', () => {
 
   test("shows the changes of the owner's other tab", async ({ page, api }) => {
     let socket;
-    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    await page.routeWebSocket(WORKSPACE_EVENTS, (ws) => (socket = ws));
     const send = (event) =>
       socket.send(
         JSON.stringify({ ts: new Date().toISOString(), actor_user_id: 'user-1', ...event }),
@@ -617,7 +638,7 @@ test.describe('Propose', () => {
 
   test("shows the proposal opened in the owner's other tab", async ({ page, api }) => {
     let socket;
-    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    await page.routeWebSocket(WORKSPACE_EVENTS, (ws) => (socket = ws));
     const send = (proposal) =>
       socket.send(
         JSON.stringify({
@@ -667,7 +688,7 @@ test.describe('Propose', () => {
     api,
   }) => {
     let socket;
-    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    await page.routeWebSocket(WORKSPACE_EVENTS, (ws) => (socket = ws));
     const diff = (line) => `--- a/notes.md\n+++ b/notes.md\n@@ -1 +1 @@\n-Old line\n+${line}\n`;
     api.files.set('/notes.md', { content: 'First version' });
     api.status.set('/notes.md', 'modified');
@@ -695,7 +716,7 @@ test.describe('Propose', () => {
 
   test('a refresh that started before a commit does not undo it', async ({ page, api }) => {
     let socket;
-    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    await page.routeWebSocket(WORKSPACE_EVENTS, (ws) => (socket = ws));
     api.files.set('/notes.md', { content: '' });
     api.status.set('/notes.md', 'added');
     api.diffs = [{ path: '/notes.md', status: 'added' }];
@@ -741,7 +762,7 @@ test.describe('Propose', () => {
 
   test('reloads the proposal after reconnecting', async ({ page, api }) => {
     let socket;
-    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    await page.routeWebSocket(WORKSPACE_EVENTS, (ws) => (socket = ws));
     api.commits = [
       {
         sha: 'abc1234',

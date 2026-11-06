@@ -1,4 +1,4 @@
-import { test, expect } from './support/mock-api';
+import { test, expect, USER_EVENTS } from './support/mock-api';
 import { optionTexts } from './support/ui';
 
 async function openWorkspaces(page) {
@@ -197,5 +197,96 @@ test.describe('Workspace types', () => {
       title: 'Other review',
       description: null,
     });
+  });
+});
+
+test.describe('Live updates', () => {
+  async function userStream(page) {
+    let socket;
+    await page.routeWebSocket(USER_EVENTS, (ws) => (socket = ws));
+    return {
+      connected: () => expect.poll(() => socket).toBeTruthy(),
+      send: (event) =>
+        socket.send(
+          JSON.stringify({ ts: new Date().toISOString(), actor_user_id: 'user-2', ...event }),
+        ),
+    };
+  }
+
+  // With the list loaded, so a change can only arrive through the stream
+  async function openList(page, stream) {
+    await openWorkspaces(page);
+    await expect(page.locator('.v-card').filter({ hasText: 'NRB review' })).toBeVisible();
+    await stream.connected();
+  }
+
+  function share(api) {
+    api.workspaces.push({
+      ...api.workspaces[0],
+      id: 'ws-2',
+      title: 'SR review',
+      viewer_role: 'readonly',
+      owner_username: 'mmustermann',
+    });
+  }
+
+  test('a workspace shared with the user appears and goes again', async ({ page, api }) => {
+    const stream = await userStream(page);
+    await openList(page, stream);
+    await page.getByRole('button', { name: /^Shared/ }).click();
+
+    share(api);
+    stream.send({
+      type: 'collaborator.added',
+      workspace_id: 'ws-2',
+      target_user_id: 'user-1',
+      mode: 'readonly',
+    });
+    const card = page.locator('.v-card').filter({ hasText: 'SR review' });
+    await expect(card).toBeVisible();
+    await expect(page.locator('.v-snackbar')).toContainText('"SR review" was shared with you.');
+
+    stream.send({ type: 'collaborator.revoked', workspace_id: 'ws-2', target_user_id: 'user-1' });
+    await expect(card).toHaveCount(0);
+  });
+
+  test('a workspace renamed in another tab is updated', async ({ page, api }) => {
+    const stream = await userStream(page);
+    await openList(page, stream);
+
+    api.workspaces[0].title = 'NRB review 2';
+    stream.send({ type: 'workspace.updated', workspace_id: 'ws-1', fields: ['title'] });
+    await expect(page.locator('.v-card').filter({ hasText: 'NRB review 2' })).toBeVisible();
+  });
+
+  test('only list events reach the list', async ({ page, api }) => {
+    const stream = await userStream(page);
+    await openList(page, stream);
+
+    // e.g. a notification a later version sends
+    stream.send({ type: 'comment.created', workspace_id: 'ws-1' });
+    api.workspaces[0].title = 'NRB review 2';
+    stream.send({ type: 'workspace.updated', workspace_id: 'ws-1', fields: ['title'] });
+    await expect(page.locator('.v-card').filter({ hasText: 'NRB review 2' })).toBeVisible();
+    const fetches = api.requests.filter((r) => r.method === 'GET' && r.path === '/workspaces/ws-1');
+    expect(fetches).toHaveLength(1);
+  });
+
+  test('events about other workspaces leave the open one alone', async ({ page, api }) => {
+    const stream = await userStream(page);
+    await page.goto('/workspaces/ws-1');
+    await expect(page.locator('.file-tree-row').first()).toBeVisible();
+    await stream.connected();
+
+    share(api);
+    stream.send({ type: 'workspace.deleted', workspace_id: 'ws-3' });
+    stream.send({
+      type: 'collaborator.added',
+      workspace_id: 'ws-2',
+      target_user_id: 'user-1',
+      mode: 'readonly',
+    });
+    await expect(page.locator('.v-snackbar')).toContainText('"SR review" was shared with you.');
+    await expect(page).toHaveURL(/\/workspaces\/ws-1$/);
   });
 });

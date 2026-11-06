@@ -4,6 +4,9 @@ import { expectNoRawData } from './ui';
 import CEOS_ARD_TYPE from './types/ceos-ard.json' with { type: 'json' };
 
 export const API = 'http://localhost:8099';
+// The realtime streams: the open workspace's, and the user's (changes to their workspaces)
+export const WORKSPACE_EVENTS = /^ws:\/\/localhost:8099\/workspaces\/[^/]+\/events/;
+export const USER_EVENTS = /^ws:\/\/localhost:8099\/events/;
 
 const USER = { id: 'user-1', username: 'jdoe', full_name: 'Jane Doe', identity_provider: 'github' };
 

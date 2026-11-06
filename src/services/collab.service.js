@@ -13,13 +13,21 @@ function toWebSocketUrl(httpUrl) {
   return httpUrl.replace(/^http/i, 'ws');
 }
 
+/** Open a WebSocket connection to a workspace's real-time change stream, see `openConnection`. */
+export function openWorkspaceConnection({ workspaceId, ...params }) {
+  return openConnection(`/workspaces/${workspaceId}/events`, params);
+}
+
+/** Open a WebSocket connection to the user's stream of changes to their workspaces, see `openConnection`. */
+export function openUserConnection(params) {
+  return openConnection('/events', params);
+}
+
 /**
- * Open a WebSocket connection to a workspace's real-time change stream.
- *
  * The browser authenticates the handshake with the session cookie. The client never sends anything.
  *
+ * @param {string} path
  * @param {Object} params
- * @param {string} params.workspaceId
  * @param {string} [params.clientId] - This page load's id, see `@/utils/client-id`.
  * @param {(event: Object) => void} params.onEvent - Called with each parsed event envelope.
  * @param {() => void} [params.onOpen]
@@ -28,11 +36,9 @@ function toWebSocketUrl(httpUrl) {
  *   reconnect logic.
  * @returns {{ close: () => void }}
  */
-export function openWorkspaceConnection({ workspaceId, clientId, onEvent, onOpen, onClose }) {
+function openConnection(path, { clientId, onEvent, onOpen, onClose }) {
   const params = new URLSearchParams(clientId ? { client_id: clientId } : {});
-  const socket = new WebSocket(
-    `${toWebSocketUrl(API_BASE_URL)}/workspaces/${workspaceId}/events?${params}`,
-  );
+  const socket = new WebSocket(`${toWebSocketUrl(API_BASE_URL)}${path}?${params}`);
   let closedByCaller = false;
   let silenceTimer = null;
 
@@ -57,7 +63,7 @@ export function openWorkspaceConnection({ workspaceId, clientId, onEvent, onOpen
       return; // Ignore malformed payloads.
     }
     if (!data || data.type === 'ping') {
-      return; // Server heartbeat, not a workspace event.
+      return; // Server heartbeat, not an event.
     }
     onEvent?.(data);
   };
