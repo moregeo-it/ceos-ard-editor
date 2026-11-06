@@ -15,6 +15,13 @@ export default {
     return api.getText(`/workspaces/${workspaceId}/previews/current`);
   },
 
+  /**
+   * Render a single file, for workspace types that preview the open file
+   */
+  async renderFile(workspaceId, path) {
+    return api.getText(`/workspaces/${workspaceId}/render/${encodeURIComponent(path)}`);
+  },
+
   async downloadPreviewFile(workspaceId, pfs, documentType) {
     const query = new URLSearchParams();
     query.append('format', documentType);

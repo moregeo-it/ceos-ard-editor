@@ -11,8 +11,15 @@ export default {
   /**
    * Search files and folders
    */
-  async searchFiles(workspaceId, query) {
-    return api.get(`/workspaces/${workspaceId}/search?query=${encodeURIComponent(query)}`);
+  async searchFiles(workspaceId, query, filters = {}) {
+    const params = new URLSearchParams();
+    if (query) {
+      params.append('query', query);
+    }
+    for (const [key, values] of Object.entries(filters)) {
+      values.forEach((value) => params.append('filter', `${key}:${value}`));
+    }
+    return api.get(`/workspaces/${workspaceId}/search?${params}`);
   },
 
   /**
@@ -84,5 +91,12 @@ export default {
 
   async createNewPFS(workspaceId, content) {
     return api.post(`/workspaces/${workspaceId}/pfs`, content);
+  },
+
+  /**
+   * Run an action of the workspace type that creates a file, e.g. a new glossary term
+   */
+  async runAction(workspaceId, action, data) {
+    return api.post(`/workspaces/${workspaceId}/actions/${encodeURIComponent(action)}`, data);
   },
 };

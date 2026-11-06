@@ -13,7 +13,36 @@
         :loading="filesStore.isSearchLoading"
         @update:model-value="debouncedSearch"
         @click:clear="clearSearch"
-      />
+      >
+        <template v-if="searchFilters.length > 0" #append-inner>
+          <v-btn
+            :icon="icons.filter"
+            :color="activeFilterCount > 0 ? 'primary' : undefined"
+            size="x-small"
+            variant="text"
+            :aria-label="showFilters ? 'Hide filters' : 'Show filters'"
+            @click.stop="showFilters = !showFilters"
+          />
+        </template>
+      </v-text-field>
+      <div v-if="showFilters" class="pt-2">
+        <v-select
+          v-for="filter in searchFilters"
+          :key="filter.id"
+          v-model="filesStore.searchFilters[filter.id]"
+          :items="filter.values"
+          :label="filter.title"
+          density="compact"
+          variant="outlined"
+          multiple
+          chips
+          closable-chips
+          clearable
+          hide-details
+          class="mb-2"
+          @update:model-value="search(filesStore.searchQuery)"
+        />
+      </div>
     </div>
 
     <!-- File Tree -->
@@ -52,7 +81,8 @@ import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
 import FileContextMenu from './FileContextMenu.vue';
 import FileTree from './FileTree.vue';
-import { mdiFolderOutline, mdiMagnify } from '@mdi/js';
+import { useTypesStore } from '@/stores/types';
+import { mdiFilterVariant, mdiFolderOutline, mdiMagnify } from '@mdi/js';
 
 export default {
   name: 'FilesPane',
@@ -65,9 +95,11 @@ export default {
   data() {
     return {
       icons: {
+        filter: mdiFilterVariant,
         folder: mdiFolderOutline,
         search: mdiMagnify,
       },
+      showFilters: false,
       debouncedSearch: null,
     };
   },
@@ -81,6 +113,13 @@ export default {
     },
     notificationsStore() {
       return useNotificationsStore();
+    },
+    searchFilters() {
+      return useTypesStore().currentType?.search_filters ?? [];
+    },
+    activeFilterCount() {
+      return Object.values(this.filesStore.searchFilters).filter((values) => values?.length > 0)
+        .length;
     },
     treeItems() {
       return this.filesStore.searchResults ?? this.filesStore.fileTree;
@@ -120,9 +159,22 @@ export default {
   async created() {
     this.debouncedSearch = useDebounceFn(this.search, 300);
     await this.loadFiles();
+    await this.openDefaultFolders();
   },
 
   methods: {
+    // Only when entering the workspace, not when coming back with folders opened
+    async openDefaultFolders() {
+      const folders = useTypesStore().currentType?.expanded_folders ?? [];
+      if (folders.length === 0 || this.openedFolders.length > 0) {
+        return;
+      }
+      for (const folder of folders) {
+        await this.loadFiles(folder);
+      }
+      this.openedFolders = [...new Set([...this.openedFolders, ...folders])];
+    },
+
     async onFolderExpand(item) {
       await this.loadFiles(item.path);
     },
@@ -191,7 +243,7 @@ export default {
 
     async search(value) {
       value = typeof value === 'string' ? value.trim() : '';
-      if (value === '') {
+      if (value === '' && this.activeFilterCount === 0) {
         this.clearSearch();
         return;
       }
@@ -205,7 +257,11 @@ export default {
 
     async clearSearch() {
       this.filesStore.searchQuery = '';
-      this.filesStore.searchResults = null;
+      if (this.activeFilterCount > 0) {
+        await this.search('');
+      } else {
+        this.filesStore.searchResults = null;
+      }
     },
   },
 };
