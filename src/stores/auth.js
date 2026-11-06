@@ -12,6 +12,7 @@ const getDefaults = () => ({
   isAuthenticated: false,
   isLoading: false,
   isPendingReauth: false,
+  isLoggingOut: false,
   // Why: 'expired', 'logged_out' (in another tab) or 'other_account' (logged in there)
   reauthReason: null,
   otherAccount: null,
@@ -114,7 +115,12 @@ export const useAuthStore = defineStore('auth', {
 
     /** Stays logged in when the server couldn't end the session, since its cookie would stay valid. */
     async logout() {
-      await authService.logout();
+      this.isLoggingOut = true;
+      try {
+        await authService.logout();
+      } finally {
+        this.isLoggingOut = false;
+      }
       this.clearAuth();
       router.push({ name: 'landing' });
     },
@@ -130,8 +136,8 @@ export const useAuthStore = defineStore('auth', {
      * the dialog what happened; `otherAccount` names the account another tab logged in with.
      */
     setPendingReauth(reason = 'expired', otherAccount = null) {
-      // Nothing to renew once logged out, e.g. when another tab's logout closes this tab's socket
-      if (!this.isAuthenticated) {
+      // Nothing to renew once logged out, e.g. when a logout here or in another tab closes the sockets
+      if (!this.isAuthenticated || this.isLoggingOut) {
         return;
       }
       // A 401 can trail a cross-tab event, so 'expired' never replaces what another tab reported

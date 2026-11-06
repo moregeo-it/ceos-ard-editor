@@ -12,6 +12,26 @@ import { useShareStore } from './share';
 import { EVENTS, on, startWorkspaceSession, workspaceSession } from '@/services/events';
 import workspaceService from '@/services/workspace.service';
 
+// What the user's stream tells the list; other events on it, e.g. future notifications, aren't for the list
+const LIST_REMOVALS = new Set([EVENTS.WORKSPACE_DELETED, EVENTS.COLLABORATOR_REVOKED]);
+const LIST_CHANGES = new Set([
+  EVENTS.WORKSPACE_CREATED,
+  EVENTS.WORKSPACE_UPDATED,
+  EVENTS.WORKSPACE_ARCHIVED,
+  EVENTS.COLLABORATOR_ADDED,
+  EVENTS.COLLABORATOR_UPDATED,
+]);
+// List loads and events run one at a time, so an older response can't undo a later change. Reset
+// when the user's stream stops, so nothing of a logged-out user is applied or blocks the queue.
+let listQueue = Promise.resolve();
+let listGeneration = 0;
+
+function queueListTask(task) {
+  const run = listQueue.then(task);
+  listQueue = run.catch(() => {});
+  return run;
+}
+
 export const useWorkspacesStore = defineStore('workspaces', {
   state: () => ({
     pfsOptions: [],
@@ -67,7 +87,9 @@ export const useWorkspacesStore = defineStore('workspaces', {
       this.resetCurrentWorkspace();
 
       try {
-        this.workspaces = await workspaceService.fetchWorkspaces();
+        await queueListTask(async () => {
+          this.workspaces = await workspaceService.fetchWorkspaces();
+        });
       } finally {
         this.isLoading = false;
       }
@@ -121,6 +143,77 @@ export const useWorkspacesStore = defineStore('workspaces', {
       }
       this.applyWorkspace(workspace);
       return workspace;
+    },
+
+    /** The list reloaded without leaving the open workspace, while it is shown. */
+    async refreshWorkspaces() {
+      if (router.currentRoute.value.name !== 'workspaces') {
+        return;
+      }
+      try {
+        await queueListTask(async () => {
+          this.workspaces = await workspaceService.fetchWorkspaces();
+        });
+      } catch (error) {
+        console.error('Error refreshing the workspaces:', error);
+      }
+    },
+
+    /** A change to the user's workspaces from their stream; the list refetches when it is shown. */
+    applyListEvent(event) {
+      if (!LIST_REMOVALS.has(event.type) && !LIST_CHANGES.has(event.type)) {
+        return Promise.resolve();
+      }
+      const generation = listGeneration;
+      return queueListTask(() => this._applyListEvent(event, generation)).catch((error) =>
+        console.error('Error applying a change to the workspaces:', error),
+      );
+    },
+
+    resetListEvents() {
+      listGeneration++;
+      listQueue = Promise.resolve();
+    },
+
+    async _applyListEvent({ type, workspace_id: workspaceId }, generation) {
+      if (generation !== listGeneration) {
+        return;
+      }
+      const remove = () => {
+        this.workspaces = this.workspaces.filter((w) => w.id !== workspaceId);
+      };
+      if (LIST_REMOVALS.has(type)) {
+        remove();
+        return;
+      }
+      const shown = () => router.currentRoute.value.name === 'workspaces';
+      // Elsewhere, only a new share is worth telling
+      if (!shown() && type !== EVENTS.COLLABORATOR_ADDED) {
+        return;
+      }
+      let workspace;
+      try {
+        workspace = await workspaceService.getWorkspace(workspaceId);
+      } catch (error) {
+        if (generation === listGeneration && (error.status === 403 || error.status === 404)) {
+          remove();
+        }
+        return;
+      }
+      if (generation !== listGeneration) {
+        return;
+      }
+      if (type === EVENTS.COLLABORATOR_ADDED) {
+        useNotificationsStore().info(`"${workspace.title}" was shared with you.`);
+      }
+      if (shown()) {
+        const index = this.workspaces.findIndex((w) => w.id === workspace.id);
+        if (index === -1) {
+          this.workspaces.unshift(workspace);
+        } else {
+          this.workspaces[index] = workspace;
+        }
+      }
     },
 
     applyWorkspace(workspace) {

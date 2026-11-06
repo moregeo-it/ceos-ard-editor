@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 
 import { EVENTS, emit, enqueue, workspaceSession } from '@/services/events';
-import { openWorkspaceConnection } from '@/services/collab.service';
+import { openUserConnection, openWorkspaceConnection } from '@/services/collab.service';
 import { CLIENT_ID } from '@/utils/client-id';
 import { useAuthStore } from './auth';
 import { useEditorStore } from './editor';
@@ -19,181 +19,233 @@ const WS_CLOSE = Object.freeze({
   POLICY_VIOLATION: 1008, // we sent data: stop
 });
 
-// Kept in module scope (not Pinia state) so the non-serializable WebSocket + timers aren't
-// wrapped in a reactive proxy.
-let client = null;
-let reconnectTimer = null;
-let backoff = 0;
-let hasConnected = false; // true once the first open succeeds, so a re-open triggers a resync
+const streams = new Set();
 let wakeListening = false;
 
-function clearReconnectTimer() {
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
+/**
+ * Network back or tab visible again: the streams skip the rest of a pending backoff. Registered once
+ * for the app's lifetime.
+ */
+function listenForWake() {
+  if (wakeListening) {
+    return;
   }
-}
-
-function closeClient() {
-  if (client) {
-    client.close();
-    client = null;
-  }
+  wakeListening = true;
+  const wake = () => {
+    if (document.visibilityState !== 'hidden') {
+      streams.forEach((stream) => stream.wake());
+    }
+  };
+  window.addEventListener('online', wake);
+  document.addEventListener('visibilitychange', wake);
 }
 
 /**
- * Manages the realtime WebSocket stream and forwards its events onto the central event bus
- * (see `@/services/events`) with `source: 'remote'`. The store listeners registered in main.js
- * apply them - the same handlers that react to local operations.
+ * A realtime connection that reconnects after drops with a backoff, asks for a new login when the
+ * session ends and stops when the server refuses it. Kept out of Pinia state, so the WebSocket and
+ * timers aren't wrapped in a reactive proxy.
  */
+class RealtimeStream {
+  /**
+   * @param {Object} options
+   * @param {(target: string, handlers: Object) => {close: () => void}} options.open - see
+   *   `@/services/collab.service`
+   * @param {(event: Object) => void} options.onEvent
+   * @param {(missed: boolean) => void} [options.onOpen] - `missed` after a drop or a failed first
+   *   attempt, when events may have been missed
+   * @param {(target: string) => void} [options.onEnd] - the server refused or ended the stream
+   */
+  constructor({ open, onEvent, onOpen, onEnd }) {
+    this.options = { open, onEvent, onOpen, onEnd };
+    this.target = null;
+    this.client = null;
+    this.reconnectTimer = null;
+    this.backoff = 0;
+    // Connections opened since start(), whether they succeeded or not
+    this.attempts = 0;
+  }
+
+  /** Connect to `target`, unless already connected to it. */
+  start(target) {
+    if (this.client && this.target === target) {
+      return;
+    }
+    this.stop();
+    // Recorded before the session check in _open, so a stream stalled on an expired session still
+    // knows what to resume after the login.
+    this.target = target;
+    streams.add(this);
+    listenForWake();
+    this._open();
+  }
+
+  stop() {
+    this._clearReconnectTimer();
+    this._closeClient();
+    this.target = null;
+    this.backoff = 0;
+    this.attempts = 0;
+    streams.delete(this);
+  }
+
+  /**
+   * Re-open a stream that stalled waiting for reauth. No-ops otherwise, so it can't create a
+   * duplicate or unauthenticated connection - e.g. when reauth is cancelled via logout.
+   */
+  resumeIfStalled() {
+    const auth = useAuthStore();
+    if (this.target && !this.client && auth.isAuthenticated && !auth.isSessionExpired) {
+      this._open();
+    }
+  }
+
+  wake() {
+    if (this.reconnectTimer) {
+      this.backoff = 0;
+      this._reconnect();
+    }
+  }
+
+  _open() {
+    if (!this.target) {
+      return;
+    }
+    const auth = useAuthStore();
+    if (!auth.isAuthenticated || auth.isSessionExpired) {
+      // Ask for a new login; App.vue calls resumeIfStalled() afterwards.
+      auth.setPendingReauth();
+      return;
+    }
+    this.attempts++;
+    this.client = this.options.open(this.target, {
+      clientId: CLIENT_ID,
+      onOpen: () => this._onOpen(),
+      onClose: (info) => this._onClose(info),
+      onEvent: this.options.onEvent,
+    });
+  }
+
+  _onOpen() {
+    this.backoff = 0;
+    this.options.onOpen?.(this.attempts > 1);
+  }
+
+  /**
+   * Closed without us asking: the server's code says what to do; anything else is a transient
+   * drop and gets a backoff.
+   */
+  _onClose({ code } = {}) {
+    this._closeClient();
+    if (!this.target) {
+      return;
+    }
+    switch (code) {
+      case WS_CLOSE.SESSION_EXPIRED:
+        // Ask for a new login; App.vue calls resumeIfStalled() afterwards.
+        useAuthStore().setPendingReauth();
+        return;
+      case WS_CLOSE.ACCESS_REVOKED:
+      case WS_CLOSE.POLICY_VIOLATION: {
+        const target = this.target;
+        this.stop();
+        this.options.onEnd?.(target);
+        return;
+      }
+      case WS_CLOSE.RESYNC:
+        // Reconnect now; the re-open resyncs.
+        this.backoff = 0;
+        this._open();
+        return;
+      default:
+        this._scheduleReconnect();
+    }
+  }
+
+  _scheduleReconnect() {
+    this._clearReconnectTimer();
+    this.backoff = this.backoff ? Math.min(this.backoff * 2, RECONNECT_MAX_MS) : RECONNECT_MIN_MS;
+    // 50-100% jitter so tabs dropped together don't reconnect in lockstep
+    const delay = Math.round(this.backoff * (0.5 + Math.random() * 0.5));
+    this.reconnectTimer = setTimeout(() => this._reconnect(), delay);
+  }
+
+  _reconnect() {
+    this._clearReconnectTimer();
+    if (this.target && !this.client) {
+      this._open();
+    }
+  }
+
+  _clearReconnectTimer() {
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+  }
+
+  _closeClient() {
+    this.client?.close();
+    this.client = null;
+  }
+}
+
+// The open workspace's events, forwarded onto the central event bus (see `@/services/events`) with
+// `source: 'remote'`. The store listeners registered in main.js apply them - the same handlers that
+// react to local operations.
+const workspaceStream = new RealtimeStream({
+  open: (workspaceId, handlers) => openWorkspaceConnection({ workspaceId, ...handlers }),
+  // The server already filters this tab's own changes; the user's other tabs count as remote.
+  onEvent: (event) => emit(event.type, { ...event, source: 'remote' }),
+  // Runs on the bus queue so it stays ahead of live events that arrive during reconciliation
+  onOpen: (missed) => missed && enqueue(() => useRealtimeStore().resync()),
+  // A terminal event already left the workspace and never gets here; a rejected handshake has no
+  // event, so announce the loss here.
+  onEnd: (workspaceId) => {
+    useRealtimeStore().workspaceId = null;
+    emit(EVENTS.REALTIME_ACCESS_LOST, { workspaceId });
+  },
+});
+
+// The changes to the user's list of workspaces. Not on the event bus: its listeners are about the
+// open workspace, and these events can be about any other.
+const userStream = new RealtimeStream({
+  open: (userId, handlers) => openUserConnection(handlers),
+  onEvent: (event) => useWorkspacesStore().applyListEvent(event),
+  // Also on the first open: the list may have loaded before the stream was subscribed
+  onOpen: () => useWorkspacesStore().refreshWorkspaces(),
+});
+
 export const useRealtimeStore = defineStore('realtime', {
-  // Null while no stream is wanted (disconnected); every reconnect path checks it
+  // Null while no workspace stream is wanted
   state: () => ({ workspaceId: null }),
 
   actions: {
-    /**
-     * Open (or re-open) the realtime stream for a workspace. Safe to call repeatedly.
-     */
+    /** Open the stream of a workspace. Safe to call repeatedly. */
     connect(workspaceId) {
-      // Already connected to this workspace - nothing to do.
-      if (client && this.workspaceId === workspaceId) {
-        return;
-      }
-
-      // The target is recorded before the session check in _open, so a stream stalled on an expired
-      // session still knows what to resume after the login.
-      this.disconnect();
-      hasConnected = false;
       this.workspaceId = workspaceId;
-      this._listenForWake();
-      this._open();
+      workspaceStream.start(workspaceId);
     },
 
-    /**
-     * Tear down the connection and stop any pending reconnect.
-     */
     disconnect() {
-      clearReconnectTimer();
-      closeClient();
+      workspaceStream.stop();
       this.workspaceId = null;
     },
 
     reset() {
       this.disconnect();
-      backoff = 0;
-      hasConnected = false;
     },
 
-    /**
-     * Re-open a stream that stalled waiting for reauth (see `_onClose` / `_reconnect`). No-ops
-     * unless a workspace stream is stalled with a now-valid session, so it can't create a duplicate
-     * or unauthenticated connection - e.g. when reauth is cancelled via logout.
-     */
+    /** The user's stream, open while logged in; null closes it. */
+    connectUser(userId) {
+      useWorkspacesStore().resetListEvents();
+      if (userId) {
+        userStream.start(userId);
+      } else {
+        userStream.stop();
+      }
+    },
+
     resumeIfStalled() {
-      const auth = useAuthStore();
-      if (this.workspaceId && !client && auth.isAuthenticated && !auth.isSessionExpired) {
-        this._open();
-      }
-    },
-
-    _open() {
-      const workspaceId = this.workspaceId;
-      if (!workspaceId) {
-        return;
-      }
-      const auth = useAuthStore();
-      if (!auth.isAuthenticated || auth.isSessionExpired) {
-        // Ask for a new login; App.vue calls resumeIfStalled() afterwards.
-        auth.setPendingReauth();
-        return;
-      }
-      client = openWorkspaceConnection({
-        workspaceId,
-        clientId: CLIENT_ID,
-        onOpen: () => this._onOpen(),
-        onClose: (info) => this._onClose(info),
-        // The server already filters this tab's own changes; the user's other tabs count as remote.
-        onEvent: (event) => emit(event.type, { ...event, source: 'remote' }),
-      });
-    },
-
-    _onOpen() {
-      backoff = 0;
-      if (hasConnected) {
-        // Reconnected after a drop - reconcile anything missed while offline. Runs on the bus
-        // queue so it stays ahead of live events that arrive during reconciliation.
-        enqueue(() => this.resync());
-      }
-      hasConnected = true;
-    },
-
-    /**
-     * Closed without us asking: the server's code says what to do; anything else is a transient
-     * drop and gets a backoff.
-     */
-    _onClose({ code } = {}) {
-      closeClient();
-      if (!this.workspaceId) {
-        return;
-      }
-      switch (code) {
-        case WS_CLOSE.SESSION_EXPIRED:
-          // Ask for a new login; App.vue calls resumeIfStalled() afterwards.
-          useAuthStore().setPendingReauth();
-          return;
-        case WS_CLOSE.ACCESS_REVOKED:
-        case WS_CLOSE.POLICY_VIOLATION: {
-          // Terminal. A terminal event already ran disconnect() and never gets here; a rejected
-          // handshake has no event, so announce the loss here.
-          const workspaceId = this.workspaceId;
-          this.disconnect();
-          emit(EVENTS.REALTIME_ACCESS_LOST, { workspaceId });
-          return;
-        }
-        case WS_CLOSE.RESYNC:
-          // Reconnect now; the re-open resyncs.
-          backoff = 0;
-          this._open();
-          return;
-        default:
-          this._scheduleReconnect();
-      }
-    },
-
-    _scheduleReconnect() {
-      clearReconnectTimer();
-      backoff = backoff ? Math.min(backoff * 2, RECONNECT_MAX_MS) : RECONNECT_MIN_MS;
-      // 50-100% jitter so tabs dropped together don't reconnect in lockstep
-      const delay = Math.round(backoff * (0.5 + Math.random() * 0.5));
-      reconnectTimer = setTimeout(() => this._reconnect(), delay);
-    },
-
-    _reconnect() {
-      clearReconnectTimer();
-      if (!this.workspaceId || client) {
-        return;
-      }
-      this._open();
-    },
-
-    /**
-     * Network back or tab visible again: skip the rest of a pending backoff. Registered once for
-     * the app's lifetime; without a pending reconnect the handler does nothing.
-     */
-    _listenForWake() {
-      if (wakeListening) {
-        return;
-      }
-      wakeListening = true;
-      const wake = () => {
-        if (document.visibilityState === 'hidden' || !reconnectTimer) {
-          return;
-        }
-        backoff = 0;
-        this._reconnect();
-      };
-      window.addEventListener('online', wake);
-      document.addEventListener('visibilitychange', wake);
+      workspaceStream.resumeIfStalled();
+      userStream.resumeIfStalled();
     },
 
     /**

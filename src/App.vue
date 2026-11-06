@@ -69,10 +69,16 @@ export default {
         });
       } else {
         this.closeDialog('ReauthenticationDialog');
-        // Reauth completed - revive the realtime stream if it stalled waiting for a fresh token
-        // (no-op unless a workspace stream is currently stalled).
+        // Reauth completed - revive the realtime streams that stalled waiting for a fresh token
         this.realtimeStore.resumeIfStalled();
       }
+    },
+
+    'authStore.userId': {
+      immediate: true,
+      handler(userId) {
+        this.realtimeStore.connectUser(userId);
+      },
     },
 
     'authStore.isAuthenticated'(isAuthenticated) {

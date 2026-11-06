@@ -66,6 +66,9 @@ export const EVENTS = Object.freeze({
   PREVIEW_GENERATED: 'preview.generated',
   PREVIEW_PREPARING: 'preview.preparing',
   PROPOSAL_UPDATED: 'proposal.updated',
+  // Only on the user's stream, see stores/realtime.js
+  WORKSPACE_CREATED: 'workspace.created',
+  COLLABORATOR_ADDED: 'collaborator.added',
   // Client-only events — never sent over the wire.
   REALTIME_RESYNCED: 'realtime.resynced',
   // The server refused or ended the stream (close 4003/1008) without a terminal event.
