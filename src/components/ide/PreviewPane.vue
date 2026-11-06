@@ -48,19 +48,17 @@
 
     <div class="flex-grow-1">
       <v-alert
-        v-if="previewStore.preparingLabel && !isGenerating && isAnyDownloading"
+        v-if="previewStore.preparing && !isGenerating && isAnyDownloading"
         type="info"
         variant="tonal"
         class="ma-4"
       >
-        Preparing {{ previewStore.preparingLabel }} for the download. This happens once per version
-        and can take a few minutes.
+        Setting up the tools for the download. This happens once and can take a few minutes.
       </v-alert>
       <div v-if="isGenerating" class="text-center pa-8 ma-4">
         <v-progress-circular indeterminate color="primary" size="64" />
-        <p v-if="previewStore.preparingLabel" class="mt-4 text-medium-emphasis">
-          Preparing {{ previewStore.preparingLabel }}. This happens once per version and can take a
-          few minutes.
+        <p v-if="previewStore.preparing" class="mt-4 text-medium-emphasis">
+          Setting up the tools for this workspace. This happens once and can take a few minutes.
         </p>
       </div>
 

@@ -29,9 +29,6 @@ export const usePreviewStore = defineStore('preview', {
     hasPreview: (state) => !!state.previewHtml,
     // The workspace's PFS list is the preview selection: the owner saves it, everyone follows it
     hasSelectedPfs: () => (useWorkspacesStore().currentWorkspace?.pfs?.length ?? 0) > 0,
-    // e.g. "CEOS-ARD CLI 0.5.9" for the toolchain `ceos-ard-cli-0.5.9`
-    preparingLabel: (state) =>
-      state.preparing?.replace(/^ceos-ard-cli-(.+)$/, 'CEOS-ARD CLI $1') ?? null,
   },
 
   actions: {

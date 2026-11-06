@@ -412,7 +412,7 @@ test.describe('Preview', () => {
     await expect.poll(() => iframe.evaluate((element) => element.contentWindow.scrollY)).toBe(1200);
   });
 
-  test('tells while a CLI version is being prepared', async ({ page }) => {
+  test('tells while the tools for the preview are set up', async ({ page }) => {
     let socket;
     await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
     let release;
@@ -431,14 +431,14 @@ test.describe('Preview', () => {
     // The server installs the toolchain before it builds, and says so to every tab
     await expect.poll(() => socket).toBeTruthy();
     socket.send(JSON.stringify(preparing('ceos-ard-cli-0.5.9')));
-    await expect(page.getByText('Preparing CEOS-ARD CLI 0.5.9')).toBeVisible();
+    await expect(page.getByText('Setting up the tools')).toBeVisible();
 
     release();
     await expect(page.frameLocator('.preview-iframe').locator('h1')).toHaveText('NRB preview');
-    await expect(page.getByText('Preparing CEOS-ARD CLI 0.5.9')).toHaveCount(0);
+    await expect(page.getByText('Setting up the tools')).toHaveCount(0);
   });
 
-  test('tells while a download waits for a CLI version', async ({ page }) => {
+  test('tells while a download waits for the tools', async ({ page }) => {
     let socket;
     await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
     let release;
@@ -456,10 +456,10 @@ test.describe('Preview', () => {
     await page.getByRole('button', { name: 'PDF', exact: true }).click();
     await expect.poll(() => socket).toBeTruthy();
     socket.send(JSON.stringify(preparing('ceos-ard-cli-0.5.9')));
-    await expect(page.getByText('Preparing CEOS-ARD CLI 0.5.9 for the download')).toBeVisible();
+    await expect(page.getByText('Setting up the tools for the download')).toBeVisible();
 
     release();
-    await expect(page.getByText('Preparing CEOS-ARD CLI 0.5.9')).toHaveCount(0);
+    await expect(page.getByText('Setting up the tools')).toHaveCount(0);
   });
 
   test("ignores the preparation of other tabs' requests", async ({ page }) => {
@@ -484,7 +484,7 @@ test.describe('Preview', () => {
     await expect(page.getByRole('button', { name: 'PDF', exact: true })).toHaveClass(
       /v-btn--loading/,
     );
-    await expect(page.getByText('Preparing CEOS-ARD CLI')).toHaveCount(0);
+    await expect(page.getByText('Setting up the tools')).toHaveCount(0);
     release();
   });
 
