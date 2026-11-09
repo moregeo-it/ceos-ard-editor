@@ -56,6 +56,7 @@
       <div class="file-tree-title flex-grow-1 overflow-hidden">
         <div class="d-flex align-center justify-space-between">
           <span ref="nameEl" class="file-tree-name">{{ item.name }}</span>
+          <CommentCount v-if="item.type === 'file'" :path="item.path" class="ml-1 flex-shrink-0" />
           <FileStatusBadge v-if="item.status" :status="item.status" class="ml-2" />
         </div>
         <div v-if="item.excerpt" class="text-caption text-pre-wrap text-subtle">
@@ -99,12 +100,14 @@ import {
   mdiChevronDown,
   mdiChevronRight,
 } from '@mdi/js';
+import CommentCount from '../comments/CommentCount.vue';
 import FileStatusBadge from '../FileStatusBadge.vue';
 
 export default {
   name: 'FileTreeNode',
 
   components: {
+    CommentCount,
     FileStatusBadge,
   },
 

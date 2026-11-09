@@ -74,6 +74,30 @@ function workspace(overrides = {}) {
   };
 }
 
+const AUTHOR = { user_id: USER.id, github_id: '4242', username: USER.username };
+
+/** A comment thread as the server returns it (ThreadResponse in app/schemas/comment.py). */
+export function thread({ id = 'thread-1', path, body, author = AUTHOR, ...overrides }) {
+  const created = '2026-10-03T09:00:00Z';
+  return {
+    id,
+    workspace_id: 'ws-1',
+    path,
+    previous_paths: [],
+    status: 'open',
+    outdated: false,
+    created_by: author,
+    created_at: created,
+    updated_at: created,
+    resolved_by: null,
+    resolved_at: null,
+    comments: [
+      { id: `${id}-c1`, author, body, deleted: false, created_at: created, edited_at: null },
+    ],
+    ...overrides,
+  };
+}
+
 // The editor and the API are on different origins, as in production
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -110,6 +134,7 @@ export class MockApi {
     this.fileDiffs = new Map();
     this.commits = [];
     this.proposal = null;
+    this.threads = [];
     this.requests = [];
   }
 
@@ -335,6 +360,9 @@ export class MockApi {
     if (sub === '/commits') {
       return json(route, this.commits);
     }
+    if (sub === '/threads' || sub.startsWith('/threads/')) {
+      return this.handleThreads(route, request, method, sub);
+    }
     if (sub === '/proposal') {
       return json(route, this.proposal);
     }
@@ -342,6 +370,61 @@ export class MockApi {
       return json(route, []);
     }
     return json(route, { detail: `Not mocked: ${method} ${sub}` }, 404);
+  }
+
+  handleThreads(route, request, method, sub) {
+    const [, threadId, , commentId] = sub.split('/').slice(1);
+    const data = request.postData() ? JSON.parse(request.postData()) : {};
+    const now = new Date().toISOString();
+    if (!threadId) {
+      if (method === 'POST') {
+        const created = thread({ id: `thread-${this.threads.length + 1}`, ...data });
+        this.threads.unshift(created);
+        return json(route, created, 201);
+      }
+      return json(route, this.threads);
+    }
+    const found = this.threads.find((t) => t.id === threadId);
+    if (!found) return json(route, { detail: 'Thread not found' }, 404);
+    if (!commentId && sub.endsWith('/comments')) {
+      const id = `${threadId}-c${found.comments.length + 1}`;
+      found.comments.push({
+        id,
+        author: AUTHOR,
+        body: data.body,
+        deleted: false,
+        created_at: now,
+        edited_at: null,
+      });
+      return json(route, found, 201);
+    }
+    if (!commentId) {
+      const resolved = data.status === 'resolved';
+      Object.assign(found, {
+        status: data.status,
+        resolved_by: resolved ? AUTHOR : null,
+        resolved_at: resolved ? now : null,
+      });
+      return json(route, found);
+    }
+    const comment = found.comments.find((c) => c.id === commentId);
+    if (method === 'PATCH') {
+      Object.assign(comment, { body: data.body, edited_at: now });
+      return json(route, found);
+    }
+    if (comment !== found.comments[0] && comment !== found.comments.at(-1)) {
+      return json(route, { detail: 'Only the last reply of a thread can be deleted' }, 409);
+    }
+    if (comment === found.comments[0]) {
+      Object.assign(comment, { body: null, deleted: true });
+    } else {
+      found.comments = found.comments.filter((c) => c !== comment);
+    }
+    if (found.comments.every((c) => c.deleted)) {
+      this.threads = this.threads.filter((t) => t !== found);
+      return fulfill(route, { status: 204 });
+    }
+    return json(route, found);
   }
 }
 

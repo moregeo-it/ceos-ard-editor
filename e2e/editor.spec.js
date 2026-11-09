@@ -76,6 +76,7 @@ test.describe('File tree', () => {
 
     expect(await menuEntries(page, 'document.yaml')).toEqual([
       'Open in Source Code Editor',
+      'Comment',
       'Download',
     ]);
   });
@@ -86,6 +87,7 @@ test.describe('File tree', () => {
 
     expect(await menuEntries(page, 'unused.yaml')).toEqual([
       'Open in Source Code Editor',
+      'Comment',
       'Download',
       'Rename',
       'Delete',

@@ -38,7 +38,7 @@
       </v-container>
       <splitpanes v-else @resized="storePaneSizes" :dbl-click-splitter="false">
         <pane class="files" min-size="10" :size="panelSizes.files">
-          <FilesPane />
+          <SidePane />
         </pane>
         <pane class="editor" min-size="30" :size="panelSizes.editor">
           <EditorPane />
@@ -55,6 +55,7 @@
 </template>
 
 <script>
+import { useCommentsStore } from '@/stores/comments';
 import { useEditorStore } from '@/stores/editor';
 import { useNotificationsStore } from '@/stores/notifications';
 import { usePreviewStore } from '@/stores/preview';
@@ -65,8 +66,8 @@ import { mdiAlertOutline, mdiNotebookEdit, mdiShareVariant, mdiSourceBranchSync 
 import HeaderBar from '@/components/HeaderBar.vue';
 import HeaderSwitch from '@/components/HeaderSwitch.vue';
 import EditorPane from '@/components/ide/EditorPane.vue';
-import FilesPane from '@/components/ide/FilesPane.vue';
 import PreviewPane from '@/components/ide/PreviewPane.vue';
+import SidePane from '@/components/ide/SidePane.vue';
 import ShareModeChip from '@/components/workspace/ShareModeChip.vue';
 import { Splitpanes, Pane } from 'splitpanes';
 
@@ -74,12 +75,12 @@ export default {
   name: 'EditorView',
   components: {
     EditorPane,
-    FilesPane,
     HeaderBar,
     HeaderSwitch,
     Pane,
     PreviewPane,
     ShareModeChip,
+    SidePane,
     Splitpanes,
   },
   data() {
@@ -174,6 +175,8 @@ export default {
       // through the workspace.synced event instead.
       await this.syncRemoteChanges();
     }
+    // After the sync, which can move and delete files the threads are on
+    this.loadComments();
     this.syncReady = true;
   },
 
@@ -205,6 +208,16 @@ export default {
           this.$router.push({ name: 'workspaces' });
         }
         return false;
+      }
+    },
+
+    async loadComments() {
+      try {
+        await useCommentsStore().load();
+      } catch (error) {
+        if (!this.unmounted) {
+          this.notificationsStore.error(`The comments could not be loaded: ${error.message}`);
+        }
       }
     },
 

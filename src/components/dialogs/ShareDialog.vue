@@ -47,6 +47,7 @@
               Type a GitHub username and press Enter or Invite. To invite several people at once,
               separate their usernames with commas or spaces.
             </p>
+            <p class="text-body-2 text-medium-emphasis mt-2 mb-0">{{ commentsVisibilityNote }}</p>
 
             <v-list class="mt-4">
               <v-list-item v-if="shareStore.isLoadingCollaborators">
@@ -206,6 +207,7 @@ import DialogMixin from '@/components/DialogMixin';
 import { useShareStore } from '@/stores/share';
 import { useNotificationsStore } from '@/stores/notifications';
 import { ACCESS_MODES, shareModeLabel } from '@/utils/shareMode';
+import { COMMENTS_VISIBILITY_NOTE } from '@/utils/comments';
 
 // How long a removal can be undone before it is sent
 const UNDO_SECONDS = 10;
@@ -237,6 +239,7 @@ export default {
       linkMode: 'readonly',
       isCreatingLink: false,
       modeOptions: ACCESS_MODES,
+      commentsVisibilityNote: COMMENTS_VISIBILITY_NOTE,
       // Collaborator id -> timer of a removal that can still be undone, null once it is being sent
       removals: {},
     };

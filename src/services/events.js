@@ -47,6 +47,9 @@
  * @property {number} [seq] Present iff the event was published by the server broker.
  * @property {string} [target_user_id] `collaborator.revoked` and `collaborator.updated` only.
  * @property {string} [mode] `collaborator.updated` only: this user's new access mode; refetch the workspace.
+ * @property {Object} [thread] `thread.created` and `thread.updated` only: the comment thread as the
+ *   REST API returns it (see `services/comment.service.js`).
+ * @property {string} [thread_id] `thread.deleted` only: the thread that went with its last comment.
  */
 
 export const EVENTS = Object.freeze({
@@ -59,6 +62,9 @@ export const EVENTS = Object.freeze({
   FILE_COMMITTED: 'file.committed',
   COLLABORATOR_REVOKED: 'collaborator.revoked',
   COLLABORATOR_UPDATED: 'collaborator.updated',
+  THREAD_CREATED: 'thread.created',
+  THREAD_UPDATED: 'thread.updated',
+  THREAD_DELETED: 'thread.deleted',
   WORKSPACE_ARCHIVED: 'workspace.archived',
   WORKSPACE_DELETED: 'workspace.deleted',
   WORKSPACE_SYNCED: 'workspace.synced',

@@ -30,6 +30,7 @@ import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
 import {
+  mdiCommentPlusOutline,
   mdiFileCompare,
   mdiPlus,
   mdiDotsVertical,
@@ -44,6 +45,7 @@ import { downloadBlob } from '@/utils/api';
 import { useTypesStore } from '@/stores/types';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { matchesGlob } from '@/utils/glob';
+import { openCommentDialog } from '@/utils/comments';
 
 export default {
   name: 'FileContextMenu',
@@ -58,6 +60,7 @@ export default {
   data() {
     return {
       icons: {
+        comment: mdiCommentPlusOutline,
         diff: mdiFileCompare,
         add: mdiPlus,
         menu: mdiDotsVertical,
@@ -131,6 +134,15 @@ export default {
             title: 'Open in Source Code Editor',
             icon: this.icons.codeeditor,
             handler: () => this.openFile(this.item.path, true),
+          },
+        // Commenting is open to everyone allowed to comment, whatever the file menu rules say
+        this.workspacesStore.canComment &&
+          isFile &&
+          exists && {
+            id: 'comment',
+            title: 'Comment',
+            icon: this.icons.comment,
+            handler: () => openCommentDialog(this.$root, this.item.path),
           },
         allows('diff') &&
           isFile &&
