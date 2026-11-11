@@ -52,6 +52,18 @@ Developing in Safari over plain HTTP needs `SESSION_COOKIE_SECURE=false` on the 
 `VITE_APP_TITLE` and `VITE_APP_SUBTITLE` set the name and tagline of a deployment, shown on the landing
 page and as the page title.
 
+### Content Security Policy
+
+`index.html` sets a Content-Security-Policy that only allows the editor itself and the API, whose origin
+is filled in from `VITE_API_BASE_URL` at build time. The preview inherits it, so a workspace can't make
+its viewers load images, styles or fonts from other hosts, e.g. tracking pixels. Styles allow
+`'unsafe-inline'` (Vuetify, CodeMirror and the preview use inline styles) and scripts allow `'unsafe-eval'`
+(the form editor compiles the JSON schemas with Ajv).
+
+A deployment may also send a CSP header, e.g. to add `frame-ancestors`, which a `<meta>` tag can't set.
+Browsers enforce both policies, so a deployment that loads anything else, e.g. analytics from another host,
+must extend the policy in `index.html`.
+
 ### Workspace types
 
 What differs between the repositories the editor works with, e.g. which files are shown, what the file
