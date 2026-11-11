@@ -185,6 +185,13 @@ export class MockApi {
         JSON.stringify({ ...value, expiresAt: Date.now() + 8 * 3600 * 1000 }),
       );
     }, session);
+    // CSP violations of the editor's own document; the preview's are reported in its frame
+    await page.addInitScript(() => {
+      window.cspViolations = [];
+      document.addEventListener('securitypolicyviolation', (event) => {
+        window.cspViolations.push(`${event.effectiveDirective} ${event.blockedURI}`);
+      });
+    });
     await page.routeWebSocket(new RegExp(`^ws://localhost:8099/`), () => {});
     await page.route(`${API}/**`, (route) => this.handle(route));
   }
@@ -264,7 +271,8 @@ export class MockApi {
       if (method === 'GET') {
         const file = this.files.get(path);
         if (!file) return json(route, { detail: 'Not found' }, 404);
-        return fulfill(route, { status: 200, contentType: 'text/yaml', body: file.content });
+        const contentType = file.contentType ?? 'text/yaml';
+        return fulfill(route, { status: 200, contentType, body: file.content });
       }
       if (method === 'PUT') {
         this.status.set(path, this.files.has(path) ? 'modified' : 'added');
@@ -346,6 +354,7 @@ export const test = base.extend({
       // Whatever a test leaves on screen, e.g. config or API data shown as text
       if (!page.isClosed()) {
         await expectNoRawData(page);
+        expect(await page.evaluate(() => window.cspViolations ?? [])).toEqual([]);
       }
     },
     { auto: true },

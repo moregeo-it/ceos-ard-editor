@@ -1,6 +1,11 @@
 import { Buffer } from 'node:buffer';
-import { test, expect, WORKSPACE_EVENTS } from './support/mock-api';
+import { test, expect, API, WORKSPACE_EVENTS } from './support/mock-api';
 import { fieldLabels, optionTexts } from './support/ui';
+
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  'base64',
+);
 
 const row = (page, name) =>
   page
@@ -265,6 +270,20 @@ test.describe('Editor', () => {
     await expect(page.locator('.json-schema-editor')).toHaveCount(0);
   });
 
+  test('shows images and PDFs', async ({ page, api }) => {
+    api.files.set('/assets/logo.png', { content: PNG, contentType: 'image/png' });
+    api.files.set('/assets/spec.pdf', { content: '%PDF-1.4', contentType: 'application/pdf' });
+    await openWorkspace(page);
+    await expand(page, 'assets', 'logo.png');
+
+    const image = page.locator('.v-window-item--active img');
+    await expect(image).toHaveAttribute('src', /^data:image\/png;/);
+    await expect.poll(() => image.evaluate((img) => img.naturalWidth)).toBe(1);
+
+    await row(page, 'spec.pdf').click();
+    await expect(page.locator('.v-window-item--active iframe')).toHaveAttribute('src', /^blob:/);
+  });
+
   test('search finds files by content', async ({ page }) => {
     await openWorkspace(page);
 
@@ -336,6 +355,42 @@ test.describe('Preview', () => {
 
     await expect(page).toHaveURL(/\/workspaces\/ws-1$/);
     expect(await page.title()).toBe(title);
+  });
+
+  test('loads no resources from other hosts', async ({ page, api }) => {
+    const leaked = [];
+    await page.context().route('https://tracker.example/**', (route) => {
+      leaked.push(route.request().url());
+      return route.abort();
+    });
+    await page.route(`${API}/workspaces/ws-1/previews/logo.png`, (route) =>
+      route.fulfill({ status: 200, contentType: 'image/png', body: PNG }),
+    );
+    api.previewHtml =
+      '<!doctype html><html><head>' +
+      '<link rel="stylesheet" href="https://tracker.example/style.css">' +
+      '<link rel="prefetch" href="https://tracker.example/prefetch">' +
+      '<style>@import url(https://tracker.example/import.css);' +
+      '@font-face { font-family: Remote; src: url(https://tracker.example/font.woff2); }' +
+      'body { font-family: Remote; background: url(https://tracker.example/background.png); }' +
+      '</style></head><body><h1>NRB preview</h1>' +
+      '<img src="https://tracker.example/pixel.png">' +
+      '<img srcset="https://tracker.example/srcset.png 2x">' +
+      '<video poster="https://tracker.example/poster.png"></video>' +
+      '<img src="logo.png" alt="Logo"></body></html>';
+    await openWorkspace(page);
+    const frame = page.frameLocator('.preview-iframe');
+    await expect(frame.locator('h1')).toHaveText('NRB preview');
+
+    // Relative images still load from the API
+    const logo = frame.getByAltText('Logo');
+    await expect(logo).toHaveAttribute('src', `${API}/workspaces/ws-1/previews/logo.png`);
+    await expect.poll(() => logo.evaluate((img) => img.naturalWidth)).toBe(1);
+    const iframe = page.locator('.preview-iframe');
+    await expect
+      .poll(() => iframe.evaluate((element) => element.contentDocument.readyState))
+      .toBe('complete');
+    expect(leaked).toEqual([]);
   });
 
   test('keeps the scroll position when the preview is rebuilt', async ({ page, api }) => {
