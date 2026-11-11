@@ -17,6 +17,18 @@ const getDefaults = () => ({
 
 const getWorkspaceId = () => useWorkspacesStore().currentWorkspace?.id;
 
+// Reloads and live updates overlap, and responses can arrive late: keep what changed meanwhile.
+let latestLoad = 0;
+let revision = 0;
+const changedAt = new Map(); // thread id -> revision of its last local change
+const deleted = new Set();
+
+const isNewer = (thread, than) => !than || thread.updated_at >= than.updated_at;
+
+function touch(threadId) {
+  changedAt.set(threadId, ++revision);
+}
+
 /** Whether `path` is `base` itself or lies in the folder `base`. */
 export const isWithin = (path, base) => path === base || path.startsWith(`${base}/`);
 
@@ -47,19 +59,36 @@ export const useCommentsStore = defineStore('comments', {
         return;
       }
       const started = workspaceSession();
+      const load = ++latestLoad;
+      const since = revision;
       this.isLoading = true;
       try {
         const threads = await commentService.listThreads(workspaceId);
-        // A late answer must not land in a workspace opened meanwhile
-        if (started === workspaceSession()) {
-          this.threads = threads;
+        if (started === workspaceSession() && load === latestLoad) {
+          this.threads = this.merge(threads, since);
           this.loaded = true;
         }
       } finally {
-        if (started === workspaceSession()) {
+        if (started === workspaceSession() && load === latestLoad) {
           this.isLoading = false;
         }
       }
+    },
+
+    /** A loaded list, keeping the threads that changed here since revision `since`. */
+    merge(loaded, since) {
+      const changed = (id) => (changedAt.get(id) ?? 0) > since;
+      const local = new Map(this.threads.map((thread) => [thread.id, thread]));
+      const merged = loaded
+        .filter((thread) => !deleted.has(thread.id))
+        .map((thread) => {
+          const mine = local.get(thread.id);
+          return changed(thread.id) && mine && !isNewer(thread, mine) ? mine : thread;
+        });
+      const added = this.threads.filter(
+        (thread) => changed(thread.id) && !merged.some((other) => other.id === thread.id),
+      );
+      return [...added, ...merged];
     },
 
     showFiles() {
@@ -72,24 +101,39 @@ export const useCommentsStore = defineStore('comments', {
       this.path = path;
     },
 
-    /** Add a thread, or replace it with a newer version. */
+    /** Add a thread, or replace it unless the shown version is newer. */
     upsert(thread) {
+      if (deleted.has(thread.id)) {
+        return;
+      }
       const index = this.threads.findIndex((existing) => existing.id === thread.id);
       if (index === -1) {
         this.threads.unshift(thread);
-      } else {
+      } else if (isNewer(thread, this.threads[index])) {
         this.threads[index] = thread;
+      } else {
+        return;
       }
+      touch(thread.id);
     },
 
     remove(threadId) {
+      deleted.add(threadId);
+      touch(threadId);
       this.threads = this.threads.filter((thread) => thread.id !== threadId);
     },
 
+    /** The file filter follows a renamed file or folder. */
+    movePath(oldPath, newPath) {
+      if (this.path && oldPath && newPath && isWithin(this.path, oldPath)) {
+        this.path = newPath + this.path.slice(oldPath.length);
+      }
+    },
+
     /** Run a request that answers with a thread (or null when it was deleted) and apply it. */
-    async apply(threadId, request) {
+    async apply(threadId, request, workspaceId = getWorkspaceId()) {
       const started = workspaceSession();
-      const thread = await request(getWorkspaceId());
+      const thread = await request(workspaceId);
       if (started !== workspaceSession()) {
         return thread;
       }
@@ -101,9 +145,11 @@ export const useCommentsStore = defineStore('comments', {
       return thread;
     },
 
-    async createThread(path, body) {
-      return this.apply(null, (workspaceId) =>
-        commentService.createThread(workspaceId, path, body),
+    async createThread(path, body, workspaceId = getWorkspaceId()) {
+      return this.apply(
+        null,
+        (workspaceId) => commentService.createThread(workspaceId, path, body),
+        workspaceId,
       );
     },
 
@@ -132,6 +178,9 @@ export const useCommentsStore = defineStore('comments', {
     },
 
     reset() {
+      latestLoad++;
+      changedAt.clear();
+      deleted.clear();
       Object.assign(this, getDefaults());
     },
   },
@@ -162,12 +211,15 @@ export function registerCommentsEventListeners() {
   on(EVENTS.THREAD_UPDATED, (event) => useCommentsStore().upsert(event.thread));
   on(EVENTS.THREAD_DELETED, (event) => useCommentsStore().remove(event.thread_id));
 
+  on(EVENTS.FILE_RENAMED, (event) => {
+    useCommentsStore().movePath(event.old_path ?? event.path, event.file?.path);
+  });
+  on(EVENTS.FILE_REVERTED, (event) => {
+    useCommentsStore().movePath(event.old_path, event.file?.path);
+  });
+
+  // Also retries a load that failed
   for (const type of FILE_EXISTENCE_EVENTS) {
-    on(type, async () => {
-      const comments = useCommentsStore();
-      if (comments.loaded) {
-        await comments.load();
-      }
-    });
+    on(type, () => useCommentsStore().load());
   }
 }

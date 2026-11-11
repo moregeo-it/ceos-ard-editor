@@ -1,4 +1,6 @@
+import { workspaceSession } from '@/services/events';
 import { useCommentsStore } from '@/stores/comments';
+import { useWorkspacesStore } from '@/stores/workspaces';
 import { APP_TITLE } from '@/utils/branding';
 
 /** Who can read comments, shown in the comments pane and the share dialog. */
@@ -13,12 +15,19 @@ export const COMMENTS_VISIBILITY_NOTE =
  * @param {string} path The file, e.g. `/requirements/foo.yaml`.
  */
 export function openCommentDialog(root, path) {
+  const workspaceId = useWorkspacesStore().currentWorkspace?.id;
+  const session = workspaceSession();
   root.openDialog('CommentDialog', {
     path,
     onAcceptance: async (body) => {
+      if (session !== workspaceSession()) {
+        throw new Error('The workspace was closed, so your comment was not sent.');
+      }
       const comments = useCommentsStore();
-      await comments.createThread(path, body);
-      comments.showComments(path);
+      await comments.createThread(path, body, workspaceId);
+      if (session === workspaceSession()) {
+        comments.showComments(path);
+      }
     },
   });
 }

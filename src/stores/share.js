@@ -8,6 +8,8 @@ const getDefaults = () => ({
   shares: [],
   isLoadingCollaborators: false,
   isLoadingShares: false,
+  // What the server lets owners grant
+  modes: ['readonly'],
   isMutating: false,
   activeWorkspaceId: null,
 });
@@ -38,6 +40,10 @@ export const useShareStore = defineStore('share', {
       } finally {
         if (workspaceId === this.activeWorkspaceId) this.isLoadingCollaborators = false;
       }
+    },
+
+    async fetchModes() {
+      this.modes = await shareService.listModes();
     },
 
     async fetchShares(workspaceId) {

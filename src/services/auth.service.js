@@ -27,6 +27,7 @@ export default {
     return {
       userId: user.id,
       username: user.username,
+      githubId: user.github_id ?? null,
       provider: user.identity_provider,
       expiresAt: Date.parse(user.expires_at),
     };

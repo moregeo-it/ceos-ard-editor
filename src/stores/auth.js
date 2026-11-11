@@ -7,6 +7,7 @@ import { useEditorStore } from '@/stores/editor';
 const getDefaults = () => ({
   userId: null,
   username: null,
+  githubId: null,
   provider: null,
   expiresAt: null,
   isAuthenticated: false,
@@ -201,6 +202,7 @@ export const useAuthStore = defineStore('auth', {
     _setSession(session) {
       this.userId = session.userId;
       this.username = session.username;
+      this.githubId = session.githubId ?? null;
       this.provider = session.provider;
       this.expiresAt = session.expiresAt;
       this.isAuthenticated = true;

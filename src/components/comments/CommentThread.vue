@@ -4,7 +4,6 @@
     class="comment-thread mb-2"
     :class="{ 'comment-thread--resolved': resolved }"
   >
-    <!-- The file and the thread's state -->
     <div class="d-flex align-center ga-1 pl-3 pr-1 pt-1">
       <v-icon :icon="icons.file" size="x-small" class="text-subtle" />
       <a
@@ -45,13 +44,11 @@
       Resolved by {{ thread.resolved_by.username }} on {{ formatDate(thread.resolved_at) }}
     </div>
 
-    <!-- The comments, oldest first -->
     <div v-for="comment in thread.comments" :key="comment.id" class="comment px-3 py-2">
       <div class="d-flex align-center ga-2">
         <v-avatar size="28" class="flex-shrink-0">
           <v-img :src="avatarUrl(comment.author)" :alt="comment.author.username" />
         </v-avatar>
-        <!-- Name and date on two lines, so both fit into a narrow column -->
         <div class="comment-meta flex-grow-1">
           <div class="text-body-2 font-weight-medium text-truncate">
             {{ comment.author.username }}
@@ -93,9 +90,14 @@
       <div v-if="comment.deleted" class="text-body-2 font-italic text-subtle mt-1">
         Comment deleted
       </div>
-      <v-form v-else-if="editingId === comment.id" class="mt-2" @submit.prevent="saveEdit(comment)">
+      <v-form
+        v-else-if="canComment && editingId === comment.id"
+        class="mt-2"
+        @submit.prevent="saveEdit(comment)"
+      >
         <v-textarea
           v-model="editBody"
+          :readonly="isSaving"
           auto-grow
           rows="2"
           density="compact"
@@ -120,14 +122,13 @@
           </v-btn>
         </div>
       </v-form>
-      <!-- eslint-disable-next-line vue/no-v-html -- sanitized in renderMarkdown -->
       <div v-else class="comment-body text-body-2 mt-1" v-html="renderMarkdown(comment.body)" />
     </div>
 
-    <!-- Reply -->
     <v-form v-if="canComment" class="px-3 pb-3" @submit.prevent="sendReply">
       <v-textarea
         v-model="replyBody"
+        :readonly="isReplying"
         placeholder="Reply…"
         auto-grow
         rows="1"
@@ -223,14 +224,10 @@ export default {
       return `https://avatars.githubusercontent.com/u/${encodeURIComponent(author.github_id)}?s=48`;
     },
 
+    // By GitHub ID like the server, while it is known (sessions stored by older editors lack it)
     isOwn(comment) {
-      return Boolean(comment.author.user_id) && comment.author.user_id === useAuthStore().userId;
-    },
-
-    // Only the first and the last comment can be deleted, so a discussion keeps its context
-    isDeletable(comment) {
-      const comments = this.thread.comments;
-      return comment === comments[0] || comment === comments[comments.length - 1];
+      const { githubId, userId } = useAuthStore();
+      return githubId ? comment.author.github_id === githubId : comment.author.user_id === userId;
     },
 
     // Authors edit and delete their own comments; the owner deletes any
@@ -245,14 +242,13 @@ export default {
           icon: this.icons.edit,
           handler: () => this.startEdit(comment),
         },
-        (this.isOwn(comment) || this.workspacesStore.isOwner) &&
-          this.isDeletable(comment) && {
-            id: 'delete',
-            title: 'Delete',
-            icon: this.icons.delete,
-            color: 'error',
-            handler: () => this.requestDelete(comment),
-          },
+        (this.isOwn(comment) || this.workspacesStore.isOwner) && {
+          id: 'delete',
+          title: 'Delete',
+          icon: this.icons.delete,
+          color: 'error',
+          handler: () => this.requestDelete(comment),
+        },
       ].filter(Boolean);
     },
 
@@ -300,7 +296,9 @@ export default {
       this.isSaving = true;
       try {
         await this.commentsStore.editComment(this.thread, comment, body);
-        this.editingId = null;
+        if (this.editingId === comment.id) {
+          this.editingId = null;
+        }
       } catch (error) {
         this.notificationsStore.error(`Your comment could not be saved: ${error.message}`);
       } finally {
@@ -312,12 +310,16 @@ export default {
       const whose = this.isOwn(comment)
         ? 'your comment'
         : `the comment of ${comment.author.username}`;
-      const keepsReplies = comment === this.thread.comments[0] && this.thread.comments.length > 1;
+      const comments = this.thread.comments;
+      let outcome = 'The replies stay, and "Comment deleted" is shown instead.';
+      if (comment === comments[comments.length - 1]) {
+        outcome = comments.slice(0, -1).every((other) => other.deleted)
+          ? 'It is removed, and the thread with it.'
+          : 'It is removed.';
+      }
       this.$root.openDialog('ConfirmDialog', {
         title: 'Delete comment',
-        message: keepsReplies
-          ? `Delete ${whose}? The replies stay, and "Comment deleted" is shown instead. This cannot be undone.`
-          : `Delete ${whose}? This cannot be undone.`,
+        message: `Delete ${whose}? ${outcome} This cannot be undone.`,
         confirmButton: 'Delete',
         confirmButtonColor: 'error',
         onAcceptance: () => this.commentsStore.deleteComment(this.thread, comment),

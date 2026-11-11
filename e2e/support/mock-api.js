@@ -8,7 +8,13 @@ export const API = 'http://localhost:8099';
 export const WORKSPACE_EVENTS = /^ws:\/\/localhost:8099\/workspaces\/[^/]+\/events/;
 export const USER_EVENTS = /^ws:\/\/localhost:8099\/events/;
 
-const USER = { id: 'user-1', username: 'jdoe', full_name: 'Jane Doe', identity_provider: 'github' };
+const USER = {
+  id: 'user-1',
+  username: 'jdoe',
+  github_id: '4242',
+  full_name: 'Jane Doe',
+  identity_provider: 'github',
+};
 
 const FILES = {
   '/README.md': '# CEOS-ARD\n',
@@ -74,7 +80,7 @@ function workspace(overrides = {}) {
   };
 }
 
-const AUTHOR = { user_id: USER.id, github_id: '4242', username: USER.username };
+const AUTHOR = { user_id: USER.id, github_id: USER.github_id, username: USER.username };
 
 /** A comment thread as the server returns it (ThreadResponse in app/schemas/comment.py). */
 export function thread({ id = 'thread-1', path, body, author = AUTHOR, ...overrides }) {
@@ -135,6 +141,7 @@ export class MockApi {
     this.commits = [];
     this.proposal = null;
     this.threads = [];
+    this.shareModes = ['readonly', 'comment'];
     this.requests = [];
   }
 
@@ -238,6 +245,9 @@ export class MockApi {
     }
     if (path === '/types') {
       return json(route, this.types);
+    }
+    if (path === '/shares/modes') {
+      return json(route, this.shareModes);
     }
     if (path === '/pfs') {
       // GitHub only provides the folder names of the PFS
@@ -412,15 +422,13 @@ export class MockApi {
       Object.assign(comment, { body: data.body, edited_at: now });
       return json(route, found);
     }
-    if (comment !== found.comments[0] && comment !== found.comments.at(-1)) {
-      return json(route, { detail: 'Only the last reply of a thread can be deleted' }, 409);
-    }
-    if (comment === found.comments[0]) {
-      Object.assign(comment, { body: null, deleted: true });
+    if (comment === found.comments.at(-1)) {
+      found.comments.pop();
+      while (found.comments.at(-1)?.deleted) found.comments.pop();
     } else {
-      found.comments = found.comments.filter((c) => c !== comment);
+      Object.assign(comment, { body: null, deleted: true });
     }
-    if (found.comments.every((c) => c.deleted)) {
+    if (found.comments.length === 0) {
       this.threads = this.threads.filter((t) => t !== found);
       return fulfill(route, { status: 204 });
     }

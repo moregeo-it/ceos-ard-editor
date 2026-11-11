@@ -80,7 +80,7 @@
                   <template v-else>
                     <v-select
                       :model-value="share.mode"
-                      :items="modeOptions"
+                      :items="modeOptionsWith(share.mode)"
                       density="compact"
                       hide-details
                       variant="underlined"
@@ -238,7 +238,6 @@ export default {
       isInviting: false,
       linkMode: 'readonly',
       isCreatingLink: false,
-      modeOptions: ACCESS_MODES,
       commentsVisibilityNote: COMMENTS_VISIBILITY_NOTE,
       // Collaborator id -> timer of a removal that can still be undone, null once it is being sent
       removals: {},
@@ -248,6 +247,9 @@ export default {
   computed: {
     shareStore() {
       return useShareStore();
+    },
+    modeOptions() {
+      return ACCESS_MODES.filter((mode) => this.shareStore.modes.includes(mode.value));
     },
     notificationsStore() {
       return useNotificationsStore();
@@ -284,12 +286,20 @@ export default {
       this.shareStore.setActiveWorkspace(this.workspace.id);
       try {
         await Promise.all([
+          this.shareStore.fetchModes(),
           this.shareStore.fetchCollaborators(this.workspace.id),
           this.shareStore.fetchShares(this.workspace.id),
         ]);
       } catch (error) {
         this.notificationsStore.error(`Failed to load sharing info: ${error.message}`);
       }
+    },
+
+    // A collaborator keeps showing their mode even if it can no longer be granted
+    modeOptionsWith(current) {
+      return ACCESS_MODES.filter(
+        (mode) => mode.value === current || this.shareStore.modes.includes(mode.value),
+      );
     },
 
     modeLabel(mode) {

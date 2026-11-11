@@ -92,39 +92,54 @@ test.describe('Comments', () => {
     expect(api.threads).toEqual([]);
   });
 
-  test('only the first and the last comment can be deleted', async ({ page, api }) => {
+  test('comments with replies after them become placeholders', async ({ page, api }) => {
     const base = thread({ path: FILE, body: 'First' });
     const reply = (n) => ({ ...base.comments[0], id: `c${n}`, body: `Reply ${n}` });
     api.threads = [{ ...base, comments: [base.comments[0], reply(2), reply(3)] }];
     await openWorkspace(page);
     await page.getByRole('tab', { name: /Comments/ }).click();
 
-    const actionsOf = async (index) => {
+    const remove = async (text, outcome) => {
       await threads(page)
+        .locator('.comment')
+        .filter({ hasText: text })
         .getByRole('button', { name: 'Actions for the comment of jdoe' })
-        .nth(index)
         .click();
-      const items = page.locator('.v-overlay--active .v-list-item-title');
-      await expect(items.first()).toBeVisible();
-      const titles = (await items.allTextContents()).map((title) => title.trim());
-      await page.keyboard.press('Escape');
-      await expect(items).toHaveCount(0);
-      return titles;
+      await page.locator('.v-overlay--active .v-list-item').filter({ hasText: 'Delete' }).click();
+      await expect(page.getByText(outcome)).toBeVisible();
+      await page.getByRole('button', { name: 'Delete', exact: true }).click();
     };
-    expect(await actionsOf(0)).toEqual(['Edit', 'Delete']);
-    expect(await actionsOf(1)).toEqual(['Edit']);
-    expect(await actionsOf(2)).toEqual(['Edit', 'Delete']);
 
-    // The first comment leaves a placeholder, and the replies stay
-    await threads(page)
-      .getByRole('button', { name: 'Actions for the comment of jdoe' })
-      .first()
-      .click();
-    await page.locator('.v-overlay--active .v-list-item').filter({ hasText: 'Delete' }).click();
-    await expect(page.getByText('The replies stay')).toBeVisible();
-    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    await remove('Reply 2', 'The replies stay');
     await expect(threads(page).getByText('Comment deleted')).toBeVisible();
-    await expect(threads(page)).toContainText('Reply 2');
+    await expect(threads(page)).toContainText('Reply 3');
+
+    // The last one goes with the placeholder before it
+    await remove('Reply 3', 'It is removed.');
+    await expect(threads(page).locator('.comment')).toHaveCount(1);
+
+    await remove('First', 'It is removed, and the thread with it.');
+    await expect(threads(page)).toHaveCount(0);
+  });
+
+  test('drafts survive switching to the files', async ({ page, api }) => {
+    api.threads = [thread({ path: FILE, body: 'Is this right?', author: OTHER })];
+    await openWorkspace(page);
+    await page.getByRole('tab', { name: /Comments/ }).click();
+    await threads(page).getByPlaceholder('Reply…').fill('Half a reply');
+
+    await page.getByRole('tab', { name: 'Files' }).click();
+    await page.getByRole('tab', { name: /Comments/ }).click();
+    await expect(threads(page).getByPlaceholder('Reply…')).toHaveValue('Half a reply');
+  });
+
+  test('the share dialog offers the modes the server enables', async ({ page, api }) => {
+    api.shareModes = ['readonly'];
+    await openWorkspace(page);
+    await page.getByRole('button', { name: 'Share' }).click();
+
+    await page.locator('.v-dialog .v-select').filter({ hasText: 'Access' }).first().click();
+    await expect(page.locator('.v-select__content .v-list-item')).toHaveText(['View only']);
   });
 
   test('commenters comment, but neither edit files nor delete comments of others', async ({
@@ -186,6 +201,73 @@ test.describe('Comments', () => {
 
     await page.getByRole('tab', { name: /Comments/ }).click();
     await expect(threads(page)).toContainText('Live from mmohr');
+  });
+
+  test('late and stale updates never undo newer ones', async ({ page, api }) => {
+    let socket;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    const current = thread({ path: FILE, body: 'Current', updated_at: '2026-10-05T10:00:00Z' });
+    api.threads = [current];
+    await openWorkspace(page);
+    await page.getByRole('tab', { name: /Comments/ }).click();
+    await expect(threads(page)).toContainText('Current');
+    await expect.poll(() => socket).toBeTruthy();
+
+    const send = (type, fields) =>
+      socket.send(
+        JSON.stringify({
+          type,
+          ts: new Date().toISOString(),
+          actor_user_id: OTHER.user_id,
+          path: FILE,
+          ...fields,
+        }),
+      );
+    const older = thread({ path: FILE, body: 'Older', updated_at: '2026-10-04T10:00:00Z' });
+    send('thread.updated', { thread: older });
+    // Events are applied in order: once the marker shows, the older update was handled
+    send('thread.created', { thread: thread({ id: 'marker', path: FILE, body: 'Marker' }) });
+    await expect(threads(page)).toContainText(['Marker', 'Current']);
+    await expect(threads(page).getByText('Older')).toHaveCount(0);
+
+    send('thread.deleted', { thread_id: 'marker' });
+    send('thread.deleted', { thread_id: current.id });
+    await expect(threads(page)).toHaveCount(0);
+
+    // A late update of the deleted thread doesn't bring it back
+    send('thread.updated', { thread: { ...current, updated_at: '2026-10-06T10:00:00Z' } });
+    await page.getByRole('tab', { name: 'Files' }).click();
+    await page.getByRole('tab', { name: /Comments/ }).click();
+    await expect(threads(page)).toHaveCount(0);
+  });
+
+  test('the file filter follows a rename', async ({ page, api }) => {
+    let socket;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    api.threads = [thread({ path: FILE, body: 'On accuracy' })];
+    await openWorkspace(page);
+    await row(page, 'glossary').click();
+    await row(page, 'accuracy.yaml').locator('.comment-count').click();
+    await expect(page.locator('.v-chip').filter({ hasText: 'accuracy.yaml' })).toBeVisible();
+
+    await expect.poll(() => socket).toBeTruthy();
+    const file = {
+      name: 'precision.yaml',
+      path: '/glossary/precision.yaml',
+      is_directory: false,
+      status: 'renamed',
+    };
+    socket.send(
+      JSON.stringify({
+        type: 'file.renamed',
+        ts: new Date().toISOString(),
+        actor_user_id: 'user-1',
+        path: FILE,
+        old_path: FILE,
+        file,
+      }),
+    );
+    await expect(page.locator('.v-chip').filter({ hasText: 'precision.yaml' })).toBeVisible();
   });
 
   test('comments are sanitized', async ({ page, api }) => {

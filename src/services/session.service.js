@@ -16,6 +16,7 @@ const LEGACY_KEYS = [
  * @typedef {Object} Session
  * @property {string} userId
  * @property {string} username
+ * @property {string|null} [githubId] Null for other identity providers, or a session stored before it was known
  * @property {string} provider
  * @property {number} expiresAt Unix time in milliseconds
  */
