@@ -9,9 +9,24 @@ on:
       - main
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      playwright: ${{ steps.version.outputs.playwright }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Read Playwright version
+        id: version
+        run: echo "playwright=$(jq -r '.packages["node_modules/@playwright/test"].version' package-lock.json)" >> "$GITHUB_OUTPUT"
+
   e2e:
     name: Playwright
+    needs: version
     runs-on: ubuntu-latest
+    # The image ships the browsers and system dependencies, its version must match the installed @playwright/test
+    container:
+      image: mcr.microsoft.com/playwright:v${{ needs.version.outputs.playwright }}-noble
 
     steps:
       - uses: actions/checkout@v6
@@ -25,9 +40,6 @@ jobs:
 
       - name: Run unit tests
         run: npm run test:unit
-
-      - name: Install browsers
-        run: npx playwright install --with-deps chromium
 
       - name: Run tests
         run: npm run test:e2e -- --project=chromium
