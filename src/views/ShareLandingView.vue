@@ -12,12 +12,18 @@
             <template v-else-if="preview">
               <v-icon size="64" color="primary" class="mb-4">{{ icons.share }}</v-icon>
               <h2 class="text-h5 mb-2">{{ preview.workspace_title }}</h2>
-              <v-chip class="mb-6" size="small" color="primary" variant="tonal">
-                {{ modeLabel(preview.mode) }}
-              </v-chip>
-              <p class="text-body-1 text-medium-emphasis mb-1">
+              <p class="text-body-1 text-medium-emphasis mb-6">
                 Shared by {{ preview.owner_display_name }}
               </p>
+              <v-alert
+                v-if="mode"
+                :icon="mode.icon"
+                :title="mode.summary"
+                :text="mode.description"
+                color="primary"
+                variant="tonal"
+                class="text-left mb-6"
+              />
               <v-btn
                 color="primary"
                 size="large"
@@ -47,7 +53,7 @@
 import { mdiAlertCircle, mdiGithub, mdiShareVariant } from '@mdi/js';
 import { useAuthStore } from '@/stores/auth';
 import { useShareStore } from '@/stores/share';
-import { shareModeLabel } from '@/utils/shareMode';
+import { shareMode } from '@/utils/shareMode';
 
 export default {
   name: 'ShareLandingView',
@@ -75,6 +81,9 @@ export default {
     shareStore() {
       return useShareStore();
     },
+    mode() {
+      return this.preview && shareMode(this.preview.mode);
+    },
   },
 
   async created() {
@@ -82,10 +91,6 @@ export default {
   },
 
   methods: {
-    modeLabel(mode) {
-      return shareModeLabel(mode);
-    },
-
     /** Redeem the link and enter the workspace. Not logged in: show what the link leads to. */
     async open() {
       this.loading = true;

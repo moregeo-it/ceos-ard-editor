@@ -1,5 +1,6 @@
 import { workspaceSession } from '@/services/events';
 import { useCommentsStore } from '@/stores/comments';
+import { useFilesStore } from '@/stores/files';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { APP_TITLE } from '@/utils/branding';
 
@@ -8,6 +9,14 @@ export const COMMENTS_VISIBILITY_NOTE =
   'Comments are visible to everyone this workspace is shared with. Once the workspace owner ' +
   'submits the changes as a proposal (pull request), comments may also become visible to other ' +
   `users of the ${APP_TITLE}.`;
+
+/** Whether the user can start a thread on `path`: an existing file, and the right to comment. */
+export function canCommentOn(path) {
+  const file = useFilesStore().all[path];
+  return Boolean(
+    useWorkspacesStore().canComment && file && !file.is_directory && file.status !== 'deleted',
+  );
+}
 
 /**
  * Ask for the first comment of a new thread on a file, then show the file's comments.

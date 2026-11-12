@@ -34,6 +34,9 @@
             variant="text"
             @click.stop="close(file.path)"
           />
+          <v-tooltip activator="parent" location="bottom" :open-delay="500">
+            {{ file.path }}
+          </v-tooltip>
         </v-tab>
       </v-tabs>
 
@@ -90,6 +93,31 @@
           </v-list>
         </v-menu>
 
+        <v-menu v-if="canComment || hasComments" location="top">
+          <template #activator="{ props }">
+            <v-btn v-bind="props" :append-icon="icons.usage">
+              Comments
+              <v-chip v-if="openCommentCount" size="x-small" class="ml-2">
+                {{ openCommentCount }}
+              </v-chip>
+            </v-btn>
+          </template>
+          <v-list density="compact">
+            <v-list-item
+              v-if="canComment"
+              :prepend-icon="icons.addComment"
+              title="Add a comment"
+              @click="addComment"
+            />
+            <v-list-item
+              v-if="hasComments"
+              :prepend-icon="icons.comments"
+              title="Show comments"
+              @click="commentsStore.showComments(activeFile.path)"
+            />
+          </v-list>
+        </v-menu>
+
         <template v-slot:append v-if="!workspacesStore.isReadOnly">
           <v-btn
             :disabled="isActiveSaving || !hasActiveChanges"
@@ -111,6 +139,7 @@
 </template>
 
 <script>
+import { useCommentsStore } from '@/stores/comments';
 import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
@@ -118,7 +147,16 @@ import { useWorkspacesStore } from '@/stores/workspaces';
 import { defineAsyncComponent } from 'vue';
 import BrowserViewer from './editors/BrowserViewer.vue';
 import UnsupportedViewer from './editors/UnsupportedViewer.vue';
-import { mdiClose, mdiContentSave, mdiContentSaveAll, mdiMenu, mdiMenuUp } from '@mdi/js';
+import {
+  mdiClose,
+  mdiCommentMultipleOutline,
+  mdiCommentPlusOutline,
+  mdiContentSave,
+  mdiContentSaveAll,
+  mdiMenu,
+  mdiMenuUp,
+} from '@mdi/js';
+import { canCommentOn, openCommentDialog } from '@/utils/comments';
 import { supportVisualEditing } from '@/components/ide/editors/utils';
 import { useTypesStore } from '@/stores/types';
 
@@ -145,7 +183,9 @@ export default {
   data() {
     return {
       icons: {
+        addComment: mdiCommentPlusOutline,
         close: mdiClose,
+        comments: mdiCommentMultipleOutline,
         menu: mdiMenu,
         save: mdiContentSave,
         usage: mdiMenuUp,
@@ -180,6 +220,9 @@ export default {
         this.editorStore.show(value);
       },
     },
+    commentsStore() {
+      return useCommentsStore();
+    },
     editorStore() {
       return useEditorStore();
     },
@@ -194,6 +237,16 @@ export default {
     },
     activeFile() {
       return this.editorStore.active;
+    },
+    openCommentCount() {
+      return this.commentsStore.openCount(this.activeFile.path);
+    },
+    canComment() {
+      return canCommentOn(this.activeFile.path);
+    },
+    // Resolved ones too, which the comments pane shows on request
+    hasComments() {
+      return this.commentsStore.threads.some((thread) => thread.path === this.activeFile.path);
     },
     openedFiles() {
       return this.editorStore.opened;
@@ -224,6 +277,9 @@ export default {
       } else {
         return 'SourceCodeEditor';
       }
+    },
+    addComment() {
+      openCommentDialog(this.$root, this.activeFile.path);
     },
     isDeleted(path) {
       const file = this.filesStore.all[path];

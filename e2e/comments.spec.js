@@ -248,7 +248,7 @@ test.describe('Comments', () => {
     await openWorkspace(page);
     await row(page, 'glossary').click();
     await row(page, 'accuracy.yaml').locator('.comment-count').click();
-    await expect(page.locator('.v-chip').filter({ hasText: 'accuracy.yaml' })).toBeVisible();
+    await expect(page.locator('.comments-filter')).toContainText(FILE);
 
     await expect.poll(() => socket).toBeTruthy();
     const file = {
@@ -267,22 +267,131 @@ test.describe('Comments', () => {
         file,
       }),
     );
-    await expect(page.locator('.v-chip').filter({ hasText: 'precision.yaml' })).toBeVisible();
+    await expect(page.locator('.comments-filter')).toContainText('/glossary/precision.yaml');
   });
 
-  test('comments are sanitized', async ({ page, api }) => {
+  test('comments show HTML as text, and no unsafe links', async ({ page, api }) => {
     api.threads = [
       thread({
         path: FILE,
-        body: '<img src="x" onerror="window.hacked = true"> [link](javascript:window.hacked=true)',
+        body: '<img src="x" onerror="window.hacked = true"> <b>not bold</b> **bold** [link](javascript:window.hacked=true)',
       }),
     ];
     await openWorkspace(page);
     await page.getByRole('tab', { name: /Comments/ }).click();
 
     await expect(threads(page)).toHaveCount(1);
-    await expect(threads(page).locator('.comment-body [onerror]')).toHaveCount(0);
+    const body = threads(page).locator('.comment-body');
+    await expect(body).toContainText(
+      '<img src="x" onerror="window.hacked = true"> <b>not bold</b>',
+    );
+    await expect(body.locator('img, b')).toHaveCount(0);
+    await expect(body.locator('strong')).toHaveText('bold');
     await expect(threads(page).locator('.comment-body a[href^="javascript"]')).toHaveCount(0);
     expect(await page.evaluate(() => window.hacked)).toBeUndefined();
+  });
+
+  test('the comments filter names the file, and shows all again', async ({ page, api }) => {
+    api.threads = [
+      thread({ path: FILE, body: 'On accuracy' }),
+      thread({ id: 'thread-2', path: '/README.md', body: 'On the readme' }),
+    ];
+    await openWorkspace(page);
+    await row(page, 'glossary').click();
+    await row(page, 'accuracy.yaml').locator('.comment-count').click();
+
+    await expect(page.locator('.comments-filter')).toContainText(`Comments on ${FILE} Show all`);
+    await expect(threads(page)).toHaveCount(1);
+    // Threads are titled with the whole path
+    await expect(threads(page).getByRole('link', { name: FILE, exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Show all' }).click();
+    await expect(page.locator('.comments-filter')).toHaveCount(0);
+    await expect(threads(page)).toHaveCount(2);
+  });
+
+  test('comment on the open file from the editor', async ({ page, api }) => {
+    api.threads = [thread({ path: '/README.md', body: 'On the readme' })];
+    await openWorkspace(page);
+    await row(page, 'glossary').click();
+    await row(page, 'accuracy.yaml').click();
+    await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText('accuracy.yaml');
+
+    // The tab tells the path
+    await page.locator('.editor-tabs .v-tab--selected').hover();
+    await expect(
+      page.locator('.v-tooltip .v-overlay__content').filter({ hasText: FILE }),
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: /^Comments/ }).click();
+    await page
+      .locator('.v-overlay--active .v-list-item')
+      .filter({ hasText: 'Add a comment' })
+      .click();
+    await page.getByLabel('Comment', { exact: true }).fill('From the editor');
+    await page.getByRole('button', { name: 'Comment', exact: true }).click();
+    await expect(threads(page)).toHaveCount(1);
+    expect(api.threads.find((t) => t.comments[0].body === 'From the editor').path).toBe(FILE);
+
+    // The bar counts the open threads, and shows those of the file only
+    await page.getByRole('button', { name: 'Show all' }).click();
+    await expect(threads(page)).toHaveCount(2);
+    await page.getByRole('button', { name: /^Comments 1/ }).click();
+    await page
+      .locator('.v-overlay--active .v-list-item')
+      .filter({ hasText: 'Show comments' })
+      .click();
+    await expect(page.locator('.comments-filter')).toContainText(FILE);
+    await expect(threads(page)).toHaveCount(1);
+  });
+
+  test('the editor bar only shows comments that exist', async ({ page, api }) => {
+    api.threads = [thread({ path: FILE, body: 'Resolved already', status: 'resolved' })];
+    await openWorkspace(page);
+    await row(page, 'README.md').click();
+    const bar = page.getByRole('button', { name: /^Comments/ });
+    await bar.click();
+    await expect(page.locator('.v-overlay--active .v-list-item-title')).toHaveText([
+      'Add a comment',
+    ]);
+    await page.keyboard.press('Escape');
+
+    // Resolved threads count as comments to show
+    await row(page, 'glossary').click();
+    await row(page, 'accuracy.yaml').click();
+    await bar.click();
+    await expect(page.locator('.v-overlay--active .v-list-item-title')).toHaveText([
+      'Add a comment',
+      'Show comments',
+    ]);
+  });
+
+  test('viewers can show the comments of the open file, not add one', async ({ page, api }) => {
+    api.workspaces[0].viewer_role = 'readonly';
+    api.threads = [thread({ path: FILE, body: 'On accuracy' })];
+    await openWorkspace(page);
+    await row(page, 'README.md').click();
+    await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText('README.md');
+    await expect(page.getByRole('button', { name: /^Comments/ })).toHaveCount(0);
+
+    await row(page, 'glossary').click();
+    await row(page, 'accuracy.yaml').click();
+    await page.getByRole('button', { name: /^Comments/ }).click();
+    await expect(page.locator('.v-overlay--active .v-list-item-title')).toHaveText([
+      'Show comments',
+    ]);
+  });
+
+  test('the share page tells what the link allows', async ({ page, api }) => {
+    api.sharePreviews.abc = {
+      workspace_title: 'SR update',
+      mode: 'comment',
+      owner_display_name: 'jdoe',
+    };
+    await page.goto('/share/abc');
+
+    await expect(page.getByText('Shared by jdoe')).toBeVisible();
+    await expect(page.locator('.v-alert')).toContainText('You can view and comment');
+    await expect(page.locator('.v-alert')).toContainText('Only the owner changes files.');
   });
 });

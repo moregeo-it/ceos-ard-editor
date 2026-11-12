@@ -142,6 +142,8 @@ export class MockApi {
     this.proposal = null;
     this.threads = [];
     this.shareModes = ['readonly', 'comment'];
+    // Share link token -> preview, redeemed as if logged out
+    this.sharePreviews = {};
     this.requests = [];
   }
 
@@ -248,6 +250,11 @@ export class MockApi {
     }
     if (path === '/shares/modes') {
       return json(route, this.shareModes);
+    }
+    if ((m = path.match(/^\/shares\/([^/]+)(\/redeem)?$/)) && this.sharePreviews[m[1]]) {
+      return m[2]
+        ? json(route, { detail: 'Not authenticated' }, 401)
+        : json(route, this.sharePreviews[m[1]]);
     }
     if (path === '/pfs') {
       // GitHub only provides the folder names of the PFS

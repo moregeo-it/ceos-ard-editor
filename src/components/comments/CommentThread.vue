@@ -5,25 +5,15 @@
     :class="{ 'comment-thread--resolved': resolved }"
   >
     <div class="d-flex align-center ga-1 pl-3 pr-1 pt-1">
-      <v-icon :icon="icons.file" size="x-small" class="text-subtle" />
+      <v-icon :icon="icons.file" size="x-small" class="text-subtle flex-shrink-0" />
       <a
         v-if="!thread.outdated"
         href="#"
-        class="comment-thread-file text-body-2 text-truncate"
-        :title="thread.path"
+        class="comment-thread-file text-body-2"
         @click.prevent="openFile"
-        >{{ fileName }}</a
-      >
-      <span v-else class="text-body-2 text-truncate text-subtle" :title="thread.path">{{
-        fileName
-      }}</span>
-      <v-chip v-if="thread.outdated" size="x-small" color="warning" variant="tonal">
-        File missing
-        <v-tooltip activator="parent" location="top">
-          The file was deleted or moved. The comments are kept.
-        </v-tooltip>
-      </v-chip>
-      <v-chip v-if="resolved" size="x-small" variant="tonal">Resolved</v-chip>
+        ><FilePath :path="thread.path"
+      /></a>
+      <FilePath v-else :path="thread.path" class="comment-thread-file text-body-2 text-subtle" />
       <v-spacer />
       <v-btn
         v-if="canComment"
@@ -39,6 +29,15 @@
           {{ resolved ? 'Reopen' : 'Resolve' }}
         </v-tooltip>
       </v-btn>
+    </div>
+    <div v-if="thread.outdated || resolved" class="d-flex flex-wrap ga-1 px-3">
+      <v-chip v-if="thread.outdated" size="x-small" color="warning" variant="tonal">
+        File missing
+        <v-tooltip activator="parent" location="top">
+          The file was deleted or moved. The comments are kept.
+        </v-tooltip>
+      </v-chip>
+      <v-chip v-if="resolved" size="x-small" variant="tonal">Resolved</v-chip>
     </div>
     <div v-if="resolved && thread.resolved_by" class="text-caption text-subtle px-3">
       Resolved by {{ thread.resolved_by.username }} on {{ formatDate(thread.resolved_at) }}
@@ -155,6 +154,7 @@ import { useEditorStore } from '@/stores/editor';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { renderMarkdown } from '@/utils/markdown';
+import FilePath from './FilePath.vue';
 import {
   mdiCheck,
   mdiDeleteOutline,
@@ -166,6 +166,10 @@ import {
 
 export default {
   name: 'CommentThread',
+
+  components: {
+    FilePath,
+  },
 
   props: {
     thread: { type: Object, required: true },
@@ -205,9 +209,6 @@ export default {
     },
     resolved() {
       return this.thread.status === 'resolved';
-    },
-    fileName() {
-      return this.thread.path.split('/').pop();
     },
   },
 
@@ -338,6 +339,7 @@ export default {
 }
 .comment-thread-file {
   color: inherit;
+  min-width: 0;
 }
 .comment-meta {
   min-width: 0;

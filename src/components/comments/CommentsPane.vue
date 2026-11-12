@@ -1,16 +1,24 @@
 <template>
   <div class="d-flex flex-column fill-height">
+    <div v-if="commentsStore.path" class="comments-filter mx-2 mt-2 pl-2 pr-1 pt-2 pb-1 rounded">
+      <div class="d-flex align-center ga-1 text-caption">
+        <v-icon :icon="icons.file" size="small" />
+        Comments on
+      </div>
+      <FilePath :path="commentsStore.path" class="d-block text-body-2 font-weight-medium" />
+      <div class="d-flex justify-end">
+        <v-btn
+          size="small"
+          variant="text"
+          color="primary"
+          :prepend-icon="icons.close"
+          @click="commentsStore.showComments(null)"
+        >
+          Show all
+        </v-btn>
+      </div>
+    </div>
     <div class="d-flex align-center flex-wrap ga-2 px-2 pt-2 flex-shrink-0">
-      <v-chip
-        v-if="commentsStore.path"
-        size="small"
-        closable
-        :prepend-icon="icons.file"
-        :title="commentsStore.path"
-        @click:close="commentsStore.showComments(null)"
-      >
-        {{ pathName }}
-      </v-chip>
       <v-btn
         v-if="canStartThread"
         size="small"
@@ -19,7 +27,7 @@
         :prepend-icon="icons.add"
         @click="startThread"
       >
-        Comment
+        Add Comment
       </v-btn>
       <v-spacer />
       <v-switch
@@ -48,7 +56,7 @@
       <v-icon :icon="icons.visibility" size="x-small" />
       <span class="text-truncate">Visible to everyone with access</span>
       <span class="d-inline-flex" tabindex="0" aria-label="Who can see comments">
-        <v-icon :icon="icons.info" size="x-small" />
+        <v-icon :icon="icons.info" size="small" />
         <v-tooltip activator="parent" location="top" max-width="320">
           {{ visibilityNote }}
         </v-tooltip>
@@ -59,11 +67,11 @@
 
 <script>
 import CommentThread from './CommentThread.vue';
+import FilePath from './FilePath.vue';
 import { useCommentsStore } from '@/stores/comments';
-import { useFilesStore } from '@/stores/files';
-import { useWorkspacesStore } from '@/stores/workspaces';
-import { COMMENTS_VISIBILITY_NOTE, openCommentDialog } from '@/utils/comments';
+import { COMMENTS_VISIBILITY_NOTE, canCommentOn, openCommentDialog } from '@/utils/comments';
 import {
+  mdiClose,
   mdiCommentMultipleOutline,
   mdiCommentPlusOutline,
   mdiEyeOutline,
@@ -76,12 +84,14 @@ export default {
 
   components: {
     CommentThread,
+    FilePath,
   },
 
   data() {
     return {
       icons: {
         add: mdiCommentPlusOutline,
+        close: mdiClose,
         comments: mdiCommentMultipleOutline,
         file: mdiFileDocumentOutline,
         info: mdiInformationOutline,
@@ -96,9 +106,6 @@ export default {
     commentsStore() {
       return useCommentsStore();
     },
-    pathName() {
-      return this.commentsStore.path?.split('/').pop();
-    },
     resolvedCount() {
       return this.commentsStore.shownThreads.filter((thread) => thread.status === 'resolved')
         .length;
@@ -109,10 +116,7 @@ export default {
     },
     // A new thread can be started right here when the comments are limited to an existing file
     canStartThread() {
-      const file = useFilesStore().all[this.commentsStore.path];
-      return (
-        useWorkspacesStore().canComment && file && !file.is_directory && file.status !== 'deleted'
-      );
+      return canCommentOn(this.commentsStore.path);
     },
     emptyText() {
       if (this.resolvedCount > 0) {
@@ -129,3 +133,9 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.comments-filter {
+  background: rgba(var(--v-theme-primary), 0.08);
+}
+</style>
