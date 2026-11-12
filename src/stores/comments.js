@@ -23,7 +23,9 @@ let revision = 0;
 const changedAt = new Map(); // thread id -> revision of its last local change
 const deleted = new Set();
 
+// `outdated` changes with the files, not `updated_at`: reloads take equal versions, upserts don't
 const isNewer = (thread, than) => !than || thread.updated_at >= than.updated_at;
+const isNewerVersion = (thread, than) => thread.updated_at > than.updated_at;
 
 function touch(threadId) {
   changedAt.set(threadId, ++revision);
@@ -101,7 +103,7 @@ export const useCommentsStore = defineStore('comments', {
       this.path = path;
     },
 
-    /** Add a thread, or replace it unless the shown version is newer. */
+    /** Add a thread, or replace it with a newer version. */
     upsert(thread) {
       if (deleted.has(thread.id)) {
         return;
@@ -109,7 +111,7 @@ export const useCommentsStore = defineStore('comments', {
       const index = this.threads.findIndex((existing) => existing.id === thread.id);
       if (index === -1) {
         this.threads.unshift(thread);
-      } else if (isNewer(thread, this.threads[index])) {
+      } else if (isNewerVersion(thread, this.threads[index])) {
         this.threads[index] = thread;
       } else {
         return;
@@ -222,4 +224,12 @@ export function registerCommentsEventListeners() {
   for (const type of FILE_EXISTENCE_EVENTS) {
     on(type, () => useCommentsStore().load());
   }
+
+  // Saving a deleted file restores it
+  on(EVENTS.FILE_SAVED, (event) => {
+    const comments = useCommentsStore();
+    if (comments.threads.some((thread) => thread.outdated && thread.path === event.path)) {
+      comments.load();
+    }
+  });
 }

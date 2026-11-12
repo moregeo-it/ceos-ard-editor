@@ -56,7 +56,9 @@ page and as the page title.
 
 `index.html` sets a Content-Security-Policy that only allows the editor itself and the API, whose origin
 is filled in from `VITE_API_BASE_URL` at build time. The preview inherits it, so a workspace can't make
-its viewers load images, styles or fonts from other hosts, e.g. tracking pixels. Styles allow
+its viewers load images, styles or fonts from other hosts, e.g. tracking pixels. Images may also come
+from `avatars.githubusercontent.com`, for the avatars of the comments. The preview inherits this too, so
+workspace content can show GitHub avatars, but only GitHub sees those requests. Styles allow
 `'unsafe-inline'` (Vuetify, CodeMirror and the preview use inline styles) and scripts allow `'unsafe-eval'`
 (the form editor compiles the JSON schemas with Ajv).
 

@@ -127,7 +127,7 @@
                 type="submit"
                 color="primary"
                 :loading="isCreatingLink"
-                :disabled="shareStore.isLoadingShares"
+                :disabled="!canCreateLink"
               >
                 Create link
               </v-btn>
@@ -238,6 +238,8 @@ export default {
       isInviting: false,
       linkMode: 'readonly',
       isCreatingLink: false,
+      // Until then, the selections may hold a mode the server doesn't grant
+      modesLoaded: false,
       commentsVisibilityNote: COMMENTS_VISIBILITY_NOTE,
       // Collaborator id -> timer of a removal that can still be undone, null once it is being sent
       removals: {},
@@ -266,8 +268,28 @@ export default {
     },
     canInvite() {
       return (
-        this.invitees.length > 0 && !this.isInviting && !this.shareStore.isLoadingCollaborators
+        this.invitees.length > 0 &&
+        !this.isInviting &&
+        !this.shareStore.isLoadingCollaborators &&
+        this.isGrantable(this.inviteMode)
       );
+    },
+    canCreateLink() {
+      return (
+        !this.isCreatingLink && !this.shareStore.isLoadingShares && this.isGrantable(this.linkMode)
+      );
+    },
+  },
+
+  watch: {
+    // Keep both selections on a mode the server grants
+    modeOptions: {
+      immediate: true,
+      handler(options) {
+        const modes = options.map((option) => option.value);
+        if (modes.length && !modes.includes(this.inviteMode)) this.inviteMode = modes[0];
+        if (modes.length && !modes.includes(this.linkMode)) this.linkMode = modes[0];
+      },
     },
   },
 
@@ -286,13 +308,17 @@ export default {
       this.shareStore.setActiveWorkspace(this.workspace.id);
       try {
         await Promise.all([
-          this.shareStore.fetchModes(),
+          this.shareStore.fetchModes().then(() => (this.modesLoaded = true)),
           this.shareStore.fetchCollaborators(this.workspace.id),
           this.shareStore.fetchShares(this.workspace.id),
         ]);
       } catch (error) {
         this.notificationsStore.error(`Failed to load sharing info: ${error.message}`);
       }
+    },
+
+    isGrantable(mode) {
+      return this.modesLoaded && this.shareStore.modes.includes(mode);
     },
 
     // A collaborator keeps showing their mode even if it can no longer be granted
@@ -381,6 +407,8 @@ export default {
     },
 
     async createLink() {
+      if (!this.canCreateLink) return;
+
       this.isCreatingLink = true;
       try {
         await this.shareStore.createShare(this.workspace.id, this.linkMode);

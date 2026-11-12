@@ -8,6 +8,7 @@
           <v-textarea
             v-model="body"
             label="Comment"
+            :readonly="accepting"
             hint="Markdown is supported. Press Ctrl+Enter to send."
             persistent-hint
             auto-grow

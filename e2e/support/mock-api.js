@@ -403,6 +403,7 @@ export class MockApi {
     }
     const found = this.threads.find((t) => t.id === threadId);
     if (!found) return json(route, { detail: 'Thread not found' }, 404);
+    if (method !== 'GET') found.updated_at = now;
     if (!commentId && sub.endsWith('/comments')) {
       const id = `${threadId}-c${found.comments.length + 1}`;
       found.comments.push({

@@ -55,12 +55,20 @@
       <!-- Title area -->
       <div class="file-tree-title flex-grow-1 overflow-hidden">
         <div class="d-flex align-center justify-space-between">
-          <span ref="nameEl" class="file-tree-name">{{ item.name }}</span>
+          <span
+            ref="nameEl"
+            class="file-tree-name"
+            :class="{ 'file-tree-name--result': isSearchResult && folder }"
+            >{{ item.name }}</span
+          >
+          <span v-if="isSearchResult && folder" class="file-tree-folder text-caption text-subtle">
+            <span class="file-tree-folder-dot">·</span>
+            <span class="file-tree-folder-path"
+              ><span class="file-tree-folder-text">{{ folder }}</span></span
+            >
+          </span>
           <CommentCount v-if="item.type === 'file'" :path="item.path" class="ml-1 flex-shrink-0" />
           <FileStatusBadge v-if="item.status" :status="item.status" class="ml-2" />
-        </div>
-        <div v-if="isSearchResult && folder" class="file-tree-folder text-caption text-subtle">
-          {{ folder }}
         </div>
         <div v-if="item.excerpt" class="text-caption text-pre-wrap text-subtle">
           {{ item.excerpt }}
@@ -195,10 +203,36 @@ export default {
   user-select: none;
 }
 
+/* In search results the name gets the room first; the folder gives way, losing its start */
+.file-tree-name.file-tree-name--result {
+  flex: 0 1 auto;
+}
+
 .file-tree-folder {
+  display: flex;
+  align-items: baseline;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.file-tree-folder-dot {
+  flex-shrink: 0;
+  padding: 0 0.3em;
+}
+
+.file-tree-folder-path {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.file-tree-folder-text {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 .file-tree-row:hover {

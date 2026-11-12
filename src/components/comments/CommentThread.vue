@@ -96,6 +96,7 @@
       >
         <v-textarea
           v-model="editBody"
+          aria-label="Edit comment"
           :readonly="isSaving"
           auto-grow
           rows="2"
@@ -127,6 +128,7 @@
     <v-form v-if="canComment" class="px-3 pb-3" @submit.prevent="sendReply">
       <v-textarea
         v-model="replyBody"
+        aria-label="Reply"
         :readonly="isReplying"
         placeholder="Reply…"
         auto-grow

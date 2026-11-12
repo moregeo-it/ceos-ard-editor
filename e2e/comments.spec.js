@@ -142,6 +142,28 @@ test.describe('Comments', () => {
     await expect(page.locator('.v-select__content .v-list-item')).toHaveText(['View only']);
   });
 
+  test('the share dialog only grants enabled modes', async ({ page, api }) => {
+    api.shareModes = ['comment'];
+    await openWorkspace(page);
+    await page.getByRole('button', { name: 'Share' }).click();
+
+    const dialog = page.locator('.v-dialog');
+    await expect(dialog.locator('.v-select').filter({ hasText: 'Access' }).first()).toContainText(
+      'Can comment',
+    );
+    await dialog.getByLabel('GitHub username(s)').fill('mmohr');
+    await dialog.getByRole('button', { name: 'Invite' }).click();
+    await expect
+      .poll(() =>
+        api.requests.find((r) => r.method === 'POST' && r.path.endsWith('/collaborators')),
+      )
+      .toBeTruthy();
+    const invite = api.requests.find(
+      (r) => r.method === 'POST' && r.path.endsWith('/collaborators'),
+    );
+    expect(JSON.parse(invite.body).mode).toBe('comment');
+  });
+
   test('commenters comment, but neither edit files nor delete comments of others', async ({
     page,
     api,
@@ -239,6 +261,39 @@ test.describe('Comments', () => {
     await page.getByRole('tab', { name: 'Files' }).click();
     await page.getByRole('tab', { name: /Comments/ }).click();
     await expect(threads(page)).toHaveCount(0);
+  });
+
+  test('a missing file stays missing until a newer version or a reload', async ({ page, api }) => {
+    let socket;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    const missing = thread({ path: FILE, body: 'On accuracy', outdated: true });
+    api.threads = [missing];
+    await openWorkspace(page);
+    await page.getByRole('tab', { name: /Comments/ }).click();
+    await expect(threads(page).getByText('File missing')).toBeVisible();
+    await expect.poll(() => socket).toBeTruthy();
+
+    const send = (type, fields) =>
+      socket.send(JSON.stringify({ type, ts: new Date().toISOString(), path: FILE, ...fields }));
+    // The same version from before the file went: not applied
+    send('thread.updated', {
+      actor_user_id: OTHER.user_id,
+      thread: { ...missing, outdated: false },
+    });
+    send('thread.created', {
+      actor_user_id: OTHER.user_id,
+      thread: thread({ id: 'marker', path: '/README.md', body: 'Marker' }),
+    });
+    await expect(threads(page)).toContainText(['Marker']);
+    await expect(threads(page).getByText('File missing')).toBeVisible();
+
+    // Saving the file restores it
+    api.threads = [{ ...missing, outdated: false }];
+    send('file.saved', {
+      actor_user_id: 'user-1',
+      file: { name: 'accuracy.yaml', path: FILE, is_directory: false, status: 'modified' },
+    });
+    await expect(threads(page).getByText('File missing')).toHaveCount(0);
   });
 
   test('the file filter follows a rename', async ({ page, api }) => {

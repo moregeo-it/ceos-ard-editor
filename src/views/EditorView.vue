@@ -85,8 +85,8 @@ export default {
   },
   data() {
     const panelSizeDefaults = {
-      files: 15,
-      editor: 50,
+      files: 20,
+      editor: 45,
       preview: 35,
     };
     return {

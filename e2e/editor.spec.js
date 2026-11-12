@@ -302,11 +302,17 @@ test.describe('Editor', () => {
 
     await page.getByRole('textbox', { name: 'Search files and folders...' }).fill('document');
     const results = page.locator('.file-tree-row').filter({ hasText: 'document.yaml' });
-    await expect(results.locator('.file-tree-folder')).toHaveText(['pfs/NRB', 'pfs/SR']);
+    await expect(results.locator('.file-tree-folder-path')).toHaveText(['pfs/NRB', 'pfs/SR']);
 
     await results.nth(0).click();
     await results.nth(1).click();
     await expect(page.locator('.editor-tabs .v-tab .file-folder')).toHaveText(['· NRB', '· SR']);
+    // The active file's whole path shows below the tabs
+    await expect(page.getByRole('navigation', { name: 'File path' }).locator('span')).toHaveText([
+      'pfs',
+      'SR',
+      'document.yaml',
+    ]);
   });
 });
 
