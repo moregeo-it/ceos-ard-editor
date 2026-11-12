@@ -21,6 +21,8 @@
             <span class="file-name" :class="{ 'file-deleted': isDeleted(file.path) }">{{
               file.name
             }}</span
+            ><span v-if="folderHints[file.path]" class="file-folder text-subtle">
+              · {{ folderHints[file.path] }}</span
             ><span class="file-changed">
               <template v-if="editorStore.changed[file.path]">*</template>
               <template v-else>&nbsp;</template>
@@ -157,6 +159,7 @@ import {
   mdiMenuUp,
 } from '@mdi/js';
 import { canCommentOn, openCommentDialog } from '@/utils/comments';
+import { folderHints } from '@/utils/paths';
 import { supportVisualEditing } from '@/components/ide/editors/utils';
 import { useTypesStore } from '@/stores/types';
 
@@ -251,6 +254,10 @@ export default {
     openedFiles() {
       return this.editorStore.opened;
     },
+    // Tells apart open files of the same name, e.g. the document.yaml of each PFS
+    folderHints() {
+      return folderHints(this.openedFiles.map((file) => file.path));
+    },
     hasActiveChanges() {
       return this.activeFile && this.editorStore.changed[this.activeFile.path];
     },
@@ -325,6 +332,9 @@ export default {
 </script>
 
 <style lang="css" scoped>
+.file-folder {
+  font-size: 0.85em;
+}
 .file-changed {
   width: 0.75rem;
   display: inline-block;

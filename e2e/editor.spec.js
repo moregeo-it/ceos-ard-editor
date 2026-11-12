@@ -296,6 +296,18 @@ test.describe('Editor', () => {
     await expect(row(page, 'unused.yaml')).toHaveCount(0);
     await expect(page.locator('.file-tree')).toContainText('Metadata shall be machine readable.');
   });
+
+  test('search results and tabs tell files of the same name apart', async ({ page }) => {
+    await openWorkspace(page);
+
+    await page.getByRole('textbox', { name: 'Search files and folders...' }).fill('document');
+    const results = page.locator('.file-tree-row').filter({ hasText: 'document.yaml' });
+    await expect(results.locator('.file-tree-folder')).toHaveText(['pfs/NRB', 'pfs/SR']);
+
+    await results.nth(0).click();
+    await results.nth(1).click();
+    await expect(page.locator('.editor-tabs .v-tab .file-folder')).toHaveText(['· NRB', '· SR']);
+  });
 });
 
 test.describe('Preview', () => {

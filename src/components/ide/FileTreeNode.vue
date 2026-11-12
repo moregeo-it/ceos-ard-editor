@@ -27,8 +27,8 @@
         activator="parent"
         location="top"
         open-delay="100"
-        :disabled="!isTruncated"
-        :text="item.name"
+        :disabled="!isTruncated && !isSearchResult"
+        :text="isSearchResult ? item.path : item.name"
       />
       <!-- Toggle button (folders only) -->
       <div class="file-tree-toggle" v-if="item.type === 'folder'">
@@ -58,6 +58,9 @@
           <span ref="nameEl" class="file-tree-name">{{ item.name }}</span>
           <CommentCount v-if="item.type === 'file'" :path="item.path" class="ml-1 flex-shrink-0" />
           <FileStatusBadge v-if="item.status" :status="item.status" class="ml-2" />
+        </div>
+        <div v-if="isSearchResult && folder" class="file-tree-folder text-caption text-subtle">
+          {{ folder }}
         </div>
         <div v-if="item.excerpt" class="text-caption text-pre-wrap text-subtle">
           {{ item.excerpt }}
@@ -102,6 +105,7 @@ import {
 } from '@mdi/js';
 import CommentCount from '../comments/CommentCount.vue';
 import FileStatusBadge from '../FileStatusBadge.vue';
+import { folderOf } from '@/utils/paths';
 
 export default {
   name: 'FileTreeNode',
@@ -131,6 +135,13 @@ export default {
   computed: {
     isOpen() {
       return this.openedSet.has(this.item.path);
+    },
+    // Search results are listed flat, so they tell their folder
+    isSearchResult() {
+      return Boolean(this.item.resultType);
+    },
+    folder() {
+      return folderOf(this.item.path);
     },
     isActivated() {
       return this.activatedPath === this.item.path;
@@ -182,6 +193,12 @@ export default {
   padding: 0.2rem 0.5rem 0.2rem 0;
   min-height: 2rem;
   user-select: none;
+}
+
+.file-tree-folder {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .file-tree-row:hover {
