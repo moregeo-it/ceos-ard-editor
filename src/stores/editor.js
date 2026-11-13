@@ -6,6 +6,7 @@ import { useNotificationsStore } from './notifications';
 import { supportVisualEditing } from '@/components/ide/editors/utils';
 
 import { EVENTS, on, workspaceSession } from '@/services/events';
+import { displayPath } from '@/utils/paths';
 
 // The latest save per file path, which the next save of that file waits for
 const savesInFlight = {};
@@ -61,7 +62,7 @@ export const useEditorStore = defineStore('editor', {
         if (forceSourceCodeEditor && isVisual) {
           if (this.changed[path]) {
             useNotificationsStore().warning(
-              `${path} is open in the visual editor with unsaved changes. ` +
+              `${displayPath(path)} is open in the visual editor with unsaved changes. ` +
                 'Save or discard them first, then open it in the source code editor again.',
             );
           } else {
@@ -373,7 +374,7 @@ export function registerEditorEventListeners() {
     if (editor.changed[event.path]) {
       // Saved elsewhere by this user while this tab has unsaved edits (or got some while loading): keep them.
       useNotificationsStore().warning(
-        `${event.path} was saved elsewhere; this tab keeps its unsaved changes.`,
+        `${displayPath(event.path)} was saved elsewhere; this tab keeps its unsaved changes.`,
       );
     }
   });

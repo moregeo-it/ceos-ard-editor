@@ -47,6 +47,7 @@
               Type a GitHub username and press Enter or Invite. To invite several people at once,
               separate their usernames with commas or spaces.
             </p>
+            <p class="text-body-2 text-medium-emphasis mt-2 mb-0">{{ commentsVisibilityNote }}</p>
 
             <v-list class="mt-4">
               <v-list-item v-if="shareStore.isLoadingCollaborators">
@@ -79,7 +80,7 @@
                   <template v-else>
                     <v-select
                       :model-value="share.mode"
-                      :items="modeOptions"
+                      :items="modeOptionsWith(share.mode)"
                       density="compact"
                       hide-details
                       variant="underlined"
@@ -126,7 +127,7 @@
                 type="submit"
                 color="primary"
                 :loading="isCreatingLink"
-                :disabled="shareStore.isLoadingShares"
+                :disabled="!canCreateLink"
               >
                 Create link
               </v-btn>
@@ -206,6 +207,7 @@ import DialogMixin from '@/components/DialogMixin';
 import { useShareStore } from '@/stores/share';
 import { useNotificationsStore } from '@/stores/notifications';
 import { ACCESS_MODES, shareModeLabel } from '@/utils/shareMode';
+import { COMMENTS_VISIBILITY_NOTE } from '@/utils/comments';
 
 // How long a removal can be undone before it is sent
 const UNDO_SECONDS = 10;
@@ -236,7 +238,9 @@ export default {
       isInviting: false,
       linkMode: 'readonly',
       isCreatingLink: false,
-      modeOptions: ACCESS_MODES,
+      // Until then, the selections may hold a mode the server doesn't grant
+      modesLoaded: false,
+      commentsVisibilityNote: COMMENTS_VISIBILITY_NOTE,
       // Collaborator id -> timer of a removal that can still be undone, null once it is being sent
       removals: {},
     };
@@ -245,6 +249,9 @@ export default {
   computed: {
     shareStore() {
       return useShareStore();
+    },
+    modeOptions() {
+      return ACCESS_MODES.filter((mode) => this.shareStore.modes.includes(mode.value));
     },
     notificationsStore() {
       return useNotificationsStore();
@@ -261,8 +268,28 @@ export default {
     },
     canInvite() {
       return (
-        this.invitees.length > 0 && !this.isInviting && !this.shareStore.isLoadingCollaborators
+        this.invitees.length > 0 &&
+        !this.isInviting &&
+        !this.shareStore.isLoadingCollaborators &&
+        this.isGrantable(this.inviteMode)
       );
+    },
+    canCreateLink() {
+      return (
+        !this.isCreatingLink && !this.shareStore.isLoadingShares && this.isGrantable(this.linkMode)
+      );
+    },
+  },
+
+  watch: {
+    // Keep both selections on a mode the server grants
+    modeOptions: {
+      immediate: true,
+      handler(options) {
+        const modes = options.map((option) => option.value);
+        if (modes.length && !modes.includes(this.inviteMode)) this.inviteMode = modes[0];
+        if (modes.length && !modes.includes(this.linkMode)) this.linkMode = modes[0];
+      },
     },
   },
 
@@ -281,12 +308,24 @@ export default {
       this.shareStore.setActiveWorkspace(this.workspace.id);
       try {
         await Promise.all([
+          this.shareStore.fetchModes().then(() => (this.modesLoaded = true)),
           this.shareStore.fetchCollaborators(this.workspace.id),
           this.shareStore.fetchShares(this.workspace.id),
         ]);
       } catch (error) {
         this.notificationsStore.error(`Failed to load sharing info: ${error.message}`);
       }
+    },
+
+    isGrantable(mode) {
+      return this.modesLoaded && this.shareStore.modes.includes(mode);
+    },
+
+    // A collaborator keeps showing their mode even if it can no longer be granted
+    modeOptionsWith(current) {
+      return ACCESS_MODES.filter(
+        (mode) => mode.value === current || this.shareStore.modes.includes(mode.value),
+      );
     },
 
     modeLabel(mode) {
@@ -368,6 +407,8 @@ export default {
     },
 
     async createLink() {
+      if (!this.canCreateLink) return;
+
       this.isCreatingLink = true;
       try {
         await this.shareStore.createShare(this.workspace.id, this.linkMode);

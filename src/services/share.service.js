@@ -47,6 +47,11 @@ export default {
     return api.delete(`/workspaces/${workspaceId}/collaborators/${collaboratorId}`, options);
   },
 
+  /** The access modes the server lets owners grant, e.g. `['readonly', 'comment']`. */
+  async listModes() {
+    return api.get('/shares/modes');
+  },
+
   /**
    * List the shares (links) of a workspace. Owner only.
    */

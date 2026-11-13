@@ -21,6 +21,8 @@
             <span class="file-name" :class="{ 'file-deleted': isDeleted(file.path) }">{{
               file.name
             }}</span
+            ><span v-if="folderHints[file.path]" class="file-folder text-subtle">
+              · {{ folderHints[file.path] }}</span
             ><span class="file-changed">
               <template v-if="editorStore.changed[file.path]">*</template>
               <template v-else>&nbsp;</template>
@@ -34,6 +36,9 @@
             variant="text"
             @click.stop="close(file.path)"
           />
+          <v-tooltip activator="parent" location="bottom" :open-delay="500">
+            <FilePath :path="file.path" />
+          </v-tooltip>
         </v-tab>
       </v-tabs>
 
@@ -90,6 +95,31 @@
           </v-list>
         </v-menu>
 
+        <v-menu v-if="canComment || hasComments" location="top">
+          <template #activator="{ props }">
+            <v-btn v-bind="props" :append-icon="icons.usage">
+              Comments
+              <v-chip v-if="openCommentCount" size="x-small" class="ml-2">
+                {{ openCommentCount }}
+              </v-chip>
+            </v-btn>
+          </template>
+          <v-list density="compact">
+            <v-list-item
+              v-if="canComment"
+              :prepend-icon="icons.addComment"
+              title="Add a comment"
+              @click="addComment"
+            />
+            <v-list-item
+              v-if="hasComments"
+              :prepend-icon="icons.comments"
+              title="Show comments"
+              @click="commentsStore.showComments(activeFile.path)"
+            />
+          </v-list>
+        </v-menu>
+
         <template v-slot:append v-if="!workspacesStore.isReadOnly">
           <v-btn
             :disabled="isActiveSaving || !hasActiveChanges"
@@ -111,14 +141,26 @@
 </template>
 
 <script>
+import { useCommentsStore } from '@/stores/comments';
 import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { defineAsyncComponent } from 'vue';
 import BrowserViewer from './editors/BrowserViewer.vue';
+import FilePath from '../FilePath.vue';
 import UnsupportedViewer from './editors/UnsupportedViewer.vue';
-import { mdiClose, mdiContentSave, mdiContentSaveAll, mdiMenu, mdiMenuUp } from '@mdi/js';
+import {
+  mdiClose,
+  mdiCommentMultipleOutline,
+  mdiCommentPlusOutline,
+  mdiContentSave,
+  mdiContentSaveAll,
+  mdiMenu,
+  mdiMenuUp,
+} from '@mdi/js';
+import { canCommentOn, openCommentDialog } from '@/utils/comments';
+import { displayPath, folderHints } from '@/utils/paths';
 import { supportVisualEditing } from '@/components/ide/editors/utils';
 import { useTypesStore } from '@/stores/types';
 
@@ -137,6 +179,7 @@ export default {
 
   components: {
     BrowserViewer,
+    FilePath,
     SourceCodeEditor: defineAsyncComponent(() => import('./editors/SourceCodeEditor.vue')),
     UnsupportedViewer,
     JsonSchemaEditor: defineAsyncComponent(() => import('./editors/JsonSchemaEditor.vue')),
@@ -145,7 +188,9 @@ export default {
   data() {
     return {
       icons: {
+        addComment: mdiCommentPlusOutline,
         close: mdiClose,
+        comments: mdiCommentMultipleOutline,
         menu: mdiMenu,
         save: mdiContentSave,
         usage: mdiMenuUp,
@@ -180,6 +225,9 @@ export default {
         this.editorStore.show(value);
       },
     },
+    commentsStore() {
+      return useCommentsStore();
+    },
     editorStore() {
       return useEditorStore();
     },
@@ -195,8 +243,22 @@ export default {
     activeFile() {
       return this.editorStore.active;
     },
+    openCommentCount() {
+      return this.commentsStore.openCount(this.activeFile.path);
+    },
+    canComment() {
+      return canCommentOn(this.activeFile.path);
+    },
+    // Resolved ones too, which the comments pane shows on request
+    hasComments() {
+      return this.commentsStore.threads.some((thread) => thread.path === this.activeFile.path);
+    },
     openedFiles() {
       return this.editorStore.opened;
+    },
+    // Tells apart open files of the same name, e.g. the document.yaml of each PFS
+    folderHints() {
+      return folderHints(this.openedFiles.map((file) => file.path));
     },
     hasActiveChanges() {
       return this.activeFile && this.editorStore.changed[this.activeFile.path];
@@ -225,6 +287,9 @@ export default {
         return 'SourceCodeEditor';
       }
     },
+    addComment() {
+      openCommentDialog(this.$root, this.activeFile.path);
+    },
     isDeleted(path) {
       const file = this.filesStore.all[path];
       return !file || file.status === 'deleted';
@@ -236,7 +301,9 @@ export default {
     async save(path) {
       const result = await this.editorStore.save(path);
       if (result instanceof Error) {
-        this.notificationsStore.error(`Failed to save file ${path}: ${result.message}`);
+        this.notificationsStore.error(
+          `Failed to save file ${displayPath(path)}: ${result.message}`,
+        );
       }
     },
     async saveAll() {
@@ -256,7 +323,7 @@ export default {
       if (this.editorStore.changed[path]) {
         this.$root.openDialog('ConfirmDialog', {
           title: 'Unsaved Changes',
-          message: `The file "${path}" has unsaved changes. Are you sure you want to close it? Unsaved changes will be lost.`,
+          message: `The file "${displayPath(path)}" has unsaved changes. Are you sure you want to close it? Unsaved changes will be lost.`,
           confirmButton: 'Discard Changes',
           onAcceptance: () => this.editorStore.close(path),
         });
@@ -269,6 +336,9 @@ export default {
 </script>
 
 <style lang="css" scoped>
+.file-folder {
+  font-size: 0.85em;
+}
 .file-changed {
   width: 0.75rem;
   display: inline-block;

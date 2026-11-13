@@ -76,6 +76,7 @@ test.describe('File tree', () => {
 
     expect(await menuEntries(page, 'document.yaml')).toEqual([
       'Open in Source Code Editor',
+      'Comment',
       'Download',
     ]);
   });
@@ -86,6 +87,7 @@ test.describe('File tree', () => {
 
     expect(await menuEntries(page, 'unused.yaml')).toEqual([
       'Open in Source Code Editor',
+      'Comment',
       'Download',
       'Rename',
       'Delete',
@@ -293,6 +295,26 @@ test.describe('Editor', () => {
     await expect(row(page, 'metadata-machine-readable.yaml')).toBeVisible();
     await expect(row(page, 'unused.yaml')).toHaveCount(0);
     await expect(page.locator('.file-tree')).toContainText('Metadata shall be machine readable.');
+  });
+
+  test('the header buttons are as tall as the view switch', async ({ page }) => {
+    await openWorkspace(page);
+    const height = async (locator) => (await locator.boundingBox()).height;
+    const toggle = await height(page.locator('.v-app-bar .v-btn-group'));
+    expect(await height(page.getByRole('button', { name: 'Share' }))).toBe(toggle);
+    expect(await height(page.getByRole('button', { name: 'jdoe' }))).toBe(toggle);
+  });
+
+  test('search results and tabs tell files of the same name apart', async ({ page }) => {
+    await openWorkspace(page);
+
+    await page.getByRole('textbox', { name: 'Search files and folders...' }).fill('document');
+    const results = page.locator('.file-tree-row').filter({ hasText: 'document.yaml' });
+    await expect(results.locator('.file-tree-folder-path')).toHaveText(['pfs/NRB', 'pfs/SR']);
+
+    await results.nth(0).click();
+    await results.nth(1).click();
+    await expect(page.locator('.editor-tabs .v-tab .file-folder')).toHaveText(['· NRB', '· SR']);
   });
 });
 
@@ -757,7 +779,7 @@ test.describe('Propose', () => {
     api.diffs = [{ path: '/notes.md', status: 'modified' }];
     api.fileDiffs.set('/notes.md', diff('First version'));
     await page.goto('/workspaces/ws-1/propose');
-    await page.locator('.changes-overview').getByText('/notes.md').click();
+    await page.locator('.changes-overview .file-path', { hasText: 'notes.md' }).click();
     const changes = page.locator('.diff2html-container');
     await expect(changes).toContainText('First version');
     await expect.poll(() => socket).toBeTruthy();
@@ -784,7 +806,7 @@ test.describe('Propose', () => {
     api.diffs = [{ path: '/notes.md', status: 'added' }];
     await page.goto('/workspaces/ws-1/propose');
     const overview = page.locator('.changes-overview');
-    await expect(overview).toContainText('/notes.md');
+    await expect(overview).toContainText('notes.md');
     await expect.poll(() => socket).toBeTruthy();
 
     // The refresh after the other tab's change gets the list from before the commit, but late

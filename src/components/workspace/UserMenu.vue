@@ -1,7 +1,13 @@
 <template>
   <v-menu v-model="showMenu" location="bottom end">
     <template v-slot:activator="{ props }">
-      <v-btn v-bind="props" variant="text" :prepend-icon="icons.accountCircle">
+      <v-btn v-bind="props" variant="text">
+        <template v-slot:prepend>
+          <v-avatar v-if="avatarUrl" size="35" class="user-avatar">
+            <v-img :src="avatarUrl" alt="" />
+          </v-avatar>
+          <v-icon v-else :icon="icons.accountCircle" />
+        </template>
         {{ username }}
         <v-icon :icon="icons.menuDown" />
       </v-btn>
@@ -21,6 +27,7 @@
 <script>
 import { useAuthStore } from '@/stores/auth';
 import { useNotificationsStore } from '@/stores/notifications';
+import { githubAvatarUrl } from '@/utils/avatars';
 import { mdiAccountCircle, mdiMenuDown, mdiLogout } from '@mdi/js';
 
 export default {
@@ -48,6 +55,11 @@ export default {
 
     username() {
       return this.authStore.username || 'User';
+    },
+
+    // Until a session stored by an older editor is confirmed, which adds it
+    avatarUrl() {
+      return this.authStore.githubId ? githubAvatarUrl(this.authStore.githubId) : null;
     },
   },
 

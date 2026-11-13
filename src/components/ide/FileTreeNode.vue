@@ -20,16 +20,7 @@
       @click="handleClick"
       @keydown.enter.prevent="handleClick"
       @keydown.space.prevent="handleClick"
-      @mouseenter="checkTruncated"
-      @focus="checkTruncated"
     >
-      <v-tooltip
-        activator="parent"
-        location="top"
-        open-delay="100"
-        :disabled="!isTruncated"
-        :text="item.name"
-      />
       <!-- Toggle button (folders only) -->
       <div class="file-tree-toggle" v-if="item.type === 'folder'">
         <v-btn
@@ -54,8 +45,36 @@
 
       <!-- Title area -->
       <div class="file-tree-title flex-grow-1 overflow-hidden">
-        <div class="d-flex align-center justify-space-between">
-          <span ref="nameEl" class="file-tree-name">{{ item.name }}</span>
+        <div class="d-flex align-center">
+          <span
+            class="file-tree-label"
+            :class="{ 'file-tree-label--result': isSearchResult }"
+            @mouseenter="checkTruncated"
+          >
+            <v-tooltip
+              activator="parent"
+              location="top"
+              open-delay="100"
+              :disabled="!isTruncated && !isSearchResult"
+            >
+              <FilePath v-if="isSearchResult" :path="item.path" />
+              <template v-else>{{ item.name }}</template>
+            </v-tooltip>
+            <span
+              ref="nameEl"
+              class="file-tree-name"
+              :class="{ 'file-tree-name--result': isSearchResult && folder }"
+              >{{ item.name }}</span
+            >
+            <span v-if="isSearchResult && folder" class="file-tree-folder text-caption text-subtle">
+              <span class="file-tree-folder-dot">·</span>
+              <span class="file-tree-folder-path"
+                ><FilePath :path="folder" class="file-tree-folder-text"
+              /></span>
+            </span>
+          </span>
+          <span class="flex-grow-1" />
+          <CommentCount v-if="item.type === 'file'" :path="item.path" class="ml-1 flex-shrink-0" />
           <FileStatusBadge v-if="item.status" :status="item.status" class="ml-2" />
         </div>
         <div v-if="item.excerpt" class="text-caption text-pre-wrap text-subtle">
@@ -99,12 +118,17 @@ import {
   mdiChevronDown,
   mdiChevronRight,
 } from '@mdi/js';
+import CommentCount from '../comments/CommentCount.vue';
+import FilePath from '../FilePath.vue';
 import FileStatusBadge from '../FileStatusBadge.vue';
+import { folderOf } from '@/utils/paths';
 
 export default {
   name: 'FileTreeNode',
 
   components: {
+    CommentCount,
+    FilePath,
     FileStatusBadge,
   },
 
@@ -128,6 +152,13 @@ export default {
   computed: {
     isOpen() {
       return this.openedSet.has(this.item.path);
+    },
+    // Search results are listed flat, so they tell their folder
+    isSearchResult() {
+      return Boolean(this.item.resultType);
+    },
+    folder() {
+      return folderOf(this.item.path);
     },
     isActivated() {
       return this.activatedPath === this.item.path;
@@ -179,6 +210,50 @@ export default {
   padding: 0.2rem 0.5rem 0.2rem 0;
   min-height: 2rem;
   user-select: none;
+}
+
+/* The name (and folder) only, so the badge and buttons don't open the path tooltip */
+.file-tree-label {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.file-tree-label.file-tree-label--result {
+  flex: 1 1 auto;
+}
+
+/* In search results the name gets the room first; the folder gives way, losing its start */
+.file-tree-name.file-tree-name--result {
+  flex: 0 1 auto;
+}
+
+.file-tree-folder {
+  display: flex;
+  align-items: baseline;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.file-tree-folder-dot {
+  flex-shrink: 0;
+  padding: 0 0.3em;
+}
+
+.file-tree-folder-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
+.file-tree-folder-text {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 .file-tree-row:hover {

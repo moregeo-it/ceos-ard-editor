@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia';
 import router from '@/router';
 
+import { useAuthStore } from './auth';
+import { useCommentsStore } from './comments';
 import { useEditorStore } from './editor';
 import { useFilesStore } from './files';
 import { useNotificationsStore } from './notifications';
@@ -52,13 +54,18 @@ export const useWorkspacesStore = defineStore('workspaces', {
       return state.currentWorkspace?.status === 'archived' || false;
     },
 
-    // "owner" | "readonly" | undefined (not yet loaded)
+    // "owner" | "comment" | "readonly" | undefined (not yet loaded)
     viewerRole: (state) => {
       return state.currentWorkspace?.viewer_role;
     },
 
     isOwner: (state) => {
       return state.currentWorkspace?.viewer_role === 'owner';
+    },
+
+    // The owner and commenters write comments; nobody while the workspace is archived
+    canComment() {
+      return ['owner', 'comment'].includes(this.viewerRole) && !this.isArchived;
     },
 
     // Only the owner edits, and nobody while the workspace is archived or the role is still
@@ -315,6 +322,7 @@ export const useWorkspacesStore = defineStore('workspaces', {
       }
       startWorkspaceSession();
       this.upstream = null;
+      useCommentsStore().reset();
       useEditorStore().reset();
       useFilesStore().reset();
       usePreviewStore().reset();
@@ -333,6 +341,7 @@ export const useWorkspacesStore = defineStore('workspaces', {
     leaveWorkspace() {
       startWorkspaceSession();
       useRealtimeStore().reset();
+      useCommentsStore().reset();
       useEditorStore().reset();
       useFilesStore().reset();
       useNotificationsStore().reset();
@@ -394,10 +403,15 @@ export function registerWorkspacesEventListeners() {
     }
   });
 
-  // The owner changed this user's mode; viewer_role on the refetched workspace drives the UI
-  on(EVENTS.COLLABORATOR_UPDATED, async () => {
+  // This user's mode changed, by the owner or by redeeming a share link in another tab;
+  // viewer_role on the refetched workspace drives the UI
+  on(EVENTS.COLLABORATOR_UPDATED, async (event) => {
     if (await useWorkspacesStore().refreshCurrentWorkspace()) {
-      useNotificationsStore().info('The owner changed your access to this workspace.');
+      useNotificationsStore().info(
+        event.actor_user_id === useAuthStore().userId
+          ? 'A share link gave you more access to this workspace.'
+          : 'The owner changed your access to this workspace.',
+      );
     }
   });
 

@@ -25,6 +25,36 @@ async function selectPfs(page, dialog, id) {
 }
 
 test.describe('Workspaces', () => {
+  test('the user menu shows the GitHub avatar', async ({ page }) => {
+    await page.goto('/workspaces');
+    const menu = page.getByRole('button', { name: 'jdoe' });
+    await expect(menu.locator('.v-avatar img')).toHaveAttribute(
+      'src',
+      'https://avatars.githubusercontent.com/u/4242?s=48',
+    );
+  });
+
+  test('an older stored session gets the avatar once confirmed', async ({ page, api }) => {
+    // Stored by an editor that didn't know the GitHub ID yet
+    await page.addInitScript(() => {
+      const session = JSON.parse(localStorage.getItem('ceos_ard_editor_session'));
+      delete session.githubId;
+      localStorage.setItem('ceos_ard_editor_session', JSON.stringify(session));
+    });
+    let confirm;
+    const confirmed = new Promise((resolve) => (confirm = resolve));
+    await page.route('**/auth/user', async (route) => {
+      await confirmed;
+      return api.handle(route);
+    });
+    await page.goto('/workspaces');
+    const menu = page.getByRole('button', { name: 'jdoe' });
+    await expect(menu.locator('.v-avatar')).toHaveCount(0);
+
+    confirm();
+    await expect(menu.locator('.v-avatar img')).toHaveAttribute('src', /\/u\/4242\?/);
+  });
+
   test('lists the workspaces with their PFS', async ({ page, api }) => {
     await openWorkspaces(page);
 

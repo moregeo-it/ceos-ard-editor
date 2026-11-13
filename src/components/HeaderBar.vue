@@ -12,11 +12,13 @@
 
     <v-spacer />
 
-    <div class="d-flex align-center ga-2 mr-4">
-      <slot name="actions"></slot>
-    </div>
+    <v-defaults-provider :defaults="{ VBtn: { height: 48 } }">
+      <div class="d-flex align-center ga-2 mr-4">
+        <slot name="actions"></slot>
+      </div>
 
-    <UserMenu />
+      <UserMenu />
+    </v-defaults-provider>
   </v-app-bar>
 </template>
 

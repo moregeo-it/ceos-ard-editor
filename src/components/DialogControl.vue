@@ -19,6 +19,7 @@ const components = {
   ArchiveWorkspaceDialog: defineAsyncComponent(
     () => import('@/components/dialogs/ArchiveWorkspaceDialog.vue'),
   ),
+  CommentDialog: defineAsyncComponent(() => import('@/components/dialogs/CommentDialog.vue')),
   ConfirmDialog: defineAsyncComponent(() => import('@/components/dialogs/ConfirmDialog.vue')),
   CreateFileDialog: defineAsyncComponent(() => import('@/components/dialogs/CreateFileDialog.vue')),
   CreatePfsDialog: defineAsyncComponent(() => import('@/components/dialogs/CreatePfsDialog.vue')),
