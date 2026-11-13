@@ -327,6 +327,13 @@ test.describe('Preview', () => {
     await expect(page).toHaveURL(/\/workspaces\/ws-1$/);
   });
 
+  test('an Edit link with a JSON pointer opens the file', async ({ page }) => {
+    await openWorkspace(page, '/workspaces/ws-1#edit=%2Fpfs%2FNRB%2Fdocument.yaml%23%2Ftype');
+
+    await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText('document.yaml');
+    await expect(page).toHaveURL(/\/workspaces\/ws-1$/);
+  });
+
   test('other links in the preview can not navigate the editor', async ({ page, api }) => {
     api.previewHtml =
       '<!doctype html><html><head><base target="_top"></head><body><h1>NRB preview</h1>' +
