@@ -212,7 +212,12 @@ export class MockApi {
   }
 
   async install(page) {
-    const session = { userId: USER.id, username: USER.username, provider: 'github' };
+    const session = {
+      userId: USER.id,
+      username: USER.username,
+      githubId: USER.github_id,
+      provider: 'github',
+    };
     await page.addInitScript((value) => {
       localStorage.setItem(
         'ceos_ard_editor_session',

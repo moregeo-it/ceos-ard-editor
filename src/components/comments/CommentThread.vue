@@ -46,7 +46,7 @@
     <div v-for="comment in thread.comments" :key="comment.id" class="comment px-3 py-2">
       <div class="d-flex align-center ga-2">
         <v-avatar size="28" class="flex-shrink-0">
-          <v-img :src="avatarUrl(comment.author)" :alt="comment.author.username" />
+          <v-img :src="githubAvatarUrl(comment.author.github_id)" :alt="comment.author.username" />
         </v-avatar>
         <div class="comment-meta flex-grow-1">
           <div class="text-body-2 font-weight-medium text-truncate">
@@ -155,6 +155,7 @@ import { useCommentsStore } from '@/stores/comments';
 import { useEditorStore } from '@/stores/editor';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
+import { githubAvatarUrl } from '@/utils/avatars';
 import { renderMarkdown } from '@/utils/markdown';
 import FilePath from './FilePath.vue';
 import {
@@ -215,16 +216,13 @@ export default {
   },
 
   methods: {
+    githubAvatarUrl,
     renderMarkdown,
 
     formatDate(date) {
       return date
         ? new Date(date).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
         : '';
-    },
-
-    avatarUrl(author) {
-      return `https://avatars.githubusercontent.com/u/${encodeURIComponent(author.github_id)}?s=48`;
     },
 
     // By GitHub ID like the server, while it is known (sessions stored by older editors lack it)
