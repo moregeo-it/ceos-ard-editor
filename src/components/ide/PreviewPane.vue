@@ -210,7 +210,8 @@ export default {
         if (!hash.startsWith(EDIT_HASH)) {
           return;
         }
-        const path = hash.slice(EDIT_HASH.length);
+        // Without the JSON pointer to a field of the file that can follow, e.g. #/background
+        const path = hash.slice(EDIT_HASH.length).split('#')[0];
         const { path: routePath, query } = this.$route;
         this.$router.replace({ path: routePath, query, hash: '' });
         if (path.startsWith('/')) {
