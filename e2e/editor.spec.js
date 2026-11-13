@@ -772,7 +772,7 @@ test.describe('Propose', () => {
     api.diffs = [{ path: '/notes.md', status: 'modified' }];
     api.fileDiffs.set('/notes.md', diff('First version'));
     await page.goto('/workspaces/ws-1/propose');
-    await page.locator('.changes-overview').getByText('/notes.md').click();
+    await page.locator('.changes-overview .file-path', { hasText: 'notes.md' }).click();
     const changes = page.locator('.diff2html-container');
     await expect(changes).toContainText('First version');
     await expect.poll(() => socket).toBeTruthy();
@@ -799,7 +799,7 @@ test.describe('Propose', () => {
     api.diffs = [{ path: '/notes.md', status: 'added' }];
     await page.goto('/workspaces/ws-1/propose');
     const overview = page.locator('.changes-overview');
-    await expect(overview).toContainText('/notes.md');
+    await expect(overview).toContainText('notes.md');
     await expect.poll(() => socket).toBeTruthy();
 
     // The refresh after the other tab's change gets the list from before the commit, but late

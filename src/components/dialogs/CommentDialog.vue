@@ -3,7 +3,7 @@
     <v-form @submit.prevent="submit">
       <v-card>
         <v-card-title>Comment on {{ fileName }}</v-card-title>
-        <v-card-subtitle>{{ shownPath }}</v-card-subtitle>
+        <v-card-subtitle><FilePath :path="path" /></v-card-subtitle>
         <v-card-text>
           <v-textarea
             v-model="body"
@@ -40,11 +40,14 @@
 
 <script>
 import DialogMixin from '@/components/DialogMixin';
-import { displayPath } from '@/utils/paths';
+import FilePath from '@/components/FilePath.vue';
 
 export default {
   name: 'CommentDialog',
   mixins: [DialogMixin],
+  components: {
+    FilePath,
+  },
   props: {
     path: {
       type: String,
@@ -60,9 +63,6 @@ export default {
   computed: {
     fileName() {
       return this.path.split('/').pop();
-    },
-    shownPath() {
-      return displayPath(this.path);
     },
     isValid() {
       const length = this.body.trim().length;

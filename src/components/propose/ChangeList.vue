@@ -16,8 +16,10 @@
         <v-expansion-panel v-for="file in diffs" :key="file.path">
           <v-expansion-panel-title>
             <FileStatusBadge :status="file.status" class="mr-2" width="60px" />
-            <template v-if="file.source">{{ file.source }} → </template>
-            {{ file.path }}
+            <template v-if="file.source"
+              ><FilePath :path="file.source" class="mr-1" />→&nbsp;</template
+            >
+            <FilePath :path="file.path" />
           </v-expansion-panel-title>
           <v-expansion-panel-text>
             <FileDiff :file="file" />
@@ -63,6 +65,7 @@ import { useProposalStore } from '@/stores/proposal';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useTypesStore } from '@/stores/types';
 import { useNotificationsStore } from '@/stores/notifications';
+import FilePath from '@/components/FilePath.vue';
 import FileStatusBadge from '@/components/FileStatusBadge.vue';
 import FileDiff from './FileDiff.vue';
 import PreviousCommits from './PreviousCommits.vue';
@@ -71,6 +74,7 @@ export default {
   name: 'ChangeList',
 
   components: {
+    FilePath,
     FileStatusBadge,
     FileDiff,
     PreviousCommits,

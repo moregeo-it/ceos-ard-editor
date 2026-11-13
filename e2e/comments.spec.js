@@ -361,6 +361,8 @@ test.describe('Comments', () => {
       `Showing only comments on ${SHOWN} Show all`,
     );
     await expect(threads(page)).toHaveCount(1);
+    // As breadcrumbs, which still read and copy as the plain path
+    await expect(page.locator('.comments-filter .file-path-separator')).toHaveCount(1);
     // Threads are titled with the whole path
     const title = threads(page).getByRole('link', { name: SHOWN, exact: true });
     await title.hover();

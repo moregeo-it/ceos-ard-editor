@@ -56,8 +56,10 @@
               location="top"
               open-delay="100"
               :disabled="!isTruncated && !isSearchResult"
-              :text="isSearchResult ? displayPath(item.path) : item.name"
-            />
+            >
+              <FilePath v-if="isSearchResult" :path="item.path" />
+              <template v-else>{{ item.name }}</template>
+            </v-tooltip>
             <span
               ref="nameEl"
               class="file-tree-name"
@@ -67,8 +69,8 @@
             <span v-if="isSearchResult && folder" class="file-tree-folder text-caption text-subtle">
               <span class="file-tree-folder-dot">·</span>
               <span class="file-tree-folder-path"
-                ><span class="file-tree-folder-text">{{ folder }}</span></span
-              >
+                ><FilePath :path="folder" class="file-tree-folder-text"
+              /></span>
             </span>
           </span>
           <span class="flex-grow-1" />
@@ -117,14 +119,16 @@ import {
   mdiChevronRight,
 } from '@mdi/js';
 import CommentCount from '../comments/CommentCount.vue';
+import FilePath from '../FilePath.vue';
 import FileStatusBadge from '../FileStatusBadge.vue';
-import { displayPath, folderOf } from '@/utils/paths';
+import { folderOf } from '@/utils/paths';
 
 export default {
   name: 'FileTreeNode',
 
   components: {
     CommentCount,
+    FilePath,
     FileStatusBadge,
   },
 
@@ -181,7 +185,6 @@ export default {
   },
 
   methods: {
-    displayPath,
     handleClick() {
       if (this.item.type === 'folder') {
         this.$emit('toggle', this.item);

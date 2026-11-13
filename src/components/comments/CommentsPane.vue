@@ -82,7 +82,7 @@
 
 <script>
 import CommentThread from './CommentThread.vue';
-import FilePath from './FilePath.vue';
+import FilePath from '@/components/FilePath.vue';
 import { useCommentsStore } from '@/stores/comments';
 import { COMMENTS_VISIBILITY_NOTE, canCommentOn, openCommentDialog } from '@/utils/comments';
 import {

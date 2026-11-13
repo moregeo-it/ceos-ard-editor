@@ -161,7 +161,7 @@ import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { githubAvatarUrl } from '@/utils/avatars';
 import { renderMarkdown } from '@/utils/markdown';
-import FilePath from './FilePath.vue';
+import FilePath from '@/components/FilePath.vue';
 import {
   mdiCheck,
   mdiDeleteOutline,

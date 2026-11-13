@@ -37,7 +37,7 @@
             @click.stop="close(file.path)"
           />
           <v-tooltip activator="parent" location="bottom" :open-delay="500">
-            {{ displayPath(file.path) }}
+            <FilePath :path="file.path" />
           </v-tooltip>
         </v-tab>
       </v-tabs>
@@ -148,6 +148,7 @@ import { useNotificationsStore } from '@/stores/notifications';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { defineAsyncComponent } from 'vue';
 import BrowserViewer from './editors/BrowserViewer.vue';
+import FilePath from '../FilePath.vue';
 import UnsupportedViewer from './editors/UnsupportedViewer.vue';
 import {
   mdiClose,
@@ -178,6 +179,7 @@ export default {
 
   components: {
     BrowserViewer,
+    FilePath,
     SourceCodeEditor: defineAsyncComponent(() => import('./editors/SourceCodeEditor.vue')),
     UnsupportedViewer,
     JsonSchemaEditor: defineAsyncComponent(() => import('./editors/JsonSchemaEditor.vue')),
@@ -272,7 +274,6 @@ export default {
     },
   },
   methods: {
-    displayPath,
     getEditorType(file, data, forceSourceCodeEditor = false) {
       if (data instanceof Blob) {
         if (supportedBrowserTypes.includes(data.type)) {
