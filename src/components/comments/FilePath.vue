@@ -7,6 +7,8 @@
 </template>
 
 <script>
+import { displayPath } from '@/utils/paths';
+
 /** A file path that wraps after its slashes, not inside names. */
 export default {
   name: 'FilePath',
@@ -17,7 +19,7 @@ export default {
 
   computed: {
     segments() {
-      return this.path.split(/(?<=\/)/);
+      return displayPath(this.path).split(/(?<=\/)/);
     },
   },
 };

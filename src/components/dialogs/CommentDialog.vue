@@ -3,7 +3,7 @@
     <v-form @submit.prevent="submit">
       <v-card>
         <v-card-title>Comment on {{ fileName }}</v-card-title>
-        <v-card-subtitle>{{ path }}</v-card-subtitle>
+        <v-card-subtitle>{{ shownPath }}</v-card-subtitle>
         <v-card-text>
           <v-textarea
             v-model="body"
@@ -40,6 +40,7 @@
 
 <script>
 import DialogMixin from '@/components/DialogMixin';
+import { displayPath } from '@/utils/paths';
 
 export default {
   name: 'CommentDialog',
@@ -59,6 +60,9 @@ export default {
   computed: {
     fileName() {
       return this.path.split('/').pop();
+    },
+    shownPath() {
+      return displayPath(this.path);
     },
     isValid() {
       const length = this.body.trim().length;

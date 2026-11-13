@@ -1,3 +1,8 @@
+/** A path as shown to users, without the leading slash, like the changes in Propose. */
+export function displayPath(path) {
+  return path.replace(/^\//, '');
+}
+
 /** The folder of a file path without the leading slash, e.g. `pfs/SR`; empty at the root. */
 export function folderOf(path) {
   return path.slice(1, Math.max(path.lastIndexOf('/'), 1));

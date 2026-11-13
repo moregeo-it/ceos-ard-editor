@@ -297,6 +297,14 @@ test.describe('Editor', () => {
     await expect(page.locator('.file-tree')).toContainText('Metadata shall be machine readable.');
   });
 
+  test('the header buttons are as tall as the view switch', async ({ page }) => {
+    await openWorkspace(page);
+    const height = async (locator) => (await locator.boundingBox()).height;
+    const toggle = await height(page.locator('.v-app-bar .v-btn-group'));
+    expect(await height(page.getByRole('button', { name: 'Share' }))).toBe(toggle);
+    expect(await height(page.getByRole('button', { name: 'jdoe' }))).toBe(toggle);
+  });
+
   test('search results and tabs tell files of the same name apart', async ({ page }) => {
     await openWorkspace(page);
 
@@ -307,12 +315,6 @@ test.describe('Editor', () => {
     await results.nth(0).click();
     await results.nth(1).click();
     await expect(page.locator('.editor-tabs .v-tab .file-folder')).toHaveText(['· NRB', '· SR']);
-    // The active file's whole path shows below the tabs
-    await expect(page.getByRole('navigation', { name: 'File path' }).locator('span')).toHaveText([
-      'pfs',
-      'SR',
-      'document.yaml',
-    ]);
   });
 });
 

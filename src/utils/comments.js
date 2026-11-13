@@ -12,7 +12,9 @@ export const COMMENTS_VISIBILITY_NOTE =
 
 /** Whether the user can start a thread on `path`: an existing file, and the right to comment. */
 export function canCommentOn(path) {
-  const file = useFilesStore().all[path];
+  const files = useFilesStore();
+  // Search results can hold files that the tree hasn't loaded
+  const file = files.all[path] ?? files.searchResults?.find((result) => result.path === path);
   return Boolean(
     useWorkspacesStore().canComment && file && !file.is_directory && file.status !== 'deleted',
   );

@@ -1,6 +1,8 @@
 import { test, expect, thread } from './support/mock-api';
 
 const FILE = '/glossary/accuracy.yaml';
+// As shown, without the leading slash
+const SHOWN = 'glossary/accuracy.yaml';
 const OTHER = { user_id: 'user-2', github_id: '5151', username: 'mmohr' };
 
 const row = (page, name) =>
@@ -303,7 +305,7 @@ test.describe('Comments', () => {
     await openWorkspace(page);
     await row(page, 'glossary').click();
     await row(page, 'accuracy.yaml').locator('.comment-count').click();
-    await expect(page.locator('.comments-filter')).toContainText(FILE);
+    await expect(page.locator('.comments-filter')).toContainText(SHOWN);
 
     await expect.poll(() => socket).toBeTruthy();
     const file = {
@@ -322,7 +324,7 @@ test.describe('Comments', () => {
         file,
       }),
     );
-    await expect(page.locator('.comments-filter')).toContainText('/glossary/precision.yaml');
+    await expect(page.locator('.comments-filter')).toContainText('glossary/precision.yaml');
   });
 
   test('comments show HTML as text, and no unsafe links', async ({ page, api }) => {
@@ -355,14 +357,49 @@ test.describe('Comments', () => {
     await row(page, 'glossary').click();
     await row(page, 'accuracy.yaml').locator('.comment-count').click();
 
-    await expect(page.locator('.comments-filter')).toContainText(`Comments on ${FILE} Show all`);
+    await expect(page.locator('.comments-filter')).toContainText(
+      `Showing only comments on ${SHOWN} Show all`,
+    );
     await expect(threads(page)).toHaveCount(1);
     // Threads are titled with the whole path
-    await expect(threads(page).getByRole('link', { name: FILE, exact: true })).toBeVisible();
+    const title = threads(page).getByRole('link', { name: SHOWN, exact: true });
+    await title.hover();
+    await expect(
+      page.locator('.v-tooltip .v-overlay__content').filter({ hasText: 'Open in the editor' }),
+    ).toBeVisible();
 
     await page.getByRole('button', { name: 'Show all' }).click();
     await expect(page.locator('.comments-filter')).toHaveCount(0);
     await expect(threads(page)).toHaveCount(2);
+  });
+
+  test('the comment badge shows its own tooltip, not the path', async ({ page, api }) => {
+    api.threads = [thread({ path: FILE, body: 'On accuracy' })];
+    await openWorkspace(page);
+    await page.getByRole('textbox', { name: 'Search files and folders...' }).fill('accuracy');
+    const result = page.locator('.file-tree-row').filter({ hasText: 'accuracy.yaml' });
+    const tooltips = page.locator('.v-tooltip .v-overlay__content');
+
+    // On the way from the name to the badge
+    await result.locator('.file-tree-name').hover();
+    await expect(tooltips.filter({ hasText: SHOWN })).toBeVisible();
+    await result.locator('.comment-count').hover();
+    await expect(tooltips.filter({ hasText: '1 open comment thread' })).toBeVisible();
+    await expect(tooltips.filter({ hasText: SHOWN })).toBeHidden();
+  });
+
+  test('comment on a search result that the tree has not loaded', async ({ page, api }) => {
+    api.threads = [thread({ path: FILE, body: 'On accuracy' })];
+    await openWorkspace(page);
+    await page.getByRole('textbox', { name: 'Search files and folders...' }).fill('accuracy');
+    await page
+      .locator('.file-tree-row')
+      .filter({ hasText: 'accuracy.yaml' })
+      .locator('.comment-count')
+      .click();
+
+    await expect(page.locator('.comments-filter')).toContainText(SHOWN);
+    await expect(page.getByRole('button', { name: 'Add Comment' })).toBeVisible();
   });
 
   test('comment on the open file from the editor', async ({ page, api }) => {
@@ -375,7 +412,9 @@ test.describe('Comments', () => {
     // The tab tells the path
     await page.locator('.editor-tabs .v-tab--selected').hover();
     await expect(
-      page.locator('.v-tooltip .v-overlay__content').filter({ hasText: FILE }),
+      page
+        .locator('.v-tooltip .v-overlay__content')
+        .filter({ hasText: /^\s*glossary\/accuracy\.yaml\s*$/ }),
     ).toBeVisible();
 
     await page.getByRole('button', { name: /^Comments/ }).click();
@@ -396,7 +435,7 @@ test.describe('Comments', () => {
       .locator('.v-overlay--active .v-list-item')
       .filter({ hasText: 'Show comments' })
       .click();
-    await expect(page.locator('.comments-filter')).toContainText(FILE);
+    await expect(page.locator('.comments-filter')).toContainText(SHOWN);
     await expect(threads(page)).toHaveCount(1);
   });
 

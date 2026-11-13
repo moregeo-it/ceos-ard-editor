@@ -1,11 +1,13 @@
 <template>
   <div class="d-flex flex-column fill-height">
     <div v-if="commentsStore.path" class="comments-filter mx-2 mt-2 pl-2 pr-1 pt-2 pb-1 rounded">
-      <div class="d-flex align-center ga-1 text-caption">
+      <div class="d-flex ga-1 text-caption">
         <v-icon :icon="icons.file" size="small" />
-        Comments on
+        <div class="comments-filter-text flex-grow-1">
+          Showing only comments on
+          <FilePath :path="commentsStore.path" class="d-block font-weight-medium" />
+        </div>
       </div>
-      <FilePath :path="commentsStore.path" class="d-block text-body-2 font-weight-medium" />
       <div class="d-flex justify-end">
         <v-btn
           size="small"
@@ -137,5 +139,9 @@ export default {
 <style scoped>
 .comments-filter {
   background: rgba(var(--v-theme-primary), 0.08);
+}
+
+.comments-filter-text {
+  min-width: 0;
 }
 </style>

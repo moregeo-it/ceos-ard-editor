@@ -11,7 +11,11 @@
         href="#"
         class="comment-thread-file text-body-2"
         @click.prevent="openFile"
-        ><FilePath :path="thread.path"
+        ><FilePath :path="thread.path" /><v-tooltip
+          activator="parent"
+          location="top"
+          open-delay="300"
+          text="Click to open in the editor"
       /></a>
       <FilePath v-else :path="thread.path" class="comment-thread-file text-body-2 text-subtle" />
       <v-spacer />
@@ -338,8 +342,15 @@ export default {
   border-top: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
 }
 .comment-thread-file {
-  color: inherit;
   min-width: 0;
+}
+a.comment-thread-file {
+  color: rgb(var(--v-theme-primary));
+  text-decoration: none;
+}
+a.comment-thread-file:hover,
+a.comment-thread-file:focus-visible {
+  text-decoration: underline;
 }
 .comment-meta {
   min-width: 0;
