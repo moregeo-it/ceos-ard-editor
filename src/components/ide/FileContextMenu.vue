@@ -236,7 +236,16 @@ export default {
       // CEOS-ARD creates PFS with its own dialog and endpoint
       if (action.dialog === 'CreatePfsDialog') {
         this.requestNewPfs();
+        return;
       }
+      this.$root.openDialog('ActionDialog', {
+        action,
+        onAcceptance: async (data) => {
+          const file = await this.filesStore.runAction(action.id, data);
+          this.notificationsStore.success(`${file.name} created`);
+          await this.editorStore.show(file.path);
+        },
+      });
     },
 
     requestNewPfs() {

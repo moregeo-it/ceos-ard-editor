@@ -1,6 +1,9 @@
 <template>
   <div class="d-flex flex-column fill-height">
-    <div v-if="pfsOptions.length > 0" class="pa-2 pt-3 d-flex align-center border-b-sm">
+    <div
+      v-if="previewStore.mode === 'pfs' && pfsOptions.length > 0"
+      class="pa-2 pt-3 d-flex align-center border-b-sm"
+    >
       <PfsSelect
         v-model="selectedPfs"
         :items="pfsOptions"
@@ -63,7 +66,8 @@
       </div>
 
       <v-alert v-else-if="!previewHtml" type="info" variant="tonal" class="ma-4">
-        <template v-if="!workspacesStore.isOwner"
+        <template v-if="previewStore.mode === 'file'">{{ previewStore.message }}</template>
+        <template v-else-if="!workspacesStore.isOwner"
           >The owner has not generated a preview yet.</template
         >
         <template v-else-if="!previewStore.hasSelectedPfs">
@@ -175,9 +179,12 @@ export default {
     isAnyDownloading() {
       return Object.values(this.isDownloading).some(Boolean);
     },
+    activePath() {
+      return this.editorStore.active?.path ?? null;
+    },
   },
   async created() {
-    if (this.workspaceId) {
+    if (this.workspaceId && this.previewStore.mode === 'pfs') {
       await this.workspacesStore.fetchPfs(this.workspaceId);
     }
   },
@@ -220,6 +227,11 @@ export default {
             .catch((error) => console.error('Error opening file in editor:', error));
         }
       },
+    },
+    async activePath(path) {
+      if (this.previewStore.mode === 'file' && path !== this.previewStore.renderedPath) {
+        await this.previewStore.requestPreviewRefresh();
+      }
     },
     // The iframe is keyed by previewGeneration so each regeneration gets a fresh
     // document, forcing images to revalidate (304/404). Reusing the document via
@@ -284,10 +296,21 @@ export default {
           element.remove();
         });
 
+      // Opens a file of the workspace through the editor's URL, see the $route.hash watcher
+      const { pathname, search } = window.location;
+      const editUrl = (path) => `${pathname}${search}${EDIT_HASH}${encodeURIComponent(path)}`;
+
       // Only edit links may navigate the editor, and only fragments stay in the preview, as a page
       // loaded there keeps the sandbox's permissions. Others open in a new tab, javascript: etc.
       // are dropped
       doc.querySelectorAll('a, area').forEach((link) => {
+        // Links to other files of the workspace, e.g. between glossary terms, open them like edit links
+        const file = link.getAttribute('data-open-file');
+        if (file?.startsWith('/')) {
+          link.setAttribute('href', editUrl(file));
+          link.setAttribute('target', '_top');
+          return;
+        }
         const href = link.getAttribute('href') ?? link.getAttributeNS(XLINK_NS, 'href');
         if (href === null || href.startsWith('#')) {
           link.setAttribute('target', '_self');
@@ -326,7 +349,6 @@ export default {
       });
 
       // The server's Edit buttons become links that open the file through the editor's URL
-      const { pathname, search } = window.location;
       doc.querySelectorAll('button[class="edit"]').forEach((btn) => {
         const path = btn.getAttribute('value');
         if (!path) {
@@ -335,7 +357,7 @@ export default {
         const link = doc.createElement('a');
         link.className = 'edit';
         link.textContent = btn.textContent;
-        link.href = `${pathname}${search}${EDIT_HASH}${encodeURIComponent(path)}`;
+        link.href = editUrl(path);
         link.target = '_top';
         // The browser's button font keeps the button's size; the last supported keyword wins
         link.style.cssText =

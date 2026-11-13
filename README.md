@@ -72,9 +72,15 @@ in the ceos-ard-server README). The editor loads the types from `GET /types` int
 (`src/stores/types.js`) and doesn't hardcode any of it:
 
 - `src/components/ide/FileContextMenu.vue` builds the file menu from the type's `file_menu` rules and
-  `actions`. An action with a `dialog` opens that dialog. Its `requestAction` only runs `CreatePfsDialog`,
-  which is also the only dialog the server accepts; a new dialog needs both.
-- `src/components/ide/editors/utils.js` picks the form editor of a file from the type's `editors`.
+  `actions`. An action with a `schema` asks for its input in `ActionDialog.vue`; an action with a `dialog`
+  opens that dialog. Its `requestAction` only runs `CreatePfsDialog`, which is also the only dialog the
+  server accepts; a new dialog needs both.
+- `src/components/ide/editors/utils.js` picks the form editor of a file from the type's `editors`. Its
+  `codec` (`src/codecs/`) turns the file into the form data and back, changing only what was edited. The
+  forms use the renderers in `src/components/ide/editors/renderers/`, e.g. chips for enums.
+- The preview builds a document from the selected PFS (`preview: pfs`) or shows the open file as the
+  server renders it (`preview: file`).
+- The file search offers the type's `search_filters`, and the file tree opens its `expanded_folders`.
 - Globs are matched by `src/utils/glob.js`, like the server's `match_glob`; both have the same test cases.
 - Texts name the type instead of CEOS-ARD, e.g. "Behind CEOS-ARD", and the type's `labels` replace
   default texts, e.g. "Used in".
@@ -82,7 +88,7 @@ in the ceos-ard-server README). The editor loads the types from `GET /types` int
   workspace cards and the header show it.
 
 So the editor has no configuration per type: a new type needs no change in the editor, unless it uses a
-dialog the editor doesn't have yet.
+dialog or codec the editor doesn't have yet.
 
 ### Compile and Hot-Reload for Development
 
@@ -120,6 +126,7 @@ mock are exported from the server; update them when the server's types change:
 ```sh
 # In ceos-ard-server
 pixi run python scripts/export_types.py ceos-ard > ../ceos-ard-editor/e2e/support/types/ceos-ard.json
+pixi run python scripts/export_types.py eo-glossary > ../ceos-ard-editor/e2e/support/types/eo-glossary.json
 ```
 
 ### Run Unit Tests

@@ -1,0 +1,252 @@
+{
+  "id": "eo-glossary",
+  "title": "CEOS EO Glossary",
+  "description": "Terms and definitions of the CEOS Earth Observation Glossary",
+  "available": true,
+  "color": "#00796b",
+  "upstream": {
+    "owner": "ceos-org",
+    "repo": "eo-glossary",
+    "branch": "main",
+    "url": "https://github.com/ceos-org/eo-glossary"
+  },
+  "pfs": false,
+  "preview": "file",
+  "expanded_folders": ["/docs", "/docs/terms"],
+  "labels": {
+    "usage": "Linked from"
+  },
+  "editors": [
+    {
+      "match": "docs/terms/*.md",
+      "codec": "glossary-term",
+      "schema": {
+        "type": "object",
+        "required": ["title", "class", "status", "definitions"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Term",
+            "minLength": 2
+          },
+          "description": {
+            "type": "string",
+            "title": "Summary",
+            "description": "One sentence, used for search engines and link previews."
+          },
+          "class": {
+            "type": "string",
+            "title": "Class",
+            "enum": ["base", "core", "controversial", "high-impact"]
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "enum": ["to be defined", "to be discussed", "to be approved", "approved"]
+          },
+          "groups": {
+            "type": "array",
+            "title": "Responsible groups",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": ["WGISS", "WGCV", "WGCapD", "LSI-VC", "WGClimate", "B-VC", "AC-VC"]
+            }
+          },
+          "synonyms": {
+            "type": "array",
+            "title": "Synonyms",
+            "items": {
+              "type": "string"
+            }
+          },
+          "definitions": {
+            "type": "array",
+            "title": "Definitions",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "title": "Definition",
+              "properties": {
+                "definition": {
+                  "type": "string",
+                  "title": "Definition",
+                  "description": "Must be substitutable for the term in a sentence."
+                },
+                "notes": {
+                  "type": "string",
+                  "title": "Notes"
+                },
+                "examples": {
+                  "type": "string",
+                  "title": "Examples"
+                },
+                "sources": {
+                  "type": "string",
+                  "title": "Sources"
+                }
+              }
+            }
+          },
+          "other_tags": {
+            "type": "array",
+            "title": "Other tags",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ui_schema": {
+        "type": "VerticalLayout",
+        "elements": [
+          {
+            "type": "Control",
+            "scope": "#/properties/title"
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/description",
+            "options": {
+              "multi": true
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/status",
+            "options": {
+              "chips": true
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/class",
+            "options": {
+              "chips": true
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/groups"
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/synonyms"
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/definitions",
+            "options": {
+              "elementLabelProp": "definition",
+              "detail": {
+                "type": "VerticalLayout",
+                "elements": [
+                  {
+                    "type": "Control",
+                    "scope": "#/properties/definition",
+                    "options": {
+                      "multi": true
+                    }
+                  },
+                  {
+                    "type": "Control",
+                    "scope": "#/properties/notes",
+                    "options": {
+                      "multi": true
+                    }
+                  },
+                  {
+                    "type": "Control",
+                    "scope": "#/properties/examples",
+                    "options": {
+                      "multi": true
+                    }
+                  },
+                  {
+                    "type": "Control",
+                    "scope": "#/properties/sources",
+                    "options": {
+                      "multi": true
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/other_tags"
+          }
+        ]
+      }
+    }
+  ],
+  "search_filters": [
+    {
+      "id": "status",
+      "title": "Status",
+      "values": ["to be defined", "to be discussed", "to be approved", "approved"]
+    },
+    {
+      "id": "class",
+      "title": "Class",
+      "values": ["base", "core", "controversial", "high-impact"]
+    },
+    {
+      "id": "group",
+      "title": "Group",
+      "values": ["WGISS", "WGCV", "WGCapD", "LSI-VC", "WGClimate", "B-VC", "AC-VC"]
+    }
+  ],
+  "actions": [
+    {
+      "id": "new-term",
+      "title": "New term",
+      "folder": "/docs/terms",
+      "schema": {
+        "type": "object",
+        "required": ["title"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Term",
+            "minLength": 3,
+            "maxLength": 100
+          }
+        }
+      }
+    }
+  ],
+  "file_menu": [
+    {
+      "match": "**",
+      "kind": "folder",
+      "ops": ["create", "rename", "delete"],
+      "ops_if_new": []
+    },
+    {
+      "match": "**",
+      "kind": "file",
+      "ops": ["open_source", "download", "diff", "revert", "rename", "delete"],
+      "ops_if_new": []
+    },
+    {
+      "match": "docs",
+      "kind": "folder",
+      "ops": ["create"],
+      "ops_if_new": []
+    },
+    {
+      "match": "docs/terms",
+      "kind": "folder",
+      "ops": [],
+      "ops_if_new": []
+    },
+    {
+      "match": "docs/terms/*",
+      "kind": "file",
+      "ops": ["open_source", "download", "diff", "revert", "delete"],
+      "ops_if_new": []
+    }
+  ]
+}
