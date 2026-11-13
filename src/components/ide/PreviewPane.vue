@@ -95,16 +95,16 @@ import { usePreviewStore } from '@/stores/preview';
 import previewService from '@/services/preview.service';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { mdiDownload, mdiInformationOutline } from '@mdi/js';
+import { useCommentsStore } from '@/stores/comments';
+import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
 import { downloadBlob } from '@/utils/api';
+import { canCommentFromPreview, openCommentDialog, openThreadsLabel } from '@/utils/comments';
+import { enhancePreviewHtml, parseHashAction, syncCommentMarks } from '@/utils/preview-html';
 import PfsSelect from '@/components/PfsSelect.vue';
 import { workspaceSession } from '@/services/events';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-// Edit links set this on the editor's URL: WebKit runs no listeners in the sandboxed preview (#192)
-const EDIT_HASH = '#edit=';
-const SAFE_PROTOCOLS = ['http:', 'https:', 'mailto:'];
-const XLINK_NS = 'http://www.w3.org/1999/xlink';
 
 function sameList(a, b) {
   return a.length === b.length && a.every((item, i) => item === b[i]);
@@ -175,6 +175,13 @@ export default {
     isAnyDownloading() {
       return Object.values(this.isDownloading).some(Boolean);
     },
+    // Changes whenever the preview's comment links may need to change
+    commentMarks() {
+      const { all } = useFilesStore();
+      const deleted = Object.keys(all).filter((path) => all[path].status === 'deleted');
+      const open = useCommentsStore().openThreads.map((thread) => thread.path);
+      return JSON.stringify([this.workspacesStore.canComment, open, deleted]);
+    },
   },
   async created() {
     if (this.workspaceId) {
@@ -204,22 +211,22 @@ export default {
       }
     },
     '$route.hash': {
-      // Also when an Edit link was opened in a new tab
+      // Also when a link was opened in a new tab
       immediate: true,
       handler(hash) {
-        if (!hash.startsWith(EDIT_HASH)) {
+        const link = parseHashAction(hash);
+        if (!link) {
           return;
         }
-        // Without the JSON pointer to a field of the file that can follow, e.g. #/background
-        const path = hash.slice(EDIT_HASH.length).split('#')[0];
         const { path: routePath, query } = this.$route;
         this.$router.replace({ path: routePath, query, hash: '' });
-        if (path.startsWith('/')) {
-          this.editorStore
-            .show(path)
-            .catch((error) => console.error('Error opening file in editor:', error));
+        if (link.path.startsWith('/')) {
+          this.runHashAction(link.action, link.path);
         }
       },
+    },
+    commentMarks() {
+      this.syncCommentMarks();
     },
     // The iframe is keyed by previewGeneration so each regeneration gets a fresh
     // document, forcing images to revalidate (304/404). Reusing the document via
@@ -232,6 +239,18 @@ export default {
     },
   },
   methods: {
+    runHashAction(action, path) {
+      if (action === 'edit') {
+        this.editorStore
+          .show(path)
+          .catch((error) => console.error('Error opening file in editor:', error));
+      } else if (action === 'comment' && canCommentFromPreview(path)) {
+        openCommentDialog(this.$root, path);
+      } else {
+        // Also when commenting isn't possible (any more), e.g. the role isn't known yet
+        useCommentsStore().showComments(path);
+      }
+    },
     // Read from the editor, as WebKit runs no listeners in the preview
     saveScrollPosition() {
       const win = this.$refs.iframe?.contentWindow;
@@ -262,93 +281,30 @@ export default {
         { once: true },
       );
 
-      // Rewritten in an inert document: once written, closed shadow roots are out of reach
       const parsed = new DOMParser().parseFromString(this.previewHtml, 'text/html');
-      this.enhanceHtml(parsed);
+      enhancePreviewHtml(parsed, {
+        // Through the API; the browser sends the session cookie with them
+        assetUrl: (path) => `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${path}`,
+        pageUrl: window.location.pathname + window.location.search,
+      });
       const doctype = parsed.doctype ? '<!doctype html>' : '';
 
       const doc = iframe.contentWindow.document;
       doc.open();
       doc.write(doctype + parsed.documentElement.outerHTML);
       doc.close();
+      this.syncCommentMarks();
     },
-    isAbsoluteUrl(url) {
-      return URL.parse(url) !== null;
-    },
-    enhanceHtml(doc) {
-      // These could retarget links (<base>, SVG animations) or escape the rewriting below (frames,
-      // templates that become shadow roots)
-      doc
-        .querySelectorAll('base, animate, set, iframe, frame, object, embed, template')
-        .forEach((element) => {
-          element.remove();
+    syncCommentMarks() {
+      const doc = this.$refs.iframe?.contentDocument;
+      if (doc) {
+        const comments = useCommentsStore();
+        syncCommentMarks(doc, {
+          canComment: canCommentFromPreview,
+          openCount: (path) => comments.openCount(path),
+          countLabel: openThreadsLabel,
         });
-
-      // Only edit links may navigate the editor, and only fragments stay in the preview, as a page
-      // loaded there keeps the sandbox's permissions. Others open in a new tab, javascript: etc.
-      // are dropped
-      doc.querySelectorAll('a, area').forEach((link) => {
-        const href = link.getAttribute('href') ?? link.getAttributeNS(XLINK_NS, 'href');
-        if (href === null || href.startsWith('#')) {
-          link.setAttribute('target', '_self');
-          return;
-        }
-        const url = URL.parse(href, doc.baseURI);
-        if (url && SAFE_PROTOCOLS.includes(url.protocol)) {
-          link.setAttribute('target', '_blank');
-          link.setAttribute('rel', 'noopener noreferrer');
-        } else {
-          link.removeAttribute('href');
-          link.removeAttributeNS(XLINK_NS, 'href');
-          link.removeAttribute('target');
-        }
-      });
-
-      // Point relative assets at the API; the browser sends the session cookie with them
-      const assetUrl = (path) => `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${path}`;
-
-      // Fix relative images
-      const images = doc.querySelectorAll('img[src]');
-      images.forEach((img) => {
-        const src = img.getAttribute('src');
-        if (src && !this.isAbsoluteUrl(src)) {
-          img.setAttribute('src', assetUrl(src));
-        }
-      });
-
-      // Fix relative stylesheets
-      const stylesheets = doc.querySelectorAll('link[rel="stylesheet"]');
-      stylesheets.forEach((sheet) => {
-        const href = sheet.getAttribute('href');
-        if (href && !this.isAbsoluteUrl(href)) {
-          sheet.setAttribute('href', assetUrl(href));
-        }
-      });
-
-      // The server's Edit buttons become links that open the file through the editor's URL
-      const { pathname, search } = window.location;
-      doc.querySelectorAll('button[class="edit"]').forEach((btn) => {
-        const path = btn.getAttribute('value');
-        if (!path) {
-          return;
-        }
-        const link = doc.createElement('a');
-        link.className = 'edit';
-        link.textContent = btn.textContent;
-        link.href = `${pathname}${search}${EDIT_HASH}${encodeURIComponent(path)}`;
-        link.target = '_top';
-        // The browser's button font keeps the button's size; the last supported keyword wins
-        link.style.cssText =
-          'float: right; display: inline-block; margin: 0 0 0.5rem 0.5rem;' +
-          'padding: 0.3rem 0.8rem; background-color: #007bff; color: white; border-radius: 4px;' +
-          'text-decoration: none; transition: background-color 0.2s ease;' +
-          'font: 13.3333px sans-serif; font: -moz-button; font: -webkit-small-control;';
-        btn.replaceWith(link);
-      });
-      const style = doc.createElement('style');
-      style.textContent =
-        'a.edit:hover, a.edit:focus-visible { background-color: #0069d9 !important; }';
-      doc.head.append(style);
+      }
     },
     // Save and regenerate once the menu closes, not on every toggled item of the multi-select
     async handleMenuToggle(open) {

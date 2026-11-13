@@ -604,3 +604,111 @@ test.describe('Comments', () => {
     await expect(page.getByText('The owner changed your access')).toHaveCount(0);
   });
 });
+
+test.describe('Comments in the preview', () => {
+  // The file of the preview's Edit link
+  const SECTION = '/requirements/general/unused.yaml';
+  const preview = (page) => page.frameLocator('.preview-iframe');
+  const count = (page) => preview(page).locator('a.comment-count');
+
+  test('commenters comment on a file from the preview', async ({ page, api }) => {
+    api.workspaces[0].viewer_role = 'comment';
+    await openWorkspace(page);
+    await expect(count(page)).toBeHidden();
+
+    await preview(page).getByRole('link', { name: 'Comment', exact: true }).click();
+    await page.getByLabel('Comment', { exact: true }).fill('Is this still needed?');
+    await page.getByRole('button', { name: 'Comment', exact: true }).click();
+
+    await expect(threads(page)).toContainText('Is this still needed?');
+    expect(api.threads[0].path).toBe(SECTION);
+    await expect(page.locator('.comments-filter')).toContainText(
+      'requirements/general/unused.yaml',
+    );
+    // Red, as open threads still need work
+    await expect(preview(page).getByRole('link', { name: '1 open comment thread' })).toHaveText(
+      '1',
+    );
+    await expect(count(page)).toHaveCSS('background-color', 'rgb(176, 0, 32)');
+    await expect(page).toHaveURL(/\/workspaces\/ws-1$/);
+  });
+
+  test('viewers see the counts, and open the comments from them', async ({ page, api }) => {
+    api.workspaces[0].viewer_role = 'readonly';
+    api.threads = [
+      thread({ id: 't1', path: SECTION, body: 'First', author: OTHER }),
+      thread({ id: 't2', path: SECTION, body: 'Second', author: OTHER }),
+      thread({ id: 't3', path: SECTION, body: 'Done', author: OTHER, status: 'resolved' }),
+    ];
+    await openWorkspace(page);
+
+    await expect(count(page)).toHaveText('2');
+    await expect(preview(page).getByRole('link', { name: 'Comment', exact: true })).toBeHidden();
+    await preview(page).getByRole('link', { name: '2 open comment threads' }).click();
+
+    await expect(page.locator('.comments-filter')).toContainText(
+      'requirements/general/unused.yaml',
+    );
+    await expect(threads(page)).toHaveCount(2);
+  });
+
+  test('the counts and links follow live changes without a new preview', async ({ page, api }) => {
+    let socket;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    await openWorkspace(page);
+    await expect(preview(page).getByRole('link', { name: 'Comment', exact: true })).toBeVisible();
+    await expect.poll(() => socket).toBeTruthy();
+    const previews = api.requests.filter((r) => r.path.includes('/previews')).length;
+
+    const send = (type, fields) =>
+      socket.send(
+        JSON.stringify({
+          type,
+          ts: new Date().toISOString(),
+          actor_user_id: OTHER.user_id,
+          path: SECTION,
+          ...fields,
+        }),
+      );
+    const live = thread({ id: 'live', path: SECTION, body: 'Live', author: OTHER });
+    send('thread.created', { thread: live });
+    await expect(count(page)).toHaveText('1');
+
+    send('thread.updated', {
+      thread: { ...live, status: 'resolved', updated_at: '2026-10-04T09:00:00Z' },
+    });
+    await expect(count(page)).toBeHidden();
+
+    // A tracked delete keeps the file in the tree as deleted
+    send('file.deleted', {
+      tracked: true,
+      file: { name: 'unused.yaml', path: SECTION, is_directory: false, status: 'deleted' },
+    });
+    await expect(preview(page).getByRole('link', { name: 'Comment', exact: true })).toBeHidden();
+    expect(api.requests.filter((r) => r.path.includes('/previews')).length).toBe(previews);
+  });
+
+  test('a field of a file is commented as the whole file', async ({ page, api }) => {
+    api.previewHtml =
+      '<!doctype html><html><head></head><body><h1>NRB preview</h1>' +
+      `<a name="${SECTION}"></a><button class="edit" value="${SECTION}#/description">Edit</button>` +
+      '</body></html>';
+    api.threads = [thread({ id: 't1', path: SECTION, body: 'First', author: OTHER })];
+    await openWorkspace(page);
+
+    await expect(count(page)).toHaveText('1');
+    await preview(page).getByRole('link', { name: 'Comment', exact: true }).click();
+    await page.getByLabel('Comment', { exact: true }).fill('And this field?');
+    await page.getByRole('button', { name: 'Comment', exact: true }).click();
+
+    await expect(count(page)).toHaveText('2');
+    expect(api.threads.map((t) => t.path)).toEqual([SECTION, SECTION]);
+  });
+
+  test('a Comment link opened in a new tab asks for the comment', async ({ page }) => {
+    await page.goto('/workspaces/ws-1#comment=%2Frequirements%2Fgeneral%2Funused.yaml');
+
+    await expect(page.getByLabel('Comment', { exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/\/workspaces\/ws-1$/);
+  });
+});
