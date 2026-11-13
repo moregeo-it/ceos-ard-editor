@@ -315,6 +315,12 @@ test.describe('Editor', () => {
     await results.nth(0).click();
     await results.nth(1).click();
     await expect(page.locator('.editor-tabs .v-tab .file-folder')).toHaveText(['· NRB', '· SR']);
+    // The active file's whole path shows below the tabs
+    await expect(page.getByRole('navigation', { name: 'File path' }).locator('span')).toHaveText([
+      'pfs',
+      'SR',
+      'document.yaml',
+    ]);
   });
 });
 

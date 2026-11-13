@@ -42,6 +42,16 @@
         </v-tab>
       </v-tabs>
 
+      <nav
+        class="editor-breadcrumbs d-flex align-center text-caption text-subtle px-3"
+        aria-label="File path"
+      >
+        <template v-for="(segment, i) in breadcrumbs" :key="i">
+          <v-icon v-if="i" :icon="icons.breadcrumb" size="x-small" class="mx-1" />
+          <span :class="{ 'text-high-emphasis': i === breadcrumbs.length - 1 }">{{ segment }}</span>
+        </template>
+      </nav>
+
       <v-tabs-window v-model="model" class="editor-content flex-grow-1">
         <v-tabs-window-item
           v-for="file in openedFiles"
@@ -150,6 +160,7 @@ import { defineAsyncComponent } from 'vue';
 import BrowserViewer from './editors/BrowserViewer.vue';
 import UnsupportedViewer from './editors/UnsupportedViewer.vue';
 import {
+  mdiChevronRight,
   mdiClose,
   mdiCommentMultipleOutline,
   mdiCommentPlusOutline,
@@ -187,6 +198,7 @@ export default {
     return {
       icons: {
         addComment: mdiCommentPlusOutline,
+        breadcrumb: mdiChevronRight,
         close: mdiClose,
         comments: mdiCommentMultipleOutline,
         menu: mdiMenu,
@@ -240,6 +252,9 @@ export default {
     },
     activeFile() {
       return this.editorStore.active;
+    },
+    breadcrumbs() {
+      return this.activeFile.path.split('/').filter(Boolean);
     },
     openCommentCount() {
       return this.commentsStore.openCount(this.activeFile.path);
@@ -335,6 +350,12 @@ export default {
 </script>
 
 <style lang="css" scoped>
+.editor-breadcrumbs {
+  min-height: 1.75rem;
+  overflow: hidden;
+  white-space: nowrap;
+  border-bottom: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
 .file-folder {
   font-size: 0.85em;
 }
