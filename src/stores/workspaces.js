@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import router from '@/router';
 
+import { useAuthStore } from './auth';
 import { useCommentsStore } from './comments';
 import { useEditorStore } from './editor';
 import { useFilesStore } from './files';
@@ -402,10 +403,15 @@ export function registerWorkspacesEventListeners() {
     }
   });
 
-  // The owner changed this user's mode; viewer_role on the refetched workspace drives the UI
-  on(EVENTS.COLLABORATOR_UPDATED, async () => {
+  // This user's mode changed, by the owner or by redeeming a share link in another tab;
+  // viewer_role on the refetched workspace drives the UI
+  on(EVENTS.COLLABORATOR_UPDATED, async (event) => {
     if (await useWorkspacesStore().refreshCurrentWorkspace()) {
-      useNotificationsStore().info('The owner changed your access to this workspace.');
+      useNotificationsStore().info(
+        event.actor_user_id === useAuthStore().userId
+          ? 'A share link gave you more access to this workspace.'
+          : 'The owner changed your access to this workspace.',
+      );
     }
   });
 

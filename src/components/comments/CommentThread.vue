@@ -192,7 +192,6 @@ export default {
         reopen: mdiRestore,
         resolve: mdiCheck,
       },
-      replyBody: '',
       isReplying: false,
       isChangingStatus: false,
       editingId: null,
@@ -202,6 +201,14 @@ export default {
   },
 
   computed: {
+    replyBody: {
+      get() {
+        return this.commentsStore.drafts[this.thread.id] ?? '';
+      },
+      set(body) {
+        this.commentsStore.setDraft(this.thread.id, body);
+      },
+    },
     commentsStore() {
       return useCommentsStore();
     },
@@ -279,8 +286,10 @@ export default {
       }
       this.isReplying = true;
       try {
-        await this.commentsStore.reply(this.thread, body);
-        this.replyBody = '';
+        const thread = this.thread;
+        await this.commentsStore.reply(thread, body);
+        // Read-only while sending, so this is what was sent
+        this.commentsStore.setDraft(thread.id, '');
       } catch (error) {
         this.notificationsStore.error(`Your reply could not be sent: ${error.message}`);
       } finally {

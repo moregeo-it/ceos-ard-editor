@@ -47,6 +47,19 @@
       <div v-if="commentsStore.isLoading && !commentsStore.loaded" class="text-center pa-4">
         <v-progress-circular indeterminate color="primary" />
       </div>
+      <div v-else-if="commentsStore.loadFailed && !commentsStore.loaded" class="text-center pa-4">
+        <v-icon :icon="icons.error" size="48" color="error" />
+        <p class="mt-2">The comments couldn't be loaded.</p>
+        <v-btn
+          size="small"
+          variant="tonal"
+          class="mt-2"
+          :loading="commentsStore.isLoading"
+          @click="commentsStore.reload()"
+        >
+          Try again
+        </v-btn>
+      </div>
       <div v-else-if="threads.length === 0" class="text-center text-subtle pa-4">
         <v-icon :icon="icons.comments" size="48" />
         <p class="mt-2">{{ emptyText }}</p>
@@ -74,6 +87,7 @@ import { useCommentsStore } from '@/stores/comments';
 import { COMMENTS_VISIBILITY_NOTE, canCommentOn, openCommentDialog } from '@/utils/comments';
 import {
   mdiClose,
+  mdiCommentAlertOutline,
   mdiCommentMultipleOutline,
   mdiCommentPlusOutline,
   mdiEyeOutline,
@@ -95,6 +109,7 @@ export default {
         add: mdiCommentPlusOutline,
         close: mdiClose,
         comments: mdiCommentMultipleOutline,
+        error: mdiCommentAlertOutline,
         file: mdiFileDocumentOutline,
         info: mdiInformationOutline,
         visibility: mdiEyeOutline,

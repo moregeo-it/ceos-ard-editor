@@ -488,4 +488,117 @@ test.describe('Comments', () => {
     await expect(page.locator('.v-alert')).toContainText('You can view and comment');
     await expect(page.locator('.v-alert')).toContainText('Only the owner changes files.');
   });
+
+  test('a reply draft survives its thread being hidden', async ({ page, api }) => {
+    let socket;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    const open = thread({ path: FILE, body: 'Is this right?', author: OTHER });
+    api.threads = [open];
+    await openWorkspace(page);
+    await page.getByRole('tab', { name: /Comments/ }).click();
+    await threads(page).getByPlaceholder('Reply…').fill('Half a reply');
+    await expect.poll(() => socket).toBeTruthy();
+
+    // Someone else resolves it while resolved threads are hidden
+    const resolved = { ...open, status: 'resolved', updated_at: '2026-10-04T09:00:00Z' };
+    socket.send(
+      JSON.stringify({
+        type: 'thread.updated',
+        ts: new Date().toISOString(),
+        actor_user_id: OTHER.user_id,
+        path: FILE,
+        thread: resolved,
+      }),
+    );
+    await expect(threads(page)).toHaveCount(0);
+    await page.getByLabel('Resolved (1)').check();
+    await expect(threads(page).getByPlaceholder('Reply…')).toHaveValue('Half a reply');
+
+    await threads(page).getByRole('button', { name: 'Reply' }).click();
+    await expect(threads(page)).toContainText('Half a reply');
+    await expect(threads(page).getByPlaceholder('Reply…')).toHaveValue('');
+  });
+
+  test('tells when the comments could not be loaded, and loads them again', async ({
+    page,
+    api,
+  }) => {
+    let socket;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    api.threads = [thread({ path: FILE, body: 'On accuracy' })];
+    const failing = (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({ detail: 'Database unavailable' }),
+      });
+    await page.route('**/workspaces/ws-1/threads', failing);
+    await openWorkspace(page);
+    await page.getByRole('tab', { name: /Comments/ }).click();
+    await expect(page.getByText("The comments couldn't be loaded.")).toBeVisible();
+    await expect(page.getByText('No comments yet.')).toHaveCount(0);
+
+    // File changes still apply, without blaming them for the failed reload
+    await expect.poll(() => socket).toBeTruthy();
+    socket.send(
+      JSON.stringify({
+        type: 'file.created',
+        ts: new Date().toISOString(),
+        actor_user_id: 'user-1',
+        path: '/glossary/precision.yaml',
+        file: {
+          name: 'precision.yaml',
+          path: '/glossary/precision.yaml',
+          is_directory: false,
+          status: 'added',
+        },
+      }),
+    );
+    await page.getByRole('tab', { name: 'Files' }).click();
+    await row(page, 'glossary').click();
+    await expect(row(page, 'precision.yaml')).toBeVisible();
+    await expect(page.getByText(/Failed to apply update/)).toHaveCount(0);
+
+    await page.unroute('**/workspaces/ws-1/threads', failing);
+    await page.getByRole('tab', { name: /Comments/ }).click();
+    await page.getByRole('button', { name: 'Try again' }).click();
+    await expect(threads(page)).toContainText('On accuracy');
+  });
+
+  test('the Comments tab also counts open threads of missing files', async ({ page, api }) => {
+    api.threads = [
+      thread({ id: 't1', path: FILE, body: 'On accuracy' }),
+      thread({ id: 't2', path: '/glossary/gone.yaml', body: 'Gone', outdated: true }),
+      thread({ id: 't3', path: FILE, body: 'Done', status: 'resolved' }),
+    ];
+    await openWorkspace(page);
+    await row(page, 'glossary').click();
+
+    await expect(page.getByRole('tab', { name: /Comments/ }).locator('.v-badge')).toHaveText('2');
+    await expect(row(page, 'accuracy.yaml').locator('.comment-count')).toHaveText('1');
+  });
+
+  test('a share link redeemed in another tab names the link', async ({ page, api }) => {
+    let socket;
+    await page.routeWebSocket(/^ws:\/\/localhost:8099\//, (ws) => (socket = ws));
+    api.workspaces[0].viewer_role = 'readonly';
+    await openWorkspace(page);
+    await expect.poll(() => socket).toBeTruthy();
+
+    api.workspaces[0].viewer_role = 'comment';
+    socket.send(
+      JSON.stringify({
+        type: 'collaborator.updated',
+        ts: new Date().toISOString(),
+        actor_user_id: 'user-1',
+        target_user_id: 'user-1',
+        mode: 'comment',
+      }),
+    );
+    await expect(
+      page.getByText('A share link gave you more access to this workspace.'),
+    ).toBeVisible();
+    await expect(page.getByText('The owner changed your access')).toHaveCount(0);
+  });
 });

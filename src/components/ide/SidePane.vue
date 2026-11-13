@@ -53,7 +53,7 @@ export default {
       },
     },
     openCount() {
-      return this.commentsStore.openThreads.length;
+      return this.commentsStore.openThreadCount;
     },
   },
 };

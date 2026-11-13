@@ -10,6 +10,10 @@ const getDefaults = () => ({
   threads: [],
   isLoading: false,
   loaded: false,
+  // The last load failed; shown while nothing was loaded
+  loadFailed: false,
+  // Unsent replies by thread id, kept while their thread isn't shown
+  drafts: {},
   // The side pane shows the files or the comments; `path` limits the comments to a file or folder
   pane: 'files',
   path: null,
@@ -47,6 +51,9 @@ export const useCommentsStore = defineStore('comments', {
     openThreads: (state) =>
       state.threads.filter((thread) => thread.status === 'open' && !thread.outdated),
 
+    /** The open threads the comments list shows, also those of missing files. */
+    openThreadCount: (state) => state.threads.filter((thread) => thread.status === 'open').length,
+
     /** The number of open threads on a file, or on the files in a folder. */
     openCount() {
       return (path) => this.openThreads.filter((thread) => isWithin(thread.path, path)).length;
@@ -69,11 +76,30 @@ export const useCommentsStore = defineStore('comments', {
         if (started === workspaceSession() && load === latestLoad) {
           this.threads = this.merge(threads, since);
           this.loaded = true;
+          this.loadFailed = false;
         }
+      } catch (error) {
+        if (started === workspaceSession() && load === latestLoad) {
+          this.loadFailed = true;
+        }
+        throw error;
       } finally {
         if (started === workspaceSession() && load === latestLoad) {
           this.isLoading = false;
         }
+      }
+    },
+
+    /** Reload without waiting: the list shows when it fails. */
+    reload() {
+      this.load().catch((error) => console.error('Failed to reload the comments:', error));
+    },
+
+    setDraft(threadId, body) {
+      if (body) {
+        this.drafts[threadId] = body;
+      } else {
+        delete this.drafts[threadId];
       }
     },
 
@@ -123,6 +149,7 @@ export const useCommentsStore = defineStore('comments', {
       deleted.add(threadId);
       touch(threadId);
       this.threads = this.threads.filter((thread) => thread.id !== threadId);
+      delete this.drafts[threadId];
     },
 
     /** The file filter follows a renamed file or folder. */
@@ -220,16 +247,16 @@ export function registerCommentsEventListeners() {
     useCommentsStore().movePath(event.old_path, event.file?.path);
   });
 
-  // Also retries a load that failed
+  // Also retries a load that failed. Not awaited, so other updates don't wait for it
   for (const type of FILE_EXISTENCE_EVENTS) {
-    on(type, () => useCommentsStore().load());
+    on(type, () => useCommentsStore().reload());
   }
 
   // Saving a deleted file restores it
   on(EVENTS.FILE_SAVED, (event) => {
     const comments = useCommentsStore();
     if (comments.threads.some((thread) => thread.outdated && thread.path === event.path)) {
-      comments.load();
+      comments.reload();
     }
   });
 }
