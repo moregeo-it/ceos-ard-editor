@@ -21,6 +21,20 @@ export function canCommentOn(path) {
 }
 
 /**
+ * Whether the user can start a thread on a file shown in the preview. The tree may not have loaded
+ * it, so only files known to be deleted or folders are ruled out; the server checks the rest.
+ */
+export function canCommentFromPreview(path) {
+  const file = useFilesStore().all[path];
+  return Boolean(
+    useWorkspacesStore().canComment && !file?.is_directory && file?.status !== 'deleted',
+  );
+}
+
+export const openThreadsLabel = (count) =>
+  count === 1 ? '1 open comment thread' : `${count} open comment threads`;
+
+/**
  * Ask for the first comment of a new thread on a file, then show the file's comments.
  * @param {Object} root The root component (`this.$root`), which opens dialogs.
  * @param {string} path The file, e.g. `/requirements/foo.yaml`.
