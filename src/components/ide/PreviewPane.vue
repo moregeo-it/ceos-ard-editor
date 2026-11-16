@@ -99,7 +99,12 @@ import { useCommentsStore } from '@/stores/comments';
 import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
 import { downloadBlob } from '@/utils/api';
-import { canCommentFromPreview, openCommentDialog, openThreadsLabel } from '@/utils/comments';
+import {
+  canCommentFromPreview,
+  openCommentDialog,
+  openThreadsLabel,
+  showFileComments,
+} from '@/utils/comments';
 import { enhancePreviewHtml, parseHashAction, syncCommentMarks } from '@/utils/preview-html';
 import PfsSelect from '@/components/PfsSelect.vue';
 import { workspaceSession } from '@/services/events';
@@ -248,7 +253,7 @@ export default {
         openCommentDialog(this.$root, path);
       } else {
         // Also when commenting isn't possible (any more), e.g. the role isn't known yet
-        useCommentsStore().showComments(path);
+        showFileComments(path);
       }
     },
     // Read from the editor, as WebKit runs no listeners in the preview

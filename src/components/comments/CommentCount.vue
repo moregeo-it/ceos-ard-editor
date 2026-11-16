@@ -2,8 +2,8 @@
   <v-chip
     v-if="count > 0"
     size="small"
-    variant="tonal"
-    color="primary"
+    :variant="urgent ? 'flat' : 'tonal'"
+    :color="urgent ? 'error' : 'primary'"
     :prepend-icon="icons.comment"
     class="comment-count"
     @click.stop="showComments"
@@ -19,15 +19,17 @@
 
 <script>
 import { useCommentsStore } from '@/stores/comments';
-import { openThreadsLabel } from '@/utils/comments';
+import { openThreadsLabel, showFileComments } from '@/utils/comments';
 import { mdiCommentOutline } from '@mdi/js';
 
-/** The number of open comment threads on a file; shows them on click. */
+/** The number of open comment threads on a file; shows them and the file in the editor on click. */
 export default {
   name: 'CommentCount',
 
   props: {
     path: { type: String, required: true },
+    // Red, like the preview's counts: open threads still need work
+    urgent: { type: Boolean, default: false },
   },
 
   data() {
@@ -40,7 +42,8 @@ export default {
 
   computed: {
     count() {
-      return useCommentsStore().openCount(this.path);
+      // A file's threads are outdated only while it is deleted, and then still count
+      return useCommentsStore().openCount(this.path, true);
     },
     label() {
       return openThreadsLabel(this.count);
@@ -49,7 +52,11 @@ export default {
 
   methods: {
     showComments() {
-      useCommentsStore().showComments(this.path);
+      // E.g. from Propose
+      if (this.$route.name !== 'editor') {
+        this.$router.push({ name: 'editor' });
+      }
+      showFileComments(this.path);
     },
   },
 };

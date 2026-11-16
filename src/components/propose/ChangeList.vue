@@ -1,6 +1,11 @@
 <template>
   <div class="changes-overview pa-4 fill-height overflow-auto">
-    <h2 class="mb-4">List of Changes</h2>
+    <h2 class="mb-4">
+      List of Changes
+      <span v-if="openThreadCount > 0" class="text-body-2 text-subtle ml-2">{{
+        openThreadsLabel(openThreadCount)
+      }}</span>
+    </h2>
 
     <div v-if="proposalStore.isDiffLoading" class="text-center">
       <v-progress-circular indeterminate color="primary" />
@@ -20,6 +25,8 @@
               ><FilePath :path="file.source" class="mr-1" />→&nbsp;</template
             >
             <FilePath :path="file.path" />
+            <span class="flex-grow-1" />
+            <CommentCount :path="threadPath(file)" urgent class="ml-2 mr-2 flex-shrink-0" />
           </v-expansion-panel-title>
           <v-expansion-panel-text>
             <FileDiff :file="file" />
@@ -65,6 +72,9 @@ import { useProposalStore } from '@/stores/proposal';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useTypesStore } from '@/stores/types';
 import { useNotificationsStore } from '@/stores/notifications';
+import { useCommentsStore } from '@/stores/comments';
+import { openThreadsLabel } from '@/utils/comments';
+import CommentCount from '@/components/comments/CommentCount.vue';
 import FilePath from '@/components/FilePath.vue';
 import FileStatusBadge from '@/components/FileStatusBadge.vue';
 import FileDiff from './FileDiff.vue';
@@ -74,6 +84,7 @@ export default {
   name: 'ChangeList',
 
   components: {
+    CommentCount,
     FilePath,
     FileStatusBadge,
     FileDiff,
@@ -114,6 +125,13 @@ export default {
     commits() {
       return this.proposalStore.commits || [];
     },
+    openThreadCount() {
+      const comments = useCommentsStore();
+      return this.diffs.reduce(
+        (sum, file) => sum + comments.openCount(this.threadPath(file), true),
+        0,
+      );
+    },
     formDisabled() {
       return (
         this.proposalStore.isCommitting ||
@@ -124,6 +142,13 @@ export default {
   },
 
   methods: {
+    openThreadsLabel,
+
+    // The diffs' paths are repo-relative, the threads' start with a slash
+    threadPath(file) {
+      return file.path.startsWith('/') ? file.path : `/${file.path}`;
+    },
+
     async onCommitMessageSubmit() {
       const workspaceId = this.workspacesStore.currentWorkspace.id;
       let commit;
