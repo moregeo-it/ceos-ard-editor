@@ -12,13 +12,14 @@
   >
     {{ count }}
     <v-tooltip activator="parent" location="top">
-      {{ count === 1 ? '1 open comment thread' : `${count} open comment threads` }}
+      {{ label }}
     </v-tooltip>
   </v-chip>
 </template>
 
 <script>
 import { useCommentsStore } from '@/stores/comments';
+import { openThreadsLabel } from '@/utils/comments';
 import { mdiCommentOutline } from '@mdi/js';
 
 /** The number of open comment threads on a file; shows them on click. */
@@ -40,6 +41,9 @@ export default {
   computed: {
     count() {
       return useCommentsStore().openCount(this.path);
+    },
+    label() {
+      return openThreadsLabel(this.count);
     },
   },
 
