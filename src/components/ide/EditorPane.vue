@@ -120,6 +120,21 @@
           </v-list>
         </v-menu>
 
+        <v-tooltip location="top" max-width="320">
+          <template #activator="{ props }">
+            <span v-bind="props">
+              <v-btn
+                :prepend-icon="icons.preview"
+                :disabled="!isInPreview || previewStore.isGenerating"
+                @click="previewStore.showInPreview(activeFile.path)"
+              >
+                In preview
+              </v-btn>
+            </span>
+          </template>
+          {{ previewHint }}
+        </v-tooltip>
+
         <template v-slot:append v-if="!workspacesStore.isReadOnly">
           <v-btn
             :disabled="isActiveSaving || !hasActiveChanges"
@@ -145,6 +160,7 @@ import { useCommentsStore } from '@/stores/comments';
 import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
+import { usePreviewStore } from '@/stores/preview';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { defineAsyncComponent } from 'vue';
 import BrowserViewer from './editors/BrowserViewer.vue';
@@ -156,6 +172,7 @@ import {
   mdiCommentPlusOutline,
   mdiContentSave,
   mdiContentSaveAll,
+  mdiEyeOutline,
   mdiMenu,
   mdiMenuUp,
 } from '@mdi/js';
@@ -192,6 +209,7 @@ export default {
         close: mdiClose,
         comments: mdiCommentMultipleOutline,
         menu: mdiMenu,
+        preview: mdiEyeOutline,
         save: mdiContentSave,
         usage: mdiMenuUp,
         saveAll: mdiContentSaveAll,
@@ -236,6 +254,24 @@ export default {
     },
     notificationsStore() {
       return useNotificationsStore();
+    },
+    previewStore() {
+      return usePreviewStore();
+    },
+    isInPreview() {
+      return this.previewStore.files.has(this.activeFile.path);
+    },
+    previewHint() {
+      if (this.previewStore.isGenerating) {
+        return 'The preview is being updated.';
+      }
+      if (!this.previewStore.hasPreview) {
+        return 'There is no preview to show this file in yet.';
+      }
+      if (!this.isInPreview) {
+        return 'This file is not part of the preview of the selected PFS.';
+      }
+      return 'Scroll the preview to this file.';
     },
     workspacesStore() {
       return useWorkspacesStore();
