@@ -32,6 +32,7 @@
 </template>
 
 <script>
+import { useCommentsStore } from '@/stores/comments';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useTypesStore } from '@/stores/types';
 import { useWorkspacesStore } from '@/stores/workspaces';
@@ -139,6 +140,14 @@ export default {
     this.proposalStore.fetchCommits(this.workspaceId).catch((error) => {
       this.notificationsStore.error(`Failed to load commits: ${error.message}`);
     });
+    // For the counts on the changed files
+    useCommentsStore()
+      .load()
+      .catch((error) => {
+        if (!this.unmounted) {
+          this.notificationsStore.error(`The comments could not be loaded: ${error.message}`);
+        }
+      });
 
     useRealtimeStore().connect(this.workspaceId);
     this.stopListening = [

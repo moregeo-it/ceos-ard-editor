@@ -56,7 +56,13 @@ export const useCommentsStore = defineStore('comments', {
 
     /** The number of open threads on a file, or on the files in a folder. */
     openCount() {
-      return (path) => this.openThreads.filter((thread) => isWithin(thread.path, path)).length;
+      return (path, includeOutdated = false) =>
+        this.threads.filter(
+          (thread) =>
+            thread.status === 'open' &&
+            (includeOutdated || !thread.outdated) &&
+            isWithin(thread.path, path),
+        ).length;
     },
   },
 

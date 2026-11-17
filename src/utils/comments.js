@@ -1,5 +1,6 @@
 import { workspaceSession } from '@/services/events';
 import { useCommentsStore } from '@/stores/comments';
+import { useEditorStore } from '@/stores/editor';
 import { useFilesStore } from '@/stores/files';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { APP_TITLE } from '@/utils/branding';
@@ -33,6 +34,14 @@ export function canCommentFromPreview(path) {
 
 export const openThreadsLabel = (count) =>
   count === 1 ? '1 open comment thread' : `${count} open comment threads`;
+
+/** Show the comments on a file, next to the file itself in the editor. */
+export function showFileComments(path) {
+  useCommentsStore().showComments(path);
+  useEditorStore()
+    .show(path)
+    .catch((error) => console.error('Error opening file in editor:', error));
+}
 
 /**
  * Ask for the first comment of a new thread on a file, then show the file's comments.

@@ -55,6 +55,15 @@ test.describe('Comments', () => {
     await expect(row(page, 'glossary').locator('.comment-count')).toHaveCount(0);
   });
 
+  test('the file tree counts the threads of a deleted file', async ({ page, api }) => {
+    api.status.set(FILE, 'deleted');
+    api.threads = [thread({ path: FILE, body: 'On accuracy', outdated: true })];
+    await openWorkspace(page);
+    await row(page, 'glossary').click();
+
+    await expect(row(page, 'accuracy.yaml').locator('.comment-count')).toHaveText('1');
+  });
+
   test('reply, resolve and reopen a thread', async ({ page, api }) => {
     api.threads = [thread({ path: FILE, body: 'Is this right?', author: OTHER })];
     await openWorkspace(page);
@@ -361,6 +370,8 @@ test.describe('Comments', () => {
       `Showing only comments on ${SHOWN} Show all`,
     );
     await expect(threads(page)).toHaveCount(1);
+    // Next to the file itself
+    await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText('accuracy.yaml');
     // As breadcrumbs, which still read and copy as the plain path
     await expect(page.locator('.comments-filter .file-path-separator')).toHaveCount(1);
     // Threads are titled with the whole path
@@ -650,6 +661,7 @@ test.describe('Comments in the preview', () => {
       'requirements/general/unused.yaml',
     );
     await expect(threads(page)).toHaveCount(2);
+    await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText('unused.yaml');
   });
 
   test('the counts and links follow live changes without a new preview', async ({ page, api }) => {
@@ -710,5 +722,66 @@ test.describe('Comments in the preview', () => {
 
     await expect(page.getByLabel('Comment', { exact: true })).toBeVisible();
     await expect(page).toHaveURL(/\/workspaces\/ws-1$/);
+  });
+});
+
+test.describe('Comments in Propose', () => {
+  const panel = (page, path) =>
+    page.locator('.changes-overview .v-expansion-panel').filter({ hasText: path });
+
+  test('counts the open threads on the changed files', async ({ page, api }) => {
+    // Repo-relative, as the server sends them
+    api.diffs = [
+      { path: 'glossary/accuracy.yaml', status: 'modified' },
+      { path: 'glossary/gone.yaml', status: 'deleted' },
+      { path: 'README.md', status: 'modified' },
+    ];
+    api.threads = [
+      thread({ id: 't1', path: FILE, body: 'On accuracy' }),
+      thread({ id: 't2', path: FILE, body: 'Done', status: 'resolved' }),
+      thread({ id: 't3', path: '/glossary/gone.yaml', body: 'Gone', outdated: true }),
+      thread({ id: 't4', path: '/pfs/NRB/document.yaml', body: 'Unchanged file' }),
+    ];
+    await page.goto('/workspaces/ws-1/propose');
+
+    await expect(panel(page, SHOWN).locator('.comment-count')).toHaveText('1');
+    // Red, like the preview's counts
+    await expect(panel(page, SHOWN).locator('.comment-count')).toHaveCSS(
+      'background-color',
+      'rgb(176, 0, 32)',
+    );
+    // A deleted file keeps its threads
+    await expect(panel(page, 'glossary/gone.yaml').locator('.comment-count')).toHaveText('1');
+    await expect(panel(page, 'README.md').locator('.comment-count')).toHaveCount(0);
+    await expect(page.locator('.changes-overview h2').first()).toContainText(
+      'List of Changes 2 open comment threads',
+    );
+  });
+
+  test('a count opens the file and its comments in the editor', async ({ page, api }) => {
+    api.diffs = [{ path: 'glossary/accuracy.yaml', status: 'modified' }];
+    api.threads = [
+      thread({ id: 't1', path: FILE, body: 'On accuracy' }),
+      thread({ id: 't2', path: '/README.md', body: 'On the readme' }),
+    ];
+    await page.goto('/workspaces/ws-1/propose');
+    await panel(page, SHOWN).locator('.comment-count').click();
+
+    await expect(page).toHaveURL(/\/workspaces\/ws-1$/);
+    await expect(page.locator('.comments-filter')).toContainText(SHOWN);
+    await expect(threads(page)).toHaveCount(1);
+    await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText('accuracy.yaml');
+  });
+
+  test('the count of a deleted file opens only its comments', async ({ page, api }) => {
+    api.diffs = [{ path: 'glossary/gone.yaml', status: 'deleted' }];
+    api.threads = [thread({ path: '/glossary/gone.yaml', body: 'Gone', outdated: true })];
+    api.status.set('/glossary/gone.yaml', 'deleted');
+    await page.goto('/workspaces/ws-1/propose');
+    await panel(page, 'glossary/gone.yaml').locator('.comment-count').click();
+
+    await expect(page.locator('.comments-filter')).toContainText('glossary/gone.yaml');
+    await expect(threads(page)).toHaveCount(1);
+    await expect(page.locator('.editor-tabs .v-tab')).toHaveCount(0);
   });
 });
