@@ -20,6 +20,10 @@ const getDefaults = () => ({
   // The toolchain this tab's preview or download waits for, from `preview.preparing`; null when none
   preparing: null,
   scrollPosition: [0, 0], // x, y
+  // The files the shown preview contains
+  files: new Set(),
+  // The last request to show a file in the preview; `id` tells repeated requests apart
+  showRequest: null,
 });
 
 export const usePreviewStore = defineStore('preview', {
@@ -39,6 +43,17 @@ export const usePreviewStore = defineStore('preview', {
     setPreviewHtml(html) {
       this.previewHtml = html;
       this.previewGeneration++;
+      // Known again once shown
+      this.files = new Set();
+    },
+
+    setFiles(files) {
+      this.files = files;
+    },
+
+    /** Scroll the preview to a file, and open the preview if it is collapsed. */
+    showInPreview(path) {
+      this.showRequest = { path, id: (this.showRequest?.id ?? 0) + 1 };
     },
 
     /**

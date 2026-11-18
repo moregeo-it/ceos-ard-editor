@@ -25,7 +25,11 @@ const COUNT_STYLE =
 const PREVIEW_STYLE =
   'a.edit:hover, a.edit:focus-visible { background-color: #0069d9 !important; }' +
   'a.comment:hover, a.comment:focus-visible { background-color: #e7f1ff !important; }' +
-  'a.comment-count:hover, a.comment-count:focus-visible { background-color: #8c001a !important; }';
+  'a.comment-count:hover, a.comment-count:focus-visible { background-color: #8c001a !important; }' +
+  '.shown-in-preview { outline: 2px solid #f0b400; outline-offset: 4px; scroll-margin-top: 16px; }';
+const SHOWN_CLASS = 'shown-in-preview';
+// The server puts an anchor before each Edit button, e.g. `<a name="/glossary/ard.yaml">`
+const ANCHORS = 'a[name^="/"]';
 
 // Without the JSON pointer to a field of the file that can follow, e.g. #/background
 const fileOf = (path) => path.split('#')[0];
@@ -161,4 +165,41 @@ export function syncCommentMarks(doc, { canComment, openCount, countLabel }) {
     link.title = countLabel(count);
     link.setAttribute('aria-label', link.title);
   });
+}
+
+/**
+ * The files a preview shows.
+ * @param {Document} doc
+ * @returns {Set<string>} e.g. `/glossary/ard.yaml`
+ */
+export function previewFiles(doc) {
+  return new Set([...doc.querySelectorAll(ANCHORS)].map((anchor) => anchor.name));
+}
+
+// A marker that starts an element (a heading, a reference) stands for it; a loose one for the
+// block after its links (a glossary term)
+function markedElement(anchor) {
+  if (anchor === anchor.parentElement.firstElementChild) {
+    return anchor.parentElement;
+  }
+  let element = anchor.nextElementSibling;
+  while (element?.tagName === 'A') {
+    element = element.nextElementSibling;
+  }
+  return element;
+}
+
+/**
+ * Scroll a shown preview to the first place of a file, and outline it.
+ * @param {Document} doc
+ * @param {string} path The file, e.g. `/requirements/foo.yaml`.
+ */
+export function showFile(doc, path) {
+  const anchor = doc.getElementsByName(path)[0];
+  const element = anchor && markedElement(anchor);
+  if (element) {
+    doc.querySelector(`.${SHOWN_CLASS}`)?.classList.remove(SHOWN_CLASS);
+    element.classList.add(SHOWN_CLASS);
+    element.scrollIntoView({ block: 'start' });
+  }
 }

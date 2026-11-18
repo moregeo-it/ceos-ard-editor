@@ -876,3 +876,135 @@ test.describe('Propose', () => {
     await expect(pullRequest).toContainText('Proposal: Update NRB');
   });
 });
+
+test.describe('Show in preview', () => {
+  const INTRO = '/sections/introduction/what-are-ceos-ard-products.md';
+  const UNUSED = '/requirements/general/unused.yaml';
+  const tall = (text) => `<p style="height: 1500px">${text}</p>`;
+  // As the server renders `<!-- edit: path -->`: in headings, or before a block
+  const marker = (path) =>
+    `<a name="${path.split('#')[0]}"></a><button class="edit" value="${path}">Edit</button>`;
+  const PREVIEW =
+    '<!doctype html><html><head></head><body>' +
+    `<h1>${marker('/pfs/NRB/document.yaml')}NRB</h1>` +
+    `<h2>${marker(INTRO)}What are CEOS-ARD products?</h2>${tall('Introduction')}` +
+    `<h2>Definitions</h2>${marker('/glossary/accuracy.yaml')}` +
+    '<dl><dt>Accuracy</dt><dd>Closeness of agreement.</dd></dl>' +
+    `<h4>${marker(UNUSED)}Unused</h4>${tall('First use')}` +
+    `<h4>${marker('/requirements/general/metadata-machine-readable.yaml')}Metadata</h4>` +
+    tall('Machine readable') +
+    `<h4>${marker(UNUSED)}Unused again</h4>${tall('Second use')}` +
+    `<h2>${marker('/pfs/NRB/document.yaml#/background')}Background</h2>${tall('Background')}` +
+    '</body></html>';
+
+  const button = (page) => page.getByRole('button', { name: 'In preview' });
+  const frame = (page) => page.frameLocator('.preview-iframe');
+  const highlighted = (page) => frame(page).locator('.shown-in-preview');
+  const tooltip = (page, text) =>
+    page.locator('.v-tooltip .v-overlay__content').filter({ hasText: text });
+  // Whether an element of the preview sits at the preview's top, below a small margin
+  const atTop = async (page, selector) => Math.abs((await topOf(page, selector)) - 16) <= 2;
+  const topOf = (page, selector) =>
+    page
+      .locator('.preview-iframe')
+      .evaluate(
+        (iframe, selector) =>
+          Math.round(iframe.contentDocument.querySelector(selector).getBoundingClientRect().top),
+        selector,
+      );
+
+  async function openFile(page, ...names) {
+    await expand(page, ...names.slice(0, -1));
+    await row(page, names.at(-1)).click();
+    await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText(names.at(-1));
+  }
+
+  test.beforeEach(({ api }) => {
+    api.previewHtml = PREVIEW;
+  });
+
+  test('scrolls to a section and outlines its heading', async ({ page }) => {
+    await openWorkspace(page);
+    await openFile(page, 'sections', 'introduction', 'what-are-ceos-ard-products.md');
+    await button(page).click();
+
+    await expect.poll(() => atTop(page, 'h2')).toBe(true);
+    await expect(highlighted(page)).toHaveText(/What are CEOS-ARD products\?$/);
+  });
+
+  test('outlines the block that follows a loose marker', async ({ page }) => {
+    await openWorkspace(page);
+    await openFile(page, 'glossary', 'accuracy.yaml');
+    await button(page).click();
+
+    await expect(highlighted(page)).toHaveText('AccuracyCloseness of agreement.');
+    await expect.poll(() => atTop(page, 'dl')).toBe(true);
+  });
+
+  test('outlines only the last file shown', async ({ page }) => {
+    await openWorkspace(page);
+    await openFile(page, 'glossary', 'accuracy.yaml');
+    await button(page).click();
+    await expect(highlighted(page)).toHaveText('AccuracyCloseness of agreement.');
+
+    await openFile(page, 'requirements', 'general', 'unused.yaml');
+    await button(page).click();
+    await expect(highlighted(page)).toHaveText(/Unused$/);
+    await expect.poll(() => atTop(page, 'h4')).toBe(true);
+  });
+
+  test('a click while the preview loads is not undone by its scroll restore', async ({
+    page,
+    api,
+  }) => {
+    api.previewHtml = PREVIEW.replace('<body>', '<body><img src="slow.png" width="1" height="1">');
+    let release;
+    await page.route('**/previews/slow.png', async (route) => {
+      await new Promise((resolve) => (release = resolve));
+      await route.fulfill({ status: 404 });
+    });
+    await openWorkspace(page);
+    await openFile(page, 'glossary', 'accuracy.yaml');
+    await expect.poll(() => release).toBeTruthy();
+
+    await button(page).click();
+    release();
+    await expect
+      .poll(() =>
+        page.locator('.preview-iframe').evaluate((iframe) => iframe.contentDocument.readyState),
+      )
+      .toBe('complete');
+    expect(await atTop(page, 'dl')).toBe(true);
+    await expect(highlighted(page)).toHaveText('AccuracyCloseness of agreement.');
+  });
+
+  test('a file that the preview does not contain', async ({ page }) => {
+    await openWorkspace(page);
+    await openFile(page, 'README.md');
+
+    await expect(button(page)).toBeDisabled();
+    await button(page).locator('..').hover();
+    await expect(
+      tooltip(page, 'This file is not part of the preview of the selected PFS.'),
+    ).toBeVisible();
+  });
+
+  test('opens a collapsed preview again', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.filesPanelSize = 20;
+      localStorage.editorPanelSize = 80;
+      localStorage.previewPanelSize = 0;
+    });
+    await openWorkspace(page);
+    await openFile(page, 'sections', 'introduction', 'what-are-ceos-ard-products.md');
+    const pane = page.locator('.splitpanes__pane.preview');
+    expect((await pane.boundingBox()).width).toBeLessThan(10);
+
+    await button(page).click();
+    await expect.poll(async () => (await pane.boundingBox()).width).toBeGreaterThan(300);
+    await expect.poll(() => atTop(page, 'h2')).toBe(true);
+    await expect(highlighted(page)).toHaveText(/What are CEOS-ARD products\?$/);
+    expect(await page.evaluate(() => Number(localStorage.previewPanelSize))).toBe(35);
+    expect(await page.evaluate(() => Number(localStorage.editorPanelSize))).toBe(45);
+  });
+});
