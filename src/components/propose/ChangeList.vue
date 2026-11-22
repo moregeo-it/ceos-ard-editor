@@ -33,7 +33,7 @@
           </v-expansion-panel-text>
         </v-expansion-panel>
       </v-expansion-panels>
-      <v-form @submit.prevent="onCommitMessageSubmit">
+      <v-form class="readable-disabled" @submit.prevent="onCommitMessageSubmit">
         <v-text-field
           v-model="proposalStore.commitMessage"
           persistent-counter

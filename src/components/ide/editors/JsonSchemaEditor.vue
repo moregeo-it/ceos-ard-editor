@@ -1,5 +1,5 @@
 <template>
-  <div class="json-schema-editor">
+  <div class="json-schema-editor readable-disabled">
     <JsonForms
       :data="parsedData"
       :schema="schema"
