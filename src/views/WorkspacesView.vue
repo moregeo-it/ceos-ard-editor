@@ -56,7 +56,8 @@
       <!-- First-time State: the user has no workspaces at all, whichever filter is selected -->
       <v-row v-else-if="workspacesStore.workspaces.length === 0">
         <v-col cols="12">
-          <v-card class="pa-8 text-center" variant="outlined">
+          <!-- Narrow so the box fits its content and the text stays readable on wide screens -->
+          <v-card class="welcome mx-auto mt-8 pa-6 pa-sm-12 text-center" variant="outlined">
             <v-icon :icon="icons.folderPlus" size="64" class="mb-4 text-subtle"></v-icon>
             <h2 class="text-h6 mb-2">Create your first workspace</h2>
             <p class="text-body-2 text-medium-emphasis mb-6">
@@ -65,38 +66,36 @@
               the maintainers for review.
             </p>
 
-            <v-list
-              v-if="typesStore.availableTypes.length > 0"
-              class="text-left mb-6"
-              density="compact"
-              bg-color="transparent"
-            >
-              <v-list-subheader>You can create workspaces for</v-list-subheader>
-              <v-list-item
+            <div v-if="typesStore.availableTypes.length > 0" class="mb-6">
+              <p class="text-body-2 text-medium-emphasis mb-2">You can create workspaces for</p>
+              <v-sheet
                 v-for="type in typesStore.availableTypes"
                 :key="type.id"
-                :title="type.title"
-                :subtitle="type.description"
+                border
+                rounded
+                color="transparent"
+                class="d-flex flex-wrap align-center ga-3 pa-3 mb-2 text-left"
               >
-                <template #prepend>
-                  <v-icon :icon="icons.folder" :color="type.color"></v-icon>
-                </template>
-                <template v-if="type.upstream?.url" #append>
-                  <v-btn
-                    variant="text"
-                    size="small"
-                    :append-icon="icons.openInNew"
-                    :href="type.upstream.url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    View repository
-                  </v-btn>
-                </template>
-              </v-list-item>
-            </v-list>
+                <v-icon :icon="icons.folder" :color="type.color"></v-icon>
+                <div class="type-text">
+                  <div class="text-body-1">{{ type.title }}</div>
+                  <div class="text-body-2 text-medium-emphasis">{{ type.description }}</div>
+                </div>
+                <v-btn
+                  v-if="type.upstream?.url"
+                  variant="text"
+                  size="small"
+                  :append-icon="icons.openInNew"
+                  :href="type.upstream.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View repository
+                </v-btn>
+              </v-sheet>
+            </div>
 
-            <p class="text-body-2 text-medium-emphasis mb-6">
+            <p class="text-body-2 text-medium-emphasis text-left mb-6">
               Your first workspace also creates a copy (fork) of the repository on your GitHub
               account. Nothing changes in the official repository until you propose your changes.
             </p>
@@ -108,7 +107,7 @@
         </v-col>
       </v-row>
 
-      <!-- Empty State: the selected filter matches none of the user's workspaces -->
+      <!-- Empty State:the selected filter matches none of the user's workspaces -->
       <v-row v-else-if="filteredWorkspaces.length === 0">
         <v-col cols="12">
           <v-card class="pa-8 text-center text-subtle" variant="outlined">
@@ -396,3 +395,15 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.welcome {
+  max-width: 752px;
+}
+
+/* The description wraps beside the icon; on narrow screens the button moves below */
+.type-text {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+</style>
