@@ -984,9 +984,51 @@ test.describe('Show in preview', () => {
 
     await expect(button(page)).toBeDisabled();
     await button(page).locator('..').hover();
-    await expect(
-      tooltip(page, 'This file is not part of the preview of the selected PFS.'),
-    ).toBeVisible();
+    await expect(tooltip(page, 'This file is not part of the selected PFS.')).toBeVisible();
+  });
+
+  test('goes through the places of a file shown more than once', async ({ page }) => {
+    await openWorkspace(page);
+    await openFile(page, 'requirements', 'general', 'unused.yaml');
+    const badge = button(page).locator('.v-badge');
+    await expect(badge).toHaveText('2');
+
+    await button(page).click();
+    await expect(highlighted(page)).toHaveText(/Unused$/);
+    await expect(badge).toHaveText('1/2');
+    await button(page).click();
+    await expect(highlighted(page)).toHaveText(/Unused again$/);
+    await expect(badge).toHaveText('2/2');
+    await expect.poll(() => atTop(page, '.shown-in-preview')).toBe(true);
+    await button(page).click();
+    await expect(highlighted(page)).toHaveText(/Unused$/);
+    await expect(badge).toHaveText('1/2');
+  });
+
+  test('starts at the first place again for another file', async ({ page }) => {
+    await openWorkspace(page);
+    await openFile(page, 'requirements', 'general', 'unused.yaml');
+    await button(page).click();
+    await button(page).click();
+    await expect(highlighted(page)).toHaveText(/Unused again$/);
+
+    await openFile(page, 'glossary', 'accuracy.yaml');
+    await button(page).click();
+    await page.locator('.editor-tabs .v-tab').filter({ hasText: 'unused.yaml' }).click();
+    await button(page).click();
+    await expect(highlighted(page)).toHaveText(/Unused$/);
+  });
+
+  test('counts the markers of several fields on one block once', async ({ page, api }) => {
+    api.previewHtml = PREVIEW.replace(
+      marker('/glossary/accuracy.yaml'),
+      marker('/glossary/accuracy.yaml') + marker('/glossary/accuracy.yaml#/description'),
+    );
+    await openWorkspace(page);
+    await openFile(page, 'glossary', 'accuracy.yaml');
+
+    await expect(button(page)).toBeEnabled();
+    await expect(button(page).locator('.v-badge')).toHaveCount(0);
   });
 
   test('opens a collapsed preview again', async ({ page }) => {

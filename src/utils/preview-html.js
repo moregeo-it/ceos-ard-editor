@@ -168,12 +168,23 @@ export function syncCommentMarks(doc, { canComment, openCount, countLabel }) {
 }
 
 /**
- * The files a preview shows.
+ * The files a preview shows, with their number of places.
  * @param {Document} doc
- * @returns {Set<string>} e.g. `/glossary/ard.yaml`
+ * @returns {Map<string, number>} e.g. `/glossary/ard.yaml` → 1
  */
 export function previewFiles(doc) {
-  return new Set([...doc.querySelectorAll(ANCHORS)].map((anchor) => anchor.name));
+  const files = new Map();
+  doc.querySelectorAll(ANCHORS).forEach(({ name }) => {
+    if (!files.has(name)) {
+      files.set(name, placesOf(doc, name).length);
+    }
+  });
+  return files;
+}
+
+// The elements a file's markers stand for, once each: markers of several fields can share one
+function placesOf(doc, path) {
+  return [...new Set([...doc.getElementsByName(path)].map(markedElement))].filter(Boolean);
 }
 
 // A marker that starts an element (a heading, a reference) stands for it; a loose one for the
@@ -190,13 +201,14 @@ function markedElement(anchor) {
 }
 
 /**
- * Scroll a shown preview to the first place of a file, and outline it.
+ * Scroll a shown preview to a place of a file, and outline it.
  * @param {Document} doc
  * @param {string} path The file, e.g. `/requirements/foo.yaml`.
+ * @param {number} [index] The place, from the first; past the last starts over.
  */
-export function showFile(doc, path) {
-  const anchor = doc.getElementsByName(path)[0];
-  const element = anchor && markedElement(anchor);
+export function showFile(doc, path, index = 0) {
+  const places = placesOf(doc, path);
+  const element = places[index % places.length];
   if (element) {
     doc.querySelector(`.${SHOWN_CLASS}`)?.classList.remove(SHOWN_CLASS);
     element.classList.add(SHOWN_CLASS);

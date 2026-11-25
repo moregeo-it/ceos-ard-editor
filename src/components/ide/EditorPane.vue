@@ -125,10 +125,21 @@
             <span v-bind="props">
               <v-btn
                 :prepend-icon="icons.preview"
-                :disabled="!isInPreview || previewStore.isGenerating"
+                :disabled="!previewPlaces || previewStore.isGenerating"
                 @click="previewStore.showInPreview(activeFile.path)"
               >
                 In preview
+                <v-badge
+                  v-if="previewPlaces > 1"
+                  :content="previewPlace ? `${previewPlace}/${previewPlaces}` : previewPlaces"
+                  :label="
+                    previewPlace
+                      ? `place ${previewPlace} of ${previewPlaces}`
+                      : `${previewPlaces} places`
+                  "
+                  color="primary"
+                  inline
+                />
               </v-btn>
             </span>
           </template>
@@ -258,8 +269,15 @@ export default {
     previewStore() {
       return usePreviewStore();
     },
-    isInPreview() {
-      return this.previewStore.files.has(this.activeFile.path);
+    previewPlaces() {
+      return this.previewStore.files.get(this.activeFile.path) ?? 0;
+    },
+    // The place last shown of this file, from 1; null before
+    previewPlace() {
+      const request = this.previewStore.showRequest;
+      return request?.path === this.activeFile.path && this.previewPlaces
+        ? (request.index % this.previewPlaces) + 1
+        : null;
     },
     previewHint() {
       if (this.previewStore.isGenerating) {
@@ -268,8 +286,11 @@ export default {
       if (!this.previewStore.hasPreview) {
         return 'There is no preview to show this file in yet.';
       }
-      if (!this.isInPreview) {
-        return 'This file is not part of the preview of the selected PFS.';
+      if (!this.previewPlaces) {
+        return 'This file is not part of the selected PFS.';
+      }
+      if (this.previewPlaces > 1) {
+        return `The preview shows this file in ${this.previewPlaces} places. Click again for the next one.`;
       }
       return 'Scroll the preview to this file.';
     },

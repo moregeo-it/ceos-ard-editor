@@ -241,7 +241,7 @@ export default {
     },
     'previewStore.showRequest'(request) {
       if (request) {
-        this.showFile(request.path);
+        this.showFile(request);
       }
     },
     // The iframe is keyed by previewGeneration so each regeneration gets a fresh
@@ -289,10 +289,10 @@ export default {
       iframe.addEventListener(
         'load',
         () => {
-          const path = this.pendingShow;
+          const request = this.pendingShow;
           this.pendingShow = null;
-          if (path) {
-            showFile(iframe.contentDocument, path);
+          if (request) {
+            showFile(iframe.contentDocument, request.path, request.index);
           } else if (iframe.contentWindow) {
             iframe.contentWindow.scrollTo(...oldPosition);
           }
@@ -317,14 +317,14 @@ export default {
       this.syncCommentMarks();
     },
     // After a collapsed pane has opened, as positions in the preview depend on its width
-    async showFile(path) {
+    async showFile(request) {
       await this.$nextTick();
       await new Promise((resolve) => requestAnimationFrame(resolve));
       const doc = this.$refs.iframe?.contentDocument;
       if (this.restoringScroll) {
-        this.pendingShow = path;
+        this.pendingShow = request;
       } else if (doc && !this.isGenerating) {
-        showFile(doc, path);
+        showFile(doc, request.path, request.index);
       }
     },
     syncCommentMarks() {
