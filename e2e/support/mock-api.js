@@ -2,6 +2,7 @@ import { test as base, expect } from '@playwright/test';
 import { expectNoRawData } from './ui';
 // Exported from the server, see README.md
 import CEOS_ARD_TYPE from './types/ceos-ard.json' with { type: 'json' };
+import OGC_TYPE from './types/ogc.json' with { type: 'json' };
 
 export const API = 'http://localhost:8099';
 // The realtime streams: the open workspace's, and the user's (changes to their workspaces)
@@ -44,6 +45,30 @@ const PFS_TYPES = [
 ];
 
 // With an edit button as the server renders `<!-- edit: path -->`
+export const OGC_FILES = {
+  '/README.md': '# OGC API - Records\n',
+  '/core/standard/20-004.adoc':
+    '= OGC API - Records - Part 1: Core\n:mn-document-class: ogc\n\ninclude::clause_1_scope.adoc[]\n',
+  '/core/standard/clause_1_scope.adoc': '== Scope\n',
+  '/extensions/facets/document.adoc':
+    '= OGC API - Records - Part 2: Facets\n:mn-document-class: ogc\n',
+};
+
+export const OGC_DOCUMENTS = [
+  { id: 'core/standard/20-004.adoc', title: 'OGC API - Records - Part 1: Core' },
+  { id: 'extensions/facets/document.adoc', title: 'OGC API - Records - Part 2: Facets' },
+];
+
+export const OGC_REPOSITORIES = [
+  { name: 'ogcapi-records', description: 'OGC API - Records', default_branch: 'master' },
+  {
+    name: 'geoparquet',
+    description:
+      'Specification for storing geospatial vector data (point, line, polygon) in Apache Parquet, a popular columnar storage format for tabular data, see https://geoparquet.org for more details',
+    default_branch: 'main',
+  },
+];
+
 export const PREVIEW_HTML =
   '<!doctype html><html><head></head><body><h1>NRB preview</h1>' +
   '<a name="/requirements/general/unused.yaml"></a>' +
@@ -205,6 +230,31 @@ export class MockApi {
     return results;
   }
 
+  /** Turns the workspace into an OGC workspace of ogcapi-records, with both types offered. */
+  useOgc() {
+    this.types = [CEOS_ARD_TYPE, OGC_TYPE];
+    this.documents = [...OGC_DOCUMENTS];
+    this.selectionOptions = () => ({
+      options: this.documents.map((document) => ({ ...document, path: `/${document.id}` })),
+    });
+    this.files = new Map(Object.entries(OGC_FILES).map(([path, content]) => [path, { content }]));
+    this.usage = {};
+    this.previewHtml =
+      '<!doctype html><html><head></head><body><h1>OGC API - Records - Part 1: Core</h1>' +
+      '<div><a name="/core/standard/clause_1_scope.adoc"></a>' +
+      '<button class="edit" value="/core/standard/clause_1_scope.adoc">Edit</button><h2>Scope</h2></div>' +
+      '</body></html>';
+    Object.assign(this.workspaces[0], {
+      type: 'ogc',
+      title: 'Records review',
+      upstream_owner: 'opengeospatial',
+      upstream_repo: 'ogcapi-records',
+      upstream_branch: 'master',
+      fork_repo_name: 'ogcapi-records',
+      selection: null,
+    });
+  }
+
   // The PFS of the workspace, as the CEOS-ARD type lists them
   selectionOptions() {
     const ids = [...this.folders()]
@@ -293,14 +343,32 @@ export class MockApi {
         ? json(route, { detail: 'Not authenticated' }, 401)
         : json(route, this.sharePreviews[m[1]]);
     }
+    if ((m = path.match(/^\/types\/([^/]+)\/repositories$/))) {
+      return json(route, OGC_REPOSITORIES);
+    }
     if ((m = path.match(/^\/types\/([^/]+)\/selection-options$/))) {
       // GitHub only provides the folder names of the PFS
       return json(route, { options: PFS_TYPES.map(({ id }) => ({ id, title: id, path: null })) });
     }
     if (path === '/workspaces') {
       if (method === 'POST') {
-        const data = JSON.parse(request.postData());
-        const created = workspace({ id: `ws-${this.workspaces.length + 1}`, ...data });
+        const { repository, branch, ...data } = JSON.parse(request.postData());
+        const type = this.types.find((t) => t.id === (data.type ?? this.types[0].id));
+        const upstream = type.choose_repository
+          ? {
+              upstream_owner: type.upstream.owner,
+              upstream_repo: repository,
+              upstream_branch:
+                branch ?? OGC_REPOSITORIES.find((r) => r.name === repository).default_branch,
+              selection: null,
+            }
+          : { upstream_owner: type.upstream.owner, upstream_repo: type.upstream.repo };
+        const created = workspace({
+          id: `ws-${this.workspaces.length + 1}`,
+          fork_repo_name: upstream.upstream_repo,
+          ...upstream,
+          ...data,
+        });
         this.workspaces.push(created);
         return json(route, created, 201);
       }

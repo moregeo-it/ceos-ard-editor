@@ -24,6 +24,7 @@
         <SelectionBadges v-if="workspace.selection?.length" :items="workspace.selection" />
         <span v-else>No {{ type.selection.label }} assigned</span>
       </template>
+      <span v-else-if="type?.choose_repository">{{ workspace.upstream_repo }}</span>
     </div>
 
     <v-card-text class="d-flex flex-column flex-grow-1">

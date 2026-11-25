@@ -248,11 +248,11 @@ export default {
 
     // Only owned workspaces count: the list also holds workspaces shared with the user, which live
     // in someone else's fork.
-    // Every workspace type has its own repository, so the first workspace of a type creates a fork
-    ownedTypes() {
+    // The first workspace of an upstream repository creates a fork of it
+    ownedUpstreams() {
       return this.workspacesStore.workspaces
         .filter((w) => w.viewer_role === 'owner')
-        .map((w) => w.type);
+        .map((w) => `${w.upstream_owner}/${w.upstream_repo}`);
     },
 
     // The workspace dialog reads the types when it opens, e.g. its initial type
@@ -273,7 +273,7 @@ export default {
       const mode = 'create';
       this.$root.openDialog('WorkspaceDialog', {
         mode,
-        ownedTypes: this.ownedTypes(),
+        ownedUpstreams: this.ownedUpstreams(),
         onAcceptance: async (data) => await this.handleWorkspaceSubmit(data, mode),
       });
     },
@@ -282,8 +282,11 @@ export default {
       try {
         if (mode === 'create') {
           // Read before creating, which adds to the list
-          const isFirstWorkspace = !this.ownedTypes().includes(data.type);
+          const owned = this.ownedUpstreams();
           const workspace = await this.workspacesStore.createWorkspace(data);
+          const isFirstWorkspace = !owned.includes(
+            `${workspace.upstream_owner}/${workspace.upstream_repo}`,
+          );
           this.announceFork(workspace, isFirstWorkspace);
           this.handleViewWorkspace(workspace.id);
         } else {

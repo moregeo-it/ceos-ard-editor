@@ -12,7 +12,13 @@
     density="compact"
     @update:model-value="handleModelUpdate"
   >
-    <template v-slot:item="{ props: itemProps, item }">
+    <template v-if="!multiple" v-slot:item="{ props: itemProps, item }">
+      <v-list-item
+        v-bind="itemProps"
+        :subtitle="item.props.title !== item.props.value ? item.props.value : undefined"
+      />
+    </template>
+    <template v-else v-slot:item="{ props: itemProps, item }">
       <v-list-item v-bind="itemProps" :title="null">
         <v-list-item-title>
           <template v-if="item.props.title && item.props.title !== item.props.value">

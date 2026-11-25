@@ -120,9 +120,8 @@ export default {
       const typesStore = useTypesStore();
       return typesStore.hasMultipleTypes ? typesStore.currentType : null;
     },
-    // The name of what the workspace's repository holds, e.g. CEOS-ARD
     projectName() {
-      return useTypesStore().currentType?.title;
+      return useTypesStore().projectName(this.workspacesStore.currentWorkspace);
     },
     loading() {
       return this.workspacesStore.isWorkspaceLoading[this.workspaceId];

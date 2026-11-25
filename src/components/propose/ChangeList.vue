@@ -100,9 +100,8 @@ export default {
   },
 
   computed: {
-    // The name of what the workspace's repository holds, e.g. CEOS-ARD
     projectName() {
-      return useTypesStore().currentType?.title;
+      return useTypesStore().projectName(useWorkspacesStore().currentWorkspace);
     },
     editorStore() {
       return useEditorStore();

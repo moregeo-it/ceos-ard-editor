@@ -1,0 +1,38 @@
+{
+  "id": "ogc",
+  "title": "OGC",
+  "description": "Standards and other documents of the Open Geospatial Consortium, written with Metanorma",
+  "available": true,
+  "color": "#00599c",
+  "upstream": {
+    "owner": "opengeospatial",
+    "url": "https://github.com/opengeospatial"
+  },
+  "preview": "build",
+  "selection": {
+    "label": "document",
+    "multiple": false,
+    "on_create": false
+  },
+  "downloads": [],
+  "choose_repository": true,
+  "expanded_folders": [],
+  "labels": {},
+  "editors": [],
+  "search_filters": [],
+  "actions": [],
+  "file_menu": [
+    {
+      "match": "**",
+      "kind": "folder",
+      "ops": ["create", "rename", "delete"],
+      "ops_if_new": []
+    },
+    {
+      "match": "**",
+      "kind": "file",
+      "ops": ["open_source", "download", "diff", "revert", "rename", "delete"],
+      "ops_if_new": []
+    }
+  ]
+}

@@ -17,6 +17,7 @@
     "on_create": true
   },
   "downloads": ["pdf", "docx"],
+  "choose_repository": false,
   "expanded_folders": [],
   "labels": {},
   "editors": [

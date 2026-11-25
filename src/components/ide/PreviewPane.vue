@@ -24,6 +24,7 @@
           :label="`Select ${selection.multiple ? '' : 'a '}${selection.label} for the preview`"
           :multiple="selection.multiple"
           :chips="selection.multiple"
+          :no-data-text="`The workspace has no ${selection.label}`"
           hide-details
           class="preview-select flex-grow-1"
           @update:model-value="handleSelect"
@@ -164,6 +165,8 @@ export default {
       },
       menuOpen: false,
       readingMode: false,
+      // Whether the selection options were loaded, which may have found none
+      optionsLoaded: false,
       // The owner's edits of a multiple selection while the menu is open; null shows the saved one
       draftSelection: null,
       icons: {
@@ -199,7 +202,9 @@ export default {
     },
     hasSelectionBar() {
       return (
-        this.previewStore.mode === 'build' && this.selection && this.selectionOptions.length > 0
+        this.previewStore.mode === 'build' &&
+        this.selection &&
+        (this.selectionOptions.length > 0 || this.optionsLoaded)
       );
     },
     selectionOptions() {
@@ -245,7 +250,26 @@ export default {
   },
   async created() {
     if (this.workspaceId && this.previewStore.mode === 'build' && this.selection) {
-      await this.workspacesStore.fetchSelectionOptions(this.workspaceId);
+      try {
+        await this.workspacesStore.fetchSelectionOptions(this.workspaceId);
+      } catch (error) {
+        useNotificationsStore().error(
+          `Failed to load the ${this.selection.label}: ${error.message}`,
+        );
+      }
+      this.optionsLoaded = true;
+      // Types that select after creation preview the first option until the owner chooses one
+      const first = this.selectionOptions[0];
+      const { isOwner, isArchived, currentWorkspace } = this.workspacesStore;
+      if (
+        first &&
+        !this.selection.on_create &&
+        isOwner &&
+        !isArchived &&
+        !currentWorkspace?.selection?.length
+      ) {
+        await this.saveSelection([first.id]);
+      }
     }
   },
   async mounted() {

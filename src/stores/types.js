@@ -23,6 +23,14 @@ export const useTypesStore = defineStore('types', {
     hasMultipleTypes() {
       return this.availableTypes.length > 1;
     },
+
+    // The name of what the workspace's repository holds, e.g. CEOS-ARD, or the chosen repository
+    projectName() {
+      return (workspace) => {
+        const type = workspace ? this.byId(workspace.type) : null;
+        return type?.choose_repository ? workspace.upstream_repo : type?.title;
+      };
+    },
   },
 
   actions: {

@@ -58,6 +58,13 @@ export default {
   },
 
   /**
+   * The repositories new workspaces of a type that chooses its repository can start from
+   */
+  async fetchRepositories(typeId) {
+    return api.get(`/types/${encodeURIComponent(typeId)}/repositories`);
+  },
+
+  /**
    * What a workspace can select for its preview, e.g. its PFS: `[{ id, title }]`
    */
   async fetchSelectionOptions(workspaceId) {

@@ -26,6 +26,50 @@
             </template>
           </v-select>
 
+          <template v-if="!isUpdateMode && selectedType?.choose_repository">
+            <v-autocomplete
+              v-model="formData.repository"
+              :items="repositories"
+              :loading="loadingRepositories"
+              :rules="rules.repository"
+              item-title="name"
+              item-value="name"
+              label="Repository"
+              :hint="`The ${selectedType.upstream.owner} repository to propose changes to`"
+              persistent-hint
+              variant="outlined"
+              :prepend-inner-icon="icons.repository"
+              class="mb-3"
+            >
+              <template #item="{ props, item }">
+                <v-list-item
+                  v-bind="props"
+                  :subtitle="item.raw.description"
+                  class="repository-item"
+                />
+              </template>
+            </v-autocomplete>
+            <v-alert
+              v-if="repositoriesError"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mb-3"
+            >
+              Couldn't load the repositories: {{ repositoriesError }}
+            </v-alert>
+            <v-text-field
+              v-model.trim="formData.branch"
+              label="Branch (Optional)"
+              :placeholder="selectedRepository?.default_branch"
+              hint="The branch to start from and propose changes to, the default branch if empty"
+              persistent-hint
+              variant="outlined"
+              :prepend-inner-icon="icons.branch"
+              class="mb-3"
+            ></v-text-field>
+          </template>
+
           <v-text-field
             v-model="formData.title"
             label="Workspace Title"
@@ -76,15 +120,15 @@
           ></v-textarea>
 
           <v-alert
-            v-if="!ownedTypes.includes(formData.type) && !isUpdateMode"
+            v-if="upstream && !ownedUpstreams.includes(upstream) && !isUpdateMode"
             type="info"
             variant="tonal"
             density="compact"
             class="mt-3"
           >
             Creating your first workspace also creates a copy (fork) of the
-            {{ selectedType?.title }} repository on your GitHub account. All of your workspaces for
-            it are stored there.
+            {{ upstreamName }} repository on your GitHub account. All of your workspaces for it are
+            stored there.
           </v-alert>
         </v-card-text>
 
@@ -113,6 +157,8 @@ import {
   mdiFolder,
   mdiFileDocument,
   mdiShapeOutline,
+  mdiSourceBranch,
+  mdiSourceRepository,
   mdiText,
 } from '@mdi/js';
 import SelectionSelect from '@/components/SelectionSelect.vue';
@@ -133,9 +179,9 @@ export default {
       type: Object,
       default: null,
     },
-    // The types the user has workspaces of; the first workspace of a type creates the user's
-    // GitHub fork, which the dialog discloses up front
-    ownedTypes: {
+    // The upstream repositories (owner/repo) the user has workspaces of; the first workspace of a
+    // repository creates the user's GitHub fork, which the dialog discloses up front
+    ownedUpstreams: {
       type: Array,
       default: () => [],
     },
@@ -149,13 +195,21 @@ export default {
         fileDocument: mdiFileDocument,
         text: mdiText,
         type: mdiShapeOutline,
+        repository: mdiSourceRepository,
+        branch: mdiSourceBranch,
       },
       formData: {
         type: useTypesStore().availableTypes[0]?.id,
         title: '',
         selection: [],
+        repository: null,
+        branch: '',
         description: '',
       },
+      // The repositories of the selected type's owner, for types whose workspaces choose one
+      repositories: [],
+      loadingRepositories: false,
+      repositoriesError: null,
       // What the workspace can select: the upstream's options for a new workspace, the workspace's
       // own when updating, including e.g. PFS created in it but not merged upstream yet
       selectionOptions: [],
@@ -167,6 +221,7 @@ export default {
           (v) => !!v || 'Title is required',
           (v) => (v && v.length >= 3) || 'Title must be at least 3 characters',
         ],
+        repository: [(v) => !!v || 'Select a repository'],
         selection: [
           (v) =>
             (Array.isArray(v) ? v.length > 0 : !!v) ||
@@ -202,6 +257,25 @@ export default {
     selection() {
       return this.selectedType?.selection ?? null;
     },
+    selectedRepository() {
+      return this.repositories.find((repository) => repository.name === this.formData.repository);
+    },
+    // The repository the new workspace forks, as owner/repo
+    upstream() {
+      const upstream = this.selectedType?.upstream;
+      if (!upstream) {
+        return null;
+      }
+      if (this.selectedType.choose_repository) {
+        return this.formData.repository ? `${upstream.owner}/${this.formData.repository}` : null;
+      }
+      return `${upstream.owner}/${upstream.repo}`;
+    },
+    upstreamName() {
+      return this.selectedType?.choose_repository
+        ? this.formData.repository
+        : this.selectedType?.title;
+    },
     selectionItems() {
       return this.loadingOptions ? [] : this.selectionOptions;
     },
@@ -218,6 +292,14 @@ export default {
       handler(selection) {
         if (selection?.on_create) {
           this.loadSelectionOptions(this.formData.type);
+        }
+      },
+    },
+    selectedType: {
+      immediate: true,
+      handler(type) {
+        if (!this.isUpdateMode && type?.choose_repository) {
+          this.loadRepositories(type.id);
         }
       },
     },
@@ -256,6 +338,22 @@ export default {
         }
       }
     },
+    async loadRepositories(typeId) {
+      this.repositories = [];
+      this.formData.repository = null;
+      this.repositoriesError = null;
+      this.loadingRepositories = true;
+      try {
+        const repositories = await workspaceService.fetchRepositories(typeId);
+        if (this.formData.type === typeId) {
+          this.repositories = repositories;
+        }
+      } catch (error) {
+        this.repositoriesError = error.message;
+      } finally {
+        this.loadingRepositories = false;
+      }
+    },
     async handleSubmit() {
       const { valid } = await this.$refs.form.validate();
       if (!valid) return;
@@ -270,6 +368,12 @@ export default {
           ? this.formData.selection
           : [this.formData.selection].flat();
       }
+      if (!this.isUpdateMode && this.selectedType?.choose_repository) {
+        payload.repository = this.formData.repository;
+        if (this.formData.branch) {
+          payload.branch = this.formData.branch;
+        }
+      }
 
       // Include workspace ID for update mode
       if (this.isUpdateMode && this.workspace) {
@@ -281,3 +385,10 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+/* Long descriptions are cut instead of widening the menu, which would change its width while scrolling */
+.repository-item :deep(.v-list-item-subtitle) {
+  contain: inline-size;
+}
+</style>
