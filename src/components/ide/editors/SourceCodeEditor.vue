@@ -8,12 +8,13 @@ import CodeMirror from 'vue-codemirror6';
 import { keymap } from '@codemirror/view';
 import { defaultKeymap, historyKeymap } from '@codemirror/commands';
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
-import { syntaxHighlighting } from '@codemirror/language';
+import { StreamLanguage, syntaxHighlighting } from '@codemirror/language';
 import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
 import { linter, lintGutter } from '@codemirror/lint';
 import { markdown } from '@codemirror/lang-markdown';
 import { yaml } from '@codemirror/lang-yaml';
 import { bibtex } from '@citedrive/codemirror-lang-bibtex';
+import { asciidoc } from 'codemirror-asciidoc';
 import { hyperLink } from '@uiw/codemirror-extensions-hyper-link';
 
 const MAX_DIAGNOSTICS = 100;
@@ -45,6 +46,9 @@ export default {
         case 'bib':
         case 'bibtex':
           return bibtex();
+        case 'adoc':
+        case 'asciidoc':
+          return StreamLanguage.define(asciidoc);
         default:
           return null;
       }
