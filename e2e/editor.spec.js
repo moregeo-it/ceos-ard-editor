@@ -295,6 +295,11 @@ test.describe('Editor', () => {
     await expect(row(page, 'metadata-machine-readable.yaml')).toBeVisible();
     await expect(row(page, 'unused.yaml')).toHaveCount(0);
     await expect(page.locator('.file-tree')).toContainText('Metadata shall be machine readable.');
+
+    // Too short to search: the tree again
+    await page.getByRole('textbox', { name: 'Search files and folders...' }).fill('ma');
+    await expect(row(page, 'pfs')).toBeVisible();
+    await expect(row(page, 'metadata-machine-readable.yaml')).toHaveCount(0);
   });
 
   test('the header buttons are as tall as the view switch', async ({ page }) => {

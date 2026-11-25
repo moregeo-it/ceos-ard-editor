@@ -211,7 +211,8 @@ export const useFilesStore = defineStore('files', {
     async searchFiles(query) {
       query = typeof query === 'string' ? query.trim() : '';
       if (query.length < 3) {
-        // If query is empty, reload full tree
+        // Too short to search: the full tree again, not the results of a longer query
+        this.searchResults = null;
         await this.loadFiles();
         return;
       }
