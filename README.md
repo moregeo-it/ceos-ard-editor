@@ -132,6 +132,8 @@ mock are exported from the server; update them when the server's types change:
 ```sh
 # In ceos-ard-server
 pixi run python scripts/export_types.py ceos-ard > ../ceos-ard-editor/e2e/support/types/ceos-ard.json
+# With eo-glossary configured, see workspace-types.example.yaml
+pixi run python scripts/export_types.py eo-glossary > ../ceos-ard-editor/e2e/support/types/eo-glossary.json
 ```
 
 ### Run Unit Tests

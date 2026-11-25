@@ -1,4 +1,5 @@
 import { test as base, expect } from '@playwright/test';
+import EO_GLOSSARY_TYPE from './types/eo-glossary.json' with { type: 'json' };
 import { expectNoRawData } from './ui';
 // Exported from the server, see README.md
 import CEOS_ARD_TYPE from './types/ceos-ard.json' with { type: 'json' };
@@ -42,6 +43,32 @@ const PFS_TYPES = [
   { id: 'SR', title: 'Optical Surface Reflectance' },
   { id: 'AR', title: 'Aquatic Reflectance' },
 ];
+
+const term = (title, tags, definition) =>
+  `---\ntitle: ${title}\ndescription: About ${title.toLowerCase()}.\ntags:\n${tags
+    .map((tag) => `  - ${tag}\n`)
+    .join(
+      '',
+    )}---\n\n# ${title}\n\n## 1 Definition\n\n${definition}\n\n### Notes\n\n### Examples\n\n### Sources\n`;
+
+export const GLOSSARY_FILES = {
+  '/docs/intro.md': '---\ntitle: Introduction\n---\n\nThe glossary.\n',
+  '/docs/terms/accuracy.md': term(
+    'Accuracy',
+    ['core', 'approved', 'WGCV'],
+    'Closeness of agreement between a measured value and the true value.',
+  ),
+  '/docs/terms/precision.md': term(
+    'Precision',
+    ['base', 'to be approved', 'WGCV'],
+    'Closeness of repeated measurements, unlike accuracy.',
+  ),
+};
+
+const GLOSSARY_USAGE = {
+  '/docs/terms/accuracy.md': [{ label: 'Precision', path: '/docs/terms/precision.md' }],
+  '/docs/terms/precision.md': [],
+};
 
 // With an edit button as the server renders `<!-- edit: path -->`
 export const PREVIEW_HTML =
@@ -203,6 +230,28 @@ export class MockApi {
       }
     }
     return results;
+  }
+
+  /** Turns the workspace into a CEOS EO Glossary workspace, with both types offered. */
+  useGlossary() {
+    this.types = [CEOS_ARD_TYPE, EO_GLOSSARY_TYPE];
+    this.files = new Map(
+      Object.entries(GLOSSARY_FILES).map(([path, content]) => [path, { content }]),
+    );
+    this.usage = GLOSSARY_USAGE;
+    this.actions['new-term'] = ({ title }) => {
+      const path = `/docs/terms/${title.toLowerCase().replace(/\s+/g, '_')}.md`;
+      this.files.set(path, { content: term(title, ['core', 'to be defined'], '') });
+      this.status.set(path, 'added');
+      return { ...this.item(path, false), open: path };
+    };
+    Object.assign(this.workspaces[0], {
+      type: 'eo-glossary',
+      title: 'Glossary review',
+      upstream_repo: 'eo-glossary',
+      fork_repo_name: 'eo-glossary',
+      selection: null,
+    });
   }
 
   // The PFS of the workspace, as the CEOS-ARD type lists them
