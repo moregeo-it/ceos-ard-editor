@@ -105,7 +105,13 @@ import {
   openThreadsLabel,
   showFileComments,
 } from '@/utils/comments';
-import { enhancePreviewHtml, parseHashAction, syncCommentMarks } from '@/utils/preview-html';
+import {
+  enhancePreviewHtml,
+  parseHashAction,
+  previewFiles,
+  showFile,
+  syncCommentMarks,
+} from '@/utils/preview-html';
 import PfsSelect from '@/components/PfsSelect.vue';
 import { workspaceSession } from '@/services/events';
 
@@ -233,6 +239,11 @@ export default {
     commentMarks() {
       this.syncCommentMarks();
     },
+    'previewStore.showRequest'(request) {
+      if (request) {
+        this.showFile(request);
+      }
+    },
     // The iframe is keyed by previewGeneration so each regeneration gets a fresh
     // document, forcing images to revalidate (304/404). Reusing the document via
     // doc.write() would reuse already-loaded images ignoring HTTP caching,
@@ -272,13 +283,17 @@ export default {
 
       const oldPosition = this.previewStore.scrollPosition.slice(0);
 
-      // Restore the scroll position once stylesheets and images have loaded. Listen before
-      // writing: without any, it loads during close()
+      // Restore the scroll position once stylesheets and images have loaded, or show the file
+      // asked for meanwhile. Listen before writing: without any, it loads during close()
       this.restoringScroll = true;
       iframe.addEventListener(
         'load',
         () => {
-          if (iframe.contentWindow) {
+          const request = this.pendingShow;
+          this.pendingShow = null;
+          if (request) {
+            showFile(iframe.contentDocument, request.path, request.index);
+          } else if (iframe.contentWindow) {
             iframe.contentWindow.scrollTo(...oldPosition);
           }
           this.restoringScroll = false;
@@ -292,6 +307,7 @@ export default {
         assetUrl: (path) => `${API_BASE_URL}/workspaces/${this.workspaceId}/previews/${path}`,
         pageUrl: window.location.pathname + window.location.search,
       });
+      this.previewStore.setFiles(previewFiles(parsed));
       const doctype = parsed.doctype ? '<!doctype html>' : '';
 
       const doc = iframe.contentWindow.document;
@@ -299,6 +315,17 @@ export default {
       doc.write(doctype + parsed.documentElement.outerHTML);
       doc.close();
       this.syncCommentMarks();
+    },
+    // After a collapsed pane has opened, as positions in the preview depend on its width
+    async showFile(request) {
+      await this.$nextTick();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      const doc = this.$refs.iframe?.contentDocument;
+      if (this.restoringScroll) {
+        this.pendingShow = request;
+      } else if (doc && !this.isGenerating) {
+        showFile(doc, request.path, request.index);
+      }
     },
     syncCommentMarks() {
       const doc = this.$refs.iframe?.contentDocument;

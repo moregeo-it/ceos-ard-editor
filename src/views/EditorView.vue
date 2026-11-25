@@ -40,7 +40,7 @@
         <pane class="files" min-size="10" :size="panelSizes.files">
           <SidePane />
         </pane>
-        <pane class="editor" min-size="30" :size="panelSizes.editor">
+        <pane class="editor" :min-size="minEditorSize" :size="panelSizes.editor">
           <EditorPane />
         </pane>
         <pane class="preview" min-size="0" :size="panelSizes.preview">
@@ -71,6 +71,10 @@ import SidePane from '@/components/ide/SidePane.vue';
 import ShareModeChip from '@/components/workspace/ShareModeChip.vue';
 import { Splitpanes, Pane } from 'splitpanes';
 
+// In percent: a narrower preview counts as collapsed; the editor's min-size
+const MIN_PREVIEW_SIZE = 10;
+const MIN_EDITOR_SIZE = 30;
+
 export default {
   name: 'EditorView',
   components: {
@@ -97,6 +101,7 @@ export default {
         conflicts: mdiAlertOutline,
       },
       panelSizeDefaults: panelSizeDefaults,
+      minEditorSize: MIN_EDITOR_SIZE,
       panelSizes: {
         files: localStorage.filesPanelSize ?? panelSizeDefaults.files,
         editor: localStorage.editorPanelSize ?? panelSizeDefaults.editor,
@@ -184,12 +189,39 @@ export default {
     this.unmounted = true;
   },
 
+  watch: {
+    'previewStore.showRequest'() {
+      this.openPreviewPane();
+    },
+  },
+
   methods: {
-    storePaneSizes: ({ panes }) => {
+    storePaneSizes({ panes }) {
       if (panes.length === 3) {
-        localStorage.filesPanelSize = panes[0].size;
-        localStorage.editorPanelSize = panes[1].size;
-        localStorage.previewPanelSize = panes[2].size;
+        this.setPaneSizes(panes[0].size, panes[1].size, panes[2].size);
+      }
+    },
+
+    setPaneSizes(files, editor, preview) {
+      this.panelSizes = { files, editor, preview };
+      localStorage.filesPanelSize = files;
+      localStorage.editorPanelSize = editor;
+      localStorage.previewPanelSize = preview;
+    },
+
+    // Back to its default size, taken from the editor; all panes reset if the editor would get too
+    // narrow
+    openPreviewPane() {
+      if (this.panelSizes.preview >= MIN_PREVIEW_SIZE) {
+        return;
+      }
+      const defaults = this.panelSizeDefaults;
+      const files = Number(this.panelSizes.files);
+      const editor = 100 - files - defaults.preview;
+      if (editor >= MIN_EDITOR_SIZE) {
+        this.setPaneSizes(files, editor, defaults.preview);
+      } else {
+        this.setPaneSizes(defaults.files, defaults.editor, defaults.preview);
       }
     },
 
@@ -339,5 +371,7 @@ export default {
 .preview {
   max-height: 100%;
   overflow: hidden;
+  /* Sizes set from code apply at once, so the preview can scroll right after reopening */
+  transition: none;
 }
 </style>
