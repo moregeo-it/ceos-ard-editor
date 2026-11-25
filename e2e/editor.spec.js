@@ -176,6 +176,43 @@ test.describe('Upload', () => {
     await expect(row(page, 'new.yaml')).toBeVisible();
   });
 
+  test('an empty file opens with the fields of its form', async ({ page, api }) => {
+    api.files.set('/glossary/empty.yaml', { content: '' });
+    await openWorkspace(page);
+    await expand(page, 'glossary', 'empty.yaml');
+
+    const form = page.locator('.v-window-item--active .json-schema-editor');
+    await expect(form.locator('input')).toHaveCount(2);
+  });
+
+  test('a running action can neither be cancelled nor sent twice', async ({ page, api }) => {
+    let release;
+    const released = new Promise((resolve) => (release = resolve));
+    await page.route(`${API}/workspaces/ws-1/actions/create-pfs`, async (route) => {
+      if (route.request().method() === 'POST') {
+        await released;
+      }
+      await route.fallback();
+    });
+    await openWorkspace(page);
+    await chooseMenuEntry(page, 'pfs', 'Add New PFS');
+    const dialog = page.locator('.v-dialog .v-card');
+    await dialog.getByRole('textbox', { name: 'ID*' }).fill('ST');
+    await dialog.getByRole('textbox', { name: 'Title*' }).fill('Surface Temperature');
+    await dialog.getByRole('combobox', { name: 'Type*' }).click();
+    await page.locator('.v-overlay--active .v-list-item').filter({ hasText: 'Optical' }).click();
+    await dialog.getByRole('button', { name: 'Create' }).click();
+
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    await dialog.getByRole('textbox', { name: 'Title*' }).press('Enter');
+    release();
+    await expect(dialog).toBeHidden();
+    const posts = api.requests.filter(
+      (r) => r.method === 'POST' && r.path === '/workspaces/ws-1/actions/create-pfs',
+    );
+    expect(posts).toHaveLength(1);
+  });
+
   test('warns when a replaced file has unsaved changes', async ({ page }) => {
     await openWorkspace(page);
     await expand(page, 'glossary', 'accuracy.yaml');
@@ -1164,5 +1201,38 @@ test.describe('Show in preview', () => {
     await expect(highlighted(page)).toHaveText(/What are CEOS-ARD products\?$/);
     expect(await page.evaluate(() => Number(localStorage.previewPanelSize))).toBe(35);
     expect(await page.evaluate(() => Number(localStorage.editorPanelSize))).toBe(45);
+  });
+});
+
+test.describe('File preview', () => {
+  test('shows the open file when switching back during a render', async ({ page, api }) => {
+    api.types = [{ ...api.types[0], preview: 'file' }];
+    let releaseSr;
+    const srReleased = new Promise((resolve) => (releaseSr = resolve));
+    await page.route(`${API}/workspaces/ws-1/render/**`, async (route) => {
+      const path = decodeURIComponent(route.request().url().split('/render/')[1]);
+      if (path.includes('SR')) {
+        await srReleased;
+      }
+      await route.fulfill({
+        contentType: 'text/html',
+        body: `<!doctype html><html><body><h1>${path}</h1></body></html>`,
+      });
+    });
+    const open = (path) =>
+      page.evaluate((hash) => (window.location.hash = hash), `#edit=${encodeURIComponent(path)}`);
+    await openWorkspace(page);
+    await open('/pfs/NRB/document.yaml');
+    const heading = page.frameLocator('.preview-iframe').locator('h1');
+    await expect(heading).toHaveText('/pfs/NRB/document.yaml');
+
+    // SR renders slowly; NRB is open again before it is done
+    await open('/pfs/SR/document.yaml');
+    await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText('SR');
+    await open('/pfs/NRB/document.yaml');
+    await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText('NRB');
+    releaseSr();
+
+    await expect(heading).toHaveText('/pfs/NRB/document.yaml');
   });
 });

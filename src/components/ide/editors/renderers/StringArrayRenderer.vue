@@ -1,5 +1,6 @@
 <template>
   <v-combobox
+    v-if="control.visible"
     class="control"
     :model-value="control.data ?? []"
     :label="computedLabel"

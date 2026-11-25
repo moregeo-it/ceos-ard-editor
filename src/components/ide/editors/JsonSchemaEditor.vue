@@ -75,7 +75,8 @@ export default {
       immediate: true,
       handler(text) {
         if (text !== this.ownText) {
-          this.formData = this.parse(text);
+          // An empty file parses to null
+          this.formData = this.parse(text) ?? {};
         }
       },
     },

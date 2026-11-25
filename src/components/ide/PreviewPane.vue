@@ -299,7 +299,10 @@ export default {
       }
     },
     async activePath(path) {
-      if (this.previewStore.mode === 'file' && path !== this.previewStore.renderedPath) {
+      if (
+        this.previewStore.mode === 'file' &&
+        (path !== this.previewStore.renderedPath || this.previewStore.isGenerating)
+      ) {
         await this.previewStore.requestPreviewRefresh();
       }
     },

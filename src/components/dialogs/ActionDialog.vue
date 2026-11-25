@@ -1,5 +1,5 @@
 <template>
-  <v-dialog v-model="show" :max-width="sizes.medium">
+  <v-dialog v-model="show" :max-width="sizes.medium" :persistent="accepting">
     <v-form @submit.prevent="submit">
       <v-card>
         <v-card-title>{{ action.title }}</v-card-title>
@@ -21,11 +21,11 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn @click="reject">Cancel</v-btn>
+          <v-btn @click="reject" :disabled="accepting">Cancel</v-btn>
           <v-btn
             color="primary"
             type="submit"
-            :disabled="!form || !isValid"
+            :disabled="!form || !isValid || accepting"
             :loading="accepting"
             variant="elevated"
             >Create</v-btn
@@ -88,7 +88,7 @@ export default {
       this.errors = event.errors ?? [];
     },
     submit() {
-      if (this.form && this.isValid) {
+      if (this.form && this.isValid && !this.accepting) {
         this.accept(this.formData);
       }
     },

@@ -44,6 +44,7 @@ import {
 import { downloadBlob } from '@/utils/api';
 import { useTypesStore } from '@/stores/types';
 import { useWorkspacesStore } from '@/stores/workspaces';
+import { workspaceSession } from '@/services/events';
 import { matchesGlob } from '@/utils/glob';
 import { openCommentDialog } from '@/utils/comments';
 
@@ -249,7 +250,11 @@ export default {
       this.$root.openDialog('ActionDialog', {
         action,
         onAcceptance: async (data) => {
+          const started = workspaceSession();
           const result = await this.filesStore.runAction(action.id, data);
+          if (started !== workspaceSession()) {
+            return;
+          }
           this.notificationsStore.success(`${result.name} created`);
           const open = result.open ?? (result.is_directory ? null : result.path);
           if (open) {

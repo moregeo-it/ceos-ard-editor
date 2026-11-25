@@ -1,5 +1,5 @@
 <template>
-  <div class="control chips-control">
+  <div v-if="control.visible" class="control chips-control">
     <div class="chips-control-label text-caption text-medium-emphasis">{{ computedLabel }}</div>
     <v-chip-group
       :model-value="control.data"
