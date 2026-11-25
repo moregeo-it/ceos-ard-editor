@@ -26,6 +26,7 @@ import StringArrayRenderer, {
   tester as stringArrayTester,
 } from './renderers/StringArrayRenderer.vue';
 import FileIdsRenderer, { tester as fileIdsTester } from './renderers/FileIdsRenderer.vue';
+import TextListRenderer, { tester as textListTester } from './renderers/TextListRenderer.vue';
 
 // The components themselves must be imported: the production build drops the template of an unused default export
 const renderers = markRaw([
@@ -33,6 +34,7 @@ const renderers = markRaw([
   { renderer: EnumChipsRenderer, tester: enumChipsTester },
   { renderer: StringArrayRenderer, tester: stringArrayTester },
   { renderer: FileIdsRenderer, tester: fileIdsTester },
+  { renderer: TextListRenderer, tester: textListTester },
 ]);
 
 const fieldDefaults = { density: 'compact', hideDetails: 'auto' };
@@ -109,6 +111,10 @@ export default {
 
 .json-schema-editor .vertical-layout-item + .vertical-layout-item {
   margin-top: 12px;
+}
+/* Fields hidden by a rule of the UI schema leave an empty item */
+.json-schema-editor .vertical-layout-item:empty {
+  display: none;
 }
 .json-schema-editor .horizontal-layout {
   gap: 12px;

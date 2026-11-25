@@ -2,18 +2,38 @@ import { codecs } from '@/codecs';
 import { useTypesStore } from '@/stores/types';
 import { matchesGlob } from '@/utils/glob';
 
-/** The form editor rule of the workspace type that applies to the file, if any. */
-export function getEditorRule(file) {
+/**
+ * The form editor rule of the workspace type that applies to the file, if any. Given the file's text
+ * (undefined while it loads), only a rule whose codec accepts it.
+ */
+export function getEditorRule(file, ...text) {
   const rules = useTypesStore().currentType?.editors ?? [];
-  return rules.find((rule) => matchesGlob(file.path, rule.match) && codecs[rule.codec]) ?? null;
+  return (
+    rules.find((rule) => {
+      const codec = codecs[rule.codec];
+      if (!codec || !matchesGlob(file.path, rule.match)) {
+        return false;
+      }
+      return (
+        !codec.accepts ||
+        text.length === 0 ||
+        (typeof text[0] === 'string' && codec.accepts(text[0]))
+      );
+    }) ?? null
+  );
 }
 
 export function isAsciiDoc(file) {
   return /\.(adoc|asciidoc)$/i.test(file.path);
 }
 
-export function supportVisualEditing(file) {
-  return Boolean(getEditorRule(file)?.schema) || isAsciiDoc(file);
+/** Whether the file opens in a form, from the workspace type's `editors`. */
+export function hasForm(file, text) {
+  return Boolean(getEditorRule(file, text)?.schema);
+}
+
+export function supportVisualEditing(file, text) {
+  return hasForm(file, text) || isAsciiDoc(file);
 }
 
 export function getEditingSchema(file) {

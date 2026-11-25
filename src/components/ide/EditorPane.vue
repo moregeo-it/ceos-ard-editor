@@ -189,7 +189,7 @@ import {
 } from '@mdi/js';
 import { canCommentOn, openCommentDialog } from '@/utils/comments';
 import { displayPath, folderHints } from '@/utils/paths';
-import { isAsciiDoc, supportVisualEditing } from '@/components/ide/editors/utils';
+import { hasForm, isAsciiDoc } from '@/components/ide/editors/utils';
 import { useTypesStore } from '@/stores/types';
 
 const supportedBrowserTypes = [
@@ -342,13 +342,13 @@ export default {
         } else {
           return 'UnsupportedViewer';
         }
+      } else if (hasForm(file, data) && !forceSourceCodeEditor) {
+        return 'JsonSchemaEditor';
       } else if (isAsciiDoc(file)) {
         // The visual AsciiDoc editor can't be made read-only
         return forceSourceCodeEditor || this.workspacesStore.isReadOnly
           ? 'SourceCodeEditor'
           : 'AsciiDocEditor';
-      } else if (supportVisualEditing(file, data) && !forceSourceCodeEditor) {
-        return 'JsonSchemaEditor';
       } else {
         return 'SourceCodeEditor';
       }

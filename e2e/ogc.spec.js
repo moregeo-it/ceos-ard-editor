@@ -4,6 +4,15 @@ import { optionTexts } from './support/ui';
 const CORE = 'core/standard/20-004.adoc';
 const FACETS = 'extensions/facets/document.adoc';
 
+async function openFile(page, ...names) {
+  for (const name of names) {
+    await page
+      .locator('.file-tree-row')
+      .filter({ has: page.locator('.file-tree-name').getByText(name, { exact: true }) })
+      .click();
+  }
+}
+
 function documentSelect(page) {
   return page.locator('.v-select').filter({ hasText: 'Select a document for the preview' });
 }
@@ -179,5 +188,77 @@ test.describe('OGC', () => {
     await page.goto('/workspaces/ws-1');
 
     await expect(page.getByRole('button', { name: 'Behind ogcapi-records' })).toBeVisible();
+  });
+
+  test('requirements and tests open in a form', async ({ page, api }) => {
+    const REQUIREMENT = '/core/standard/requirements/REQ_time-zone.adoc';
+    const original = api.files.get(REQUIREMENT).content;
+    Object.assign(api.workspaces[0], { selection: [CORE] });
+    await page.goto('/workspaces/ws-1');
+    await openFile(page, 'core', 'standard', 'requirements', 'REQ_time-zone.adoc');
+
+    const form = page.locator('.v-window-item--active .json-schema-editor');
+    await expect(form.getByRole('textbox', { name: 'Identifier*' })).toHaveValue(
+      '/req/record-core/time-zone',
+    );
+    // Only the fields of a requirement
+    await expect(form.getByRole('textbox', { name: 'Parts 2' })).toHaveValue(
+      'Timestamps SHALL include seconds.',
+    );
+    await expect(form.getByRole('textbox', { name: 'Test method' })).toHaveCount(0);
+    await expect(form.getByRole('combobox', { name: 'Inherits' })).toHaveCount(0);
+    await form.getByRole('textbox', { name: 'Identifier*' }).fill('/req/record-core/utc');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+
+    await expect
+      .poll(() => api.files.get(REQUIREMENT).content)
+      .toBe(
+        original.replace(
+          'identifier:: /req/record-core/time-zone',
+          'identifier:: /req/record-core/utc',
+        ),
+      );
+
+    await openFile(page, 'abstract_tests', 'ATS_time-zone.adoc');
+    await expect(form.getByRole('textbox', { name: 'Test method' })).toHaveValue(
+      'Verify that all timestamps end with "Z".',
+    );
+    await expect(form.getByRole('textbox', { name: 'Parts 1' })).toHaveCount(0);
+  });
+
+  test('other AsciiDoc files open in the visual editor', async ({ page, api }) => {
+    Object.assign(api.workspaces[0], { selection: [CORE] });
+    await page.goto('/workspaces/ws-1');
+    await openFile(page, 'core', 'standard', 'clause_1_scope.adoc');
+
+    await expect(page.locator('.asciidoc-editor')).toBeVisible();
+    await expect(page.locator('.json-schema-editor')).toHaveCount(0);
+  });
+
+  test('the search filters by the type of block', async ({ page, api }) => {
+    Object.assign(api.workspaces[0], { selection: [CORE] });
+    await page.goto('/workspaces/ws-1');
+
+    await page.getByRole('button', { name: 'Show filters' }).click();
+    const filter = page.locator('.v-select').filter({ hasText: 'Specification element' });
+    expect(await optionTexts(page, filter)).toEqual([
+      'requirement',
+      'recommendation',
+      'permission',
+      'requirements class',
+      'conformance class',
+      'abstract test',
+      'conformance test',
+    ]);
+    await filter.click();
+    await page
+      .locator('.v-overlay--active .v-list-item')
+      .filter({ hasText: /^abstract test$/ })
+      .click();
+    await page.keyboard.press('Escape');
+
+    await expect(page.locator('.file-tree-name').getByText('ATS_time-zone.adoc')).toBeVisible();
+    await expect(page.locator('.file-tree-name').getByText('REQ_time-zone.adoc')).toHaveCount(0);
+    expect(api.requests.some((r) => r.search.includes('filter=block%3Aabstract+test'))).toBe(true);
   });
 });

@@ -18,8 +18,345 @@
   "choose_repository": true,
   "expanded_folders": [],
   "labels": {},
-  "editors": [],
-  "search_filters": [],
+  "editors": [
+    {
+      "match": "**/*.adoc",
+      "codec": "modspec",
+      "schema": {
+        "type": "object",
+        "required": ["identifier"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "oneOf": [
+              {
+                "const": "requirement",
+                "title": "Requirement"
+              },
+              {
+                "const": "recommendation",
+                "title": "Recommendation"
+              },
+              {
+                "const": "permission",
+                "title": "Permission"
+              },
+              {
+                "const": "requirements_class",
+                "title": "Requirements class"
+              },
+              {
+                "const": "conformance_class",
+                "title": "Conformance class"
+              },
+              {
+                "const": "abstract_test",
+                "title": "Abstract test"
+              },
+              {
+                "const": "conformance_test",
+                "title": "Conformance test"
+              }
+            ]
+          },
+          "identifier": {
+            "type": "string",
+            "title": "Identifier",
+            "minLength": 1
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "classification": {
+            "type": "string",
+            "title": "Classification"
+          },
+          "statement": {
+            "type": "string",
+            "title": "Statement"
+          },
+          "part": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Parts"
+          },
+          "condition": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Conditions"
+          },
+          "inherit": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Inherits"
+          },
+          "requirement": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Requirements"
+          },
+          "abstract-test": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Abstract tests"
+          },
+          "conformance-test": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Conformance tests"
+          },
+          "test-purpose": {
+            "type": "string",
+            "title": "Test purpose"
+          },
+          "test-method": {
+            "type": "string",
+            "title": "Test method"
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Includes"
+          }
+        }
+      },
+      "ui_schema": {
+        "type": "VerticalLayout",
+        "elements": [
+          {
+            "type": "Control",
+            "scope": "#/properties/type",
+            "options": {
+              "readonly": true
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/identifier"
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/subject",
+            "rule": {
+              "effect": "SHOW",
+              "condition": {
+                "scope": "#/properties/type",
+                "schema": {
+                  "enum": ["requirements_class"]
+                }
+              }
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/target",
+            "rule": {
+              "effect": "SHOW",
+              "condition": {
+                "scope": "#/properties/type",
+                "schema": {
+                  "enum": ["conformance_class", "abstract_test", "conformance_test"]
+                }
+              }
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/classification",
+            "rule": {
+              "effect": "SHOW",
+              "condition": {
+                "scope": "#/properties/type",
+                "schema": {
+                  "enum": ["conformance_class"]
+                }
+              }
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/statement",
+            "options": {
+              "multi": true
+            },
+            "rule": {
+              "effect": "SHOW",
+              "condition": {
+                "scope": "#/properties/type",
+                "schema": {
+                  "enum": ["requirement", "recommendation", "permission"]
+                }
+              }
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/part",
+            "options": {
+              "multi": true
+            },
+            "rule": {
+              "effect": "SHOW",
+              "condition": {
+                "scope": "#/properties/type",
+                "schema": {
+                  "enum": ["requirement", "recommendation", "permission"]
+                }
+              }
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/condition",
+            "options": {
+              "multi": true
+            },
+            "rule": {
+              "effect": "SHOW",
+              "condition": {
+                "scope": "#/properties/type",
+                "schema": {
+                  "enum": ["requirement", "recommendation", "permission"]
+                }
+              }
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/inherit",
+            "rule": {
+              "effect": "SHOW",
+              "condition": {
+                "scope": "#/properties/type",
+                "schema": {
+                  "enum": ["requirements_class", "conformance_class"]
+                }
+              }
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/requirement",
+            "rule": {
+              "effect": "SHOW",
+              "condition": {
+                "scope": "#/properties/type",
+                "schema": {
+                  "enum": ["requirements_class"]
+                }
+              }
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/abstract-test",
+            "rule": {
+              "effect": "SHOW",
+              "condition": {
+                "scope": "#/properties/type",
+                "schema": {
+                  "enum": ["conformance_class"]
+                }
+              }
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/conformance-test",
+            "rule": {
+              "effect": "SHOW",
+              "condition": {
+                "scope": "#/properties/type",
+                "schema": {
+                  "enum": ["conformance_class"]
+                }
+              }
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/test-purpose",
+            "options": {
+              "multi": true
+            },
+            "rule": {
+              "effect": "SHOW",
+              "condition": {
+                "scope": "#/properties/type",
+                "schema": {
+                  "enum": ["abstract_test", "conformance_test"]
+                }
+              }
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/test-method",
+            "options": {
+              "multi": true
+            },
+            "rule": {
+              "effect": "SHOW",
+              "condition": {
+                "scope": "#/properties/type",
+                "schema": {
+                  "enum": ["abstract_test", "conformance_test"]
+                }
+              }
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/include",
+            "rule": {
+              "effect": "SHOW",
+              "condition": {
+                "scope": "#/properties/type",
+                "schema": {
+                  "enum": ["requirement", "recommendation", "permission", "conformance_class"]
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "search_filters": [
+    {
+      "id": "block",
+      "title": "Specification element",
+      "values": [
+        "requirement",
+        "recommendation",
+        "permission",
+        "requirements class",
+        "conformance class",
+        "abstract test",
+        "conformance test"
+      ]
+    }
+  ],
   "actions": [],
   "file_menu": [
     {

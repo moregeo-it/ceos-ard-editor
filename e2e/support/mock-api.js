@@ -52,6 +52,15 @@ export const OGC_FILES = {
   '/core/standard/clause_1_scope.adoc': '== Scope\n',
   '/extensions/facets/document.adoc':
     '= OGC API - Records - Part 2: Facets\n:mn-document-class: ogc\n',
+  '/core/standard/requirements/REQ_time-zone.adoc':
+    '[[req_record-core_time-zone]]\n\n[requirement]\n====\n[%metadata]\n' +
+    'identifier:: /req/record-core/time-zone\n' +
+    'part:: Timestamps SHALL use UTC ("Z") as the time zone.\n' +
+    'part:: Timestamps SHALL include seconds.\n====\n',
+  '/core/standard/abstract_tests/ATS_time-zone.adoc':
+    '[abstract_test]\n====\n[%metadata]\nidentifier:: /conf/record-core/time-zone\n' +
+    'target:: /req/record-core/time-zone\ntest-purpose:: Validate the time zone.\n' +
+    'test-method::\n+\n--\nVerify that all timestamps end with "Z".\n--\n====\n',
 };
 
 export const OGC_DOCUMENTS = [
@@ -239,6 +248,9 @@ export class MockApi {
     });
     this.files = new Map(Object.entries(OGC_FILES).map(([path, content]) => [path, { content }]));
     this.usage = {};
+    // The kind of ModSpec block, e.g. `[abstract_test]` for "abstract test"
+    this.matchesFilter = (content, value) =>
+      new RegExp(`^\\[${value.replace(' ', '_')}[,\\]]`, 'm').test(content);
     this.previewHtml =
       '<!doctype html><html><head></head><body><h1>OGC API - Records - Part 1: Core</h1>' +
       '<div><a name="/core/standard/clause_1_scope.adoc"></a>' +
@@ -253,6 +265,11 @@ export class MockApi {
       fork_repo_name: 'ogcapi-records',
       selection: null,
     });
+  }
+
+  // Whether a file matches a value of a search filter, e.g. a tag of a glossary term
+  matchesFilter(content, value) {
+    return content.includes(`  - ${value}\n`);
   }
 
   // The PFS of the workspace, as the CEOS-ARD type lists them
@@ -447,7 +464,7 @@ export class MockApi {
       return json(
         route,
         files.filter((file) =>
-          filters.every((tag) => this.files.get(file.path).content.includes(`  - ${tag}\n`)),
+          filters.every((value) => this.matchesFilter(this.files.get(file.path).content, value)),
         ),
       );
     }
