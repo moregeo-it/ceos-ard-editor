@@ -1,10 +1,11 @@
+import { codecs } from '@/codecs';
 import { useTypesStore } from '@/stores/types';
 import { matchesGlob } from '@/utils/glob';
 
 /** The form editor rule of the workspace type that applies to the file, if any. */
 export function getEditorRule(file) {
   const rules = useTypesStore().currentType?.editors ?? [];
-  return rules.find((rule) => matchesGlob(file.path, rule.match)) ?? null;
+  return rules.find((rule) => matchesGlob(file.path, rule.match) && codecs[rule.codec]) ?? null;
 }
 
 export function supportVisualEditing(file) {
@@ -17,4 +18,8 @@ export function getEditingSchema(file) {
 
 export function getUiSchema(file) {
   return getEditorRule(file)?.ui_schema;
+}
+
+export function getCodec(file) {
+  return codecs[getEditorRule(file)?.codec] ?? codecs.yaml;
 }

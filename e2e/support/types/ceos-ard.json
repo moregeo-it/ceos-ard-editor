@@ -10,11 +10,19 @@
     "branch": "main",
     "url": "https://github.com/ceos-org/ceos-ard"
   },
-  "pfs": true,
+  "preview": "build",
+  "selection": {
+    "label": "PFS",
+    "multiple": true,
+    "on_create": true
+  },
+  "downloads": ["pdf", "docx"],
+  "expanded_folders": [],
   "labels": {},
   "editors": [
     {
       "match": "glossary/*.yaml",
+      "codec": "yaml",
       "schema": {
         "type": "object",
         "properties": {
@@ -50,12 +58,75 @@
       }
     }
   ],
+  "search_filters": [],
   "actions": [
     {
       "id": "create-pfs",
       "title": "Add New PFS",
       "folder": "/pfs",
-      "dialog": "CreatePfsDialog"
+      "schema": {
+        "type": "object",
+        "required": ["id", "title", "type"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "ID",
+            "pattern": "^[A-Z0-9]{2,10}$",
+            "description": "The name of the new PFS folder: 2 to 10 capital letters or digits, e.g. NRB"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "e.g. Normalised Radar Backscatter"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "enum": ["SAR", "Optical"]
+          },
+          "applies_to": {
+            "type": "string",
+            "title": "Applies To",
+            "maxLength": 2000,
+            "description": "e.g. Data collected by Synthetic Aperture Radar sensors"
+          },
+          "base": {
+            "type": "string",
+            "title": "Base PFS",
+            "description": "Copies this PFS of the workspace as the start of the new one"
+          }
+        }
+      },
+      "ui_schema": {
+        "type": "VerticalLayout",
+        "elements": [
+          {
+            "type": "Control",
+            "scope": "#/properties/id"
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/title"
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/type"
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/applies_to",
+            "options": {
+              "multi": true
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/base"
+          }
+        ]
+      }
     }
   ],
   "file_menu": [

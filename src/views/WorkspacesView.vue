@@ -1,5 +1,8 @@
 <template>
-  <HeaderBar title="My PFS Workspaces" :icon="icons.folderMultiple" />
+  <HeaderBar
+    :title="typesStore.hasMultipleTypes ? 'My Workspaces' : 'My PFS Workspaces'"
+    :icon="icons.folderMultiple"
+  />
 
   <v-main>
     <v-container>
@@ -194,16 +197,16 @@ export default {
   },
 
   computed: {
+    typesStore() {
+      return useTypesStore();
+    },
+
     workspacesStore() {
       return useWorkspacesStore();
     },
 
     notificationsStore() {
       return useNotificationsStore();
-    },
-
-    typesStore() {
-      return useTypesStore();
     },
 
     emptyFilterText() {
@@ -237,13 +240,7 @@ export default {
   methods: {
     async loadData() {
       try {
-        const [types] = await Promise.all([
-          this.typesStore.fetchTypes(),
-          this.workspacesStore.fetchWorkspaces(),
-        ]);
-        if (types.some((type) => type.pfs)) {
-          await this.workspacesStore.fetchPfs();
-        }
+        await Promise.all([this.typesStore.fetchTypes(), this.workspacesStore.fetchWorkspaces()]);
       } catch (error) {
         this.notificationsStore.error(`Failed to load data: ${error.message}`);
       }
@@ -292,7 +289,7 @@ export default {
         } else {
           await this.workspacesStore.updateWorkspace(data.id, {
             title: data.title,
-            pfs: data.pfs,
+            selection: data.selection,
             description: data.description,
           });
           this.notificationsStore.success('Workspace updated successfully');

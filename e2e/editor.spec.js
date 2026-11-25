@@ -115,22 +115,29 @@ test.describe('File tree', () => {
     await chooseMenuEntry(page, 'pfs', 'Add New PFS');
 
     const dialog = page.locator('.v-dialog .v-card');
-    expect(await fieldLabels(dialog)).toEqual(['ID', 'Title', 'Type', 'Applies To', 'Base PFS']);
-    expect(
-      await optionTexts(page, dialog.locator('.v-select').filter({ hasText: 'Type' }).first()),
-    ).toEqual(['SAR', 'Optical']);
-    expect(
-      await optionTexts(page, dialog.locator('.v-select').filter({ hasText: 'Base PFS' })),
-    ).toEqual(['NRB: SAR Normalised Radar Backscatter', 'SR: Optical Surface Reflectance']);
-    await dialog.getByLabel('ID').fill('ST');
-    await dialog.getByLabel('Title').fill('Surface Temperature');
-    await dialog.locator('.v-select').filter({ hasText: 'Type' }).first().click();
+    // Required fields are marked
+    expect(await fieldLabels(dialog)).toEqual(['ID*', 'Title*', 'Type*', 'Applies To', 'Base PFS']);
+    const type = dialog.getByRole('combobox', { name: 'Type*' });
+    expect(await optionTexts(page, type)).toEqual(['SAR', 'Optical']);
+    expect(await optionTexts(page, dialog.getByRole('combobox', { name: 'Base PFS' }))).toEqual([
+      'NRB: SAR Normalised Radar Backscatter',
+      'SR: Optical Surface Reflectance',
+    ]);
+    await dialog.getByRole('textbox', { name: 'ID*' }).fill('ST');
+    await dialog.getByRole('textbox', { name: 'Title*' }).fill('Surface Temperature');
+    await type.click();
     await page.locator('.v-overlay--active .v-list-item').filter({ hasText: 'Optical' }).click();
     await dialog.getByRole('button', { name: 'Create' }).click();
 
     await expect(dialog).toBeHidden();
-    const post = api.requests.find((r) => r.method === 'POST' && r.path === '/workspaces/ws-1/pfs');
-    expect(JSON.parse(post.body)).toMatchObject({ id: 'ST', title: 'Surface Temperature' });
+    const post = api.requests.find(
+      (r) => r.method === 'POST' && r.path === '/workspaces/ws-1/actions/create-pfs',
+    );
+    expect(JSON.parse(post.body)).toMatchObject({
+      id: 'ST',
+      title: 'Surface Temperature',
+      type: 'Optical',
+    });
 
     // The new PFS document opens, which reveals it in the tree
     await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText('document.yaml');
@@ -479,7 +486,7 @@ test.describe('Preview', () => {
         type: 'preview.generated',
         ts: new Date().toISOString(),
         actor_user_id: 'user-1',
-        pfs: ['NRB'],
+        selection: ['NRB'],
       }),
     );
 
@@ -509,7 +516,7 @@ test.describe('Preview', () => {
           type: 'preview.generated',
           ts: new Date().toISOString(),
           actor_user_id: 'user-1',
-          pfs: ['NRB'],
+          selection: ['NRB'],
         }),
       );
     api.previewHtml = tallPreview('First build');
@@ -696,7 +703,7 @@ test.describe('Preview', () => {
   });
 
   test('asks to select a PFS when there is none', async ({ page, api }) => {
-    api.workspaces[0].pfs = [];
+    api.workspaces[0].selection = [];
     await openWorkspace(page);
 
     await expect(

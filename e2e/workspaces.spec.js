@@ -16,7 +16,7 @@ async function openCreateDialog(page) {
 }
 
 async function selectPfs(page, dialog, id) {
-  await dialog.locator('.v-select').filter({ hasText: 'Product Family Specification' }).click();
+  await dialog.locator('.v-select').filter({ hasText: 'PFS' }).click();
   await page
     .locator('.v-overlay .v-list-item')
     .filter({ hasText: new RegExp(`^${id}$`) })
@@ -66,7 +66,7 @@ test.describe('Workspaces', () => {
     await expect(card).toContainText('Updated:');
     await expect(card).not.toContainText('n/a');
 
-    api.workspaces[0].pfs = null;
+    api.workspaces[0].selection = null;
     await page.reload();
     await expect(page.locator('.v-card').filter({ hasText: 'NRB review' })).toContainText(
       'No PFS assigned',
@@ -76,7 +76,7 @@ test.describe('Workspaces', () => {
   test('offers the PFS of CEOS-ARD', async ({ page }) => {
     const dialog = await openCreateDialog(page);
 
-    const select = dialog.locator('.v-select').filter({ hasText: 'Product Family Specification' });
+    const select = dialog.locator('.v-select').filter({ hasText: 'PFS' });
     expect(await optionTexts(page, select)).toEqual(['NRB', 'SR', 'AR']);
   });
 
@@ -97,7 +97,7 @@ test.describe('Workspaces', () => {
       type: 'ceos-ard',
       title: 'SR review',
       description: null,
-      pfs: ['SR'],
+      selection: ['SR'],
     });
     await expect(
       page.getByText('Workspace created successfully in your CEOS-ARD repository jdoe/ceos-ard'),
@@ -151,7 +151,8 @@ test.describe('Workspace types', () => {
     available: true,
     color: '#00796b',
     upstream: { owner: 'ceos-org', repo: 'other', branch: 'main', url: '' },
-    pfs: false,
+    preview: 'file',
+    downloads: [],
     labels: {},
     editors: [],
     actions: [],
@@ -170,7 +171,9 @@ test.describe('Workspace types', () => {
     await page.locator('.v-card').filter({ hasText: 'NRB review' }).getByText('Settings').click();
 
     await expect(page.locator('.v-dialog .v-card')).toBeVisible();
-    await expect.poll(() => api.requests.some((r) => r.path === '/workspaces/ws-1/pfs')).toBe(true);
+    await expect
+      .poll(() => api.requests.some((r) => r.path === '/workspaces/ws-1/selection-options'))
+      .toBe(true);
   });
 
   test('types that are not available are not offered', async ({ page, api }) => {
@@ -179,7 +182,7 @@ test.describe('Workspace types', () => {
     const dialog = await openCreateDialog(page);
 
     await expect(dialog.getByLabel('What do you want to edit?')).toHaveCount(0);
-    await expect(dialog).toContainText('Product Family Specification');
+    await expect(dialog.locator('.v-select').filter({ hasText: 'PFS' })).toBeVisible();
     await expect(page.locator('.v-card').filter({ hasText: 'Old review' })).toBeVisible();
   });
 
@@ -228,7 +231,7 @@ test.describe('Workspace types', () => {
     await typeSelect.click();
     await page.locator('.v-overlay--active .v-list-item').filter({ hasText: 'Other' }).click();
 
-    await expect(dialog.getByText('Product Family Specification')).toHaveCount(0);
+    await expect(dialog.locator('.v-select').filter({ hasText: 'PFS' })).toHaveCount(0);
     await expect(dialog).toContainText(
       'creates a copy (fork) of the Other Specification repository',
     );

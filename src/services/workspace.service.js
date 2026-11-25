@@ -58,11 +58,18 @@ export default {
   },
 
   /**
-   * Fetch available PFS types (Product Family Specifications)
+   * What a workspace can select for its preview, e.g. its PFS: `[{ id, title }]`
    */
-  async fetchPfs(workspaceId) {
-    const endpoint = workspaceId ? `/workspaces/${workspaceId}/pfs` : '/pfs';
-    const response = await api.get(endpoint);
-    return response?.pfs_types || [];
+  async fetchSelectionOptions(workspaceId) {
+    const response = await api.get(`/workspaces/${workspaceId}/selection-options`);
+    return response?.options || [];
+  },
+
+  /**
+   * What new workspaces of a type select from its upstream repository, for a `selection` with `on_create`
+   */
+  async fetchTypeSelectionOptions(typeId) {
+    const response = await api.get(`/types/${encodeURIComponent(typeId)}/selection-options`);
+    return response?.options || [];
   },
 };

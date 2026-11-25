@@ -19,6 +19,8 @@ const getDefaults = () => ({
   openedFolders: [],
   activatedItems: [],
   searchQuery: '',
+  // Selected values per search filter of the workspace type, e.g. { status: ['approved'] }
+  searchFilters: {},
 });
 
 const getParentPath = (filePath) => {
@@ -210,7 +212,11 @@ export const useFilesStore = defineStore('files', {
      */
     async searchFiles(query) {
       query = typeof query === 'string' ? query.trim() : '';
-      if (query.length < 3) {
+      const filters = Object.fromEntries(
+        Object.entries(this.searchFilters).filter(([, values]) => values?.length > 0),
+      );
+      const hasFilters = Object.keys(filters).length > 0;
+      if (query.length < 3 && !hasFilters) {
         // Too short to search: the full tree again, not the results of a longer query
         this.clearSearchResults();
         await this.loadFiles();
@@ -223,7 +229,11 @@ export const useFilesStore = defineStore('files', {
       const isLatest = () => request === searchRequest && started === workspaceSession();
       this.isSearchLoading = true;
       try {
-        const files = await fileService.searchFiles(getWorkspaceId(), query);
+        const files = await fileService.searchFiles(
+          getWorkspaceId(),
+          query.length >= 3 ? query : '',
+          filters,
+        );
         if (isLatest()) {
           this.searchResults = files.map(toFileTreeObject);
         }
@@ -358,11 +368,12 @@ export const useFilesStore = defineStore('files', {
     },
 
     /**
-     * Create a new pfs folder and document with content of source pfs
+     * Run an action of the workspace type that creates a file or folder, e.g. a new PFS. The result
+     * names the file to open, if any, in `open`.
      */
-    async createNewPfs(content) {
+    async runAction(action, data) {
       const started = workspaceSession();
-      const fileData = await fileService.createNewPFS(getWorkspaceId(), content);
+      const fileData = await fileService.runAction(getWorkspaceId(), action, data);
       if (started !== workspaceSession()) {
         return fileData;
       }

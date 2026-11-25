@@ -1,8 +1,8 @@
 <template>
   <div class="d-flex align-center flex-wrap gap-2">
-    <template v-if="hasPfs">
+    <template v-if="hasItems">
       <v-chip
-        v-for="(item, index) in pfs"
+        v-for="(item, index) in items"
         :key="index"
         size="small"
         color="info"
@@ -17,18 +17,19 @@
 
 <script>
 export default {
-  name: 'PfsBadges',
+  name: 'SelectionBadges',
 
   props: {
-    pfs: {
+    // The workspace's selection, e.g. PFS ids
+    items: {
       type: Array,
       default: () => [],
     },
   },
 
   computed: {
-    hasPfs() {
-      return this.pfs && this.pfs.length > 0;
+    hasItems() {
+      return this.items && this.items.length > 0;
     },
   },
 };

@@ -15,6 +15,7 @@ import { defineAsyncComponent } from 'vue';
 
 // Import all dialog components asynchronously
 const components = {
+  ActionDialog: defineAsyncComponent(() => import('@/components/dialogs/ActionDialog.vue')),
   ArchivedDialog: defineAsyncComponent(() => import('@/components/dialogs/ArchivedDialog.vue')),
   ArchiveWorkspaceDialog: defineAsyncComponent(
     () => import('@/components/dialogs/ArchiveWorkspaceDialog.vue'),
@@ -22,7 +23,6 @@ const components = {
   CommentDialog: defineAsyncComponent(() => import('@/components/dialogs/CommentDialog.vue')),
   ConfirmDialog: defineAsyncComponent(() => import('@/components/dialogs/ConfirmDialog.vue')),
   CreateFileDialog: defineAsyncComponent(() => import('@/components/dialogs/CreateFileDialog.vue')),
-  CreatePfsDialog: defineAsyncComponent(() => import('@/components/dialogs/CreatePfsDialog.vue')),
   DeleteFileDialog: defineAsyncComponent(() => import('@/components/dialogs/DeleteFileDialog.vue')),
   DiffDialog: defineAsyncComponent(() => import('@/components/dialogs/DiffDialog.vue')),
   ForkCreatedDialog: defineAsyncComponent(

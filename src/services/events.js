@@ -38,10 +38,10 @@
  *   `file.committed` only: the changes included in the commit.
  * @property {'updated'|'merged'} [status] `workspace.synced` only: whether the workspace was
  *   fast-forwarded or merged with the changes from GitHub. Files may have changed at any depth.
- * @property {Array<'title'|'description'|'pfs'|'status'>} [fields] `workspace.updated` only: the
+ * @property {Array<'title'|'description'|'selection'|'status'>} [fields] `workspace.updated` only: the
  *   changed workspace fields; refetch the workspace.
- * @property {string[]} [pfs] `preview.generated` only: the PFS list the owner built the preview
- *   for; fetch the current preview instead of building.
+ * @property {string[]} [selection] `preview.generated` only: the selection the owner built the
+ *   preview for; fetch the current preview instead of building.
  * @property {string} [toolchain] `preview.preparing` only: the toolchain a preview or download waits
  *   for, e.g. `ceos-ard-cli-0.5.9`. Sent to every client, the waiting one included.
  * @property {number} [seq] Present iff the event was published by the server broker.

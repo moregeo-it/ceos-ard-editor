@@ -3,6 +3,17 @@ import { createVuetify } from 'vuetify';
 import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
 import { aliases, mdi } from 'vuetify/iconsets/mdi-svg';
+import {
+  mdiAlertCircleOutline,
+  mdiArrowDown,
+  mdiArrowUp,
+  mdiCalendarClock,
+  mdiClockOutline,
+  mdiDelete,
+  mdiEye,
+  mdiEyeOff,
+  mdiPlus,
+} from '@mdi/js';
 
 const vuetify = createVuetify({
   components,
@@ -19,7 +30,19 @@ const vuetify = createVuetify({
   },
   icons: {
     defaultSet: 'mdi',
-    aliases,
+    aliases: {
+      ...aliases,
+      // The JSON Forms renderers use these, with icon font names unless set here
+      itemAdd: mdiPlus,
+      itemMoveUp: mdiArrowUp,
+      itemMoveDown: mdiArrowDown,
+      itemDelete: mdiDelete,
+      calendarClock: mdiCalendarClock,
+      clock: mdiClockOutline,
+      passwordHide: mdiEyeOff,
+      passwordShow: mdiEye,
+      validationError: mdiAlertCircleOutline,
+    },
     sets: {
       mdi,
     },

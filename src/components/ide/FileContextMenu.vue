@@ -210,23 +210,24 @@ export default {
   },
 
   methods: {
-    getPfsFolderId(path) {
-      if (typeof path !== 'string') {
+    // The selected option of the preview that `path` is, or contains, e.g. the folder of a PFS
+    async selectedOptionAt(path) {
+      const selection = this.workspacesStore.currentWorkspace?.selection ?? [];
+      if (selection.length === 0) {
         return null;
       }
-
-      const parts = path.split('/').filter(Boolean);
-      if (parts.length !== 2 || parts[0] !== 'pfs') {
-        return null;
+      const workspaceId = this.workspacesStore.currentWorkspace.id;
+      if (this.workspacesStore.selectionOptions.length === 0) {
+        await this.workspacesStore.fetchSelectionOptions(workspaceId);
       }
-
-      return parts[1];
-    },
-
-    // Part of the workspace's PFS list, i.e. the preview selection
-    isSelectedPfsFolder(path) {
-      const pfsId = this.getPfsFolderId(path);
-      return !!pfsId && (this.workspacesStore.currentWorkspace?.pfs ?? []).includes(pfsId);
+      return (
+        this.workspacesStore.selectionOptions.find(
+          (option) =>
+            selection.includes(option.id) &&
+            option.path &&
+            (option.path === path || option.path.startsWith(`${path}/`)),
+        ) ?? null
+      );
     },
 
     openFile(path, forceSourceCodeEditor = false) {
@@ -245,15 +246,16 @@ export default {
     },
 
     requestAction(action) {
-      // CEOS-ARD creates PFS with its own dialog and endpoint
-      if (action.dialog === 'CreatePfsDialog') {
-        this.requestNewPfs();
-      }
-    },
-
-    requestNewPfs() {
-      this.$root.openDialog('CreatePfsDialog', {
-        onAcceptance: this.handleCreatePfs,
+      this.$root.openDialog('ActionDialog', {
+        action,
+        onAcceptance: async (data) => {
+          const result = await this.filesStore.runAction(action.id, data);
+          this.notificationsStore.success(`${result.name} created`);
+          const open = result.open ?? (result.is_directory ? null : result.path);
+          if (open) {
+            await this.editorStore.show(open);
+          }
+        },
       });
     },
 
@@ -266,11 +268,6 @@ export default {
       this.notificationsStore.success(
         `${type === 'folder' ? 'Folder' : 'File'} created successfully`,
       );
-    },
-
-    async handleCreatePfs(pfsContent) {
-      await this.filesStore.createNewPfs(pfsContent);
-      this.notificationsStore.success('PFS created successfully');
     },
 
     requestRename() {
@@ -286,10 +283,14 @@ export default {
       this.notificationsStore.success('Renamed successfully');
     },
 
-    requestDelete() {
-      if (this.item.type === 'folder' && this.isSelectedPfsFolder(this.item.path)) {
+    async requestDelete() {
+      const selected = await this.selectedOptionAt(this.item.path).catch(() => null);
+      if (selected) {
+        const label = useTypesStore().currentType?.selection?.label ?? 'file';
         this.notificationsStore.warning(
-          "You can't delete a PFS that is selected for preview. Deselect it before deleting.",
+          selected.path === this.item.path
+            ? `You can't delete a ${label} that is selected for the preview. Deselect it before deleting.`
+            : `You can't delete a folder with a ${label} that is selected for the preview. Deselect it before deleting.`,
         );
         return;
       }

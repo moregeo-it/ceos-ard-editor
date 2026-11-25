@@ -15,7 +15,7 @@
     <template v-slot:item="{ props: itemProps, item }">
       <v-list-item v-bind="itemProps" :title="null">
         <v-list-item-title>
-          <template v-if="item.props.title">
+          <template v-if="item.props.title && item.props.title !== item.props.value">
             {{ item.props.value }}: {{ item.props.title }}
           </template>
           <template v-else>
@@ -37,7 +37,7 @@ import { mdiFileDocumentOutline } from '@mdi/js';
 
 // Other v-select props and events (readonly, clearable, hint, update:menu, ...) fall through
 export default {
-  name: 'PfsSelect',
+  name: 'SelectionSelect',
   props: {
     modelValue: {
       type: [String, Array],

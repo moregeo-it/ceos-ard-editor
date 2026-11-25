@@ -20,8 +20,10 @@
       >
         {{ typeTitle }}
       </v-chip>
-      <PfsBadges v-if="workspace.pfs" :pfs="workspace.pfs" />
-      <span v-else-if="type?.pfs">No PFS assigned</span>
+      <template v-if="type?.selection?.on_create">
+        <SelectionBadges v-if="workspace.selection?.length" :items="workspace.selection" />
+        <span v-else>No {{ type.selection.label }} assigned</span>
+      </template>
     </div>
 
     <v-card-text class="d-flex flex-column flex-grow-1">
@@ -79,7 +81,7 @@
 
 <script>
 import { useTypesStore } from '@/stores/types';
-import PfsBadges from './PfsBadges.vue';
+import SelectionBadges from './SelectionBadges.vue';
 import ShareModeChip from './ShareModeChip.vue';
 import {
   mdiFolder,
@@ -96,7 +98,7 @@ export default {
   name: 'WorkspaceCard',
 
   components: {
-    PfsBadges,
+    SelectionBadges,
     ShareModeChip,
   },
 

@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia';
 import previewService from '@/services/preview.service';
 
-import { useWorkspacesStore } from './workspaces';
+import { useEditorStore } from './editor';
 import { useNotificationsStore } from './notifications';
+import { useTypesStore } from './types';
+import { useWorkspacesStore } from './workspaces';
 
 import { EVENTS, on, workspaceSession } from '@/services/events';
 
@@ -24,6 +26,9 @@ const getDefaults = () => ({
   files: new Map(),
   // The last request to show a file in the preview: `{ path, index }` of the place
   showRequest: null,
+  // The file shown by a workspace type that previews the open file, and why nothing is shown
+  renderedPath: null,
+  message: '',
 });
 
 export const usePreviewStore = defineStore('preview', {
@@ -31,8 +36,10 @@ export const usePreviewStore = defineStore('preview', {
 
   getters: {
     hasPreview: (state) => !!state.previewHtml,
-    // The workspace's PFS list is the preview selection: the owner saves it, everyone follows it
-    hasSelectedPfs: () => (useWorkspacesStore().currentWorkspace?.pfs?.length ?? 0) > 0,
+    // The owner saves the selection, e.g. PFS, and everyone follows it
+    hasSelection: () => (useWorkspacesStore().currentWorkspace?.selection?.length ?? 0) > 0,
+    // "build": the owner builds a document from the selection; "file": everyone renders the open file
+    mode: () => useTypesStore().currentType?.preview ?? 'build',
   },
 
   actions: {
@@ -88,7 +95,11 @@ export const usePreviewStore = defineStore('preview', {
      * @param {{build?: boolean}} [options] `build: false` fetches even in an owner tab
      */
     async generatePreview({ build = true } = {}) {
-      if (!this.hasSelectedPfs) {
+      if (this.mode === 'file') {
+        await this.renderActiveFile();
+        return;
+      }
+      if (!this.hasSelection) {
         this.setPreviewHtml('');
         return;
       }
@@ -122,6 +133,46 @@ export const usePreviewStore = defineStore('preview', {
         if (error.status !== 404 || shouldBuild) {
           notifications.error(`Failed to generate preview: ${error.message}`);
         }
+        this.setPreviewHtml('');
+      } finally {
+        if (started === workspaceSession()) {
+          this.isGenerating = false;
+        }
+      }
+    },
+
+    async renderActiveFile() {
+      const workspace = useWorkspacesStore().currentWorkspace;
+      const path = useEditorStore().active?.path ?? null;
+      if (!workspace?.id || !path) {
+        this.renderedPath = null;
+        this.message = 'Open a file to see its preview.';
+        this.setPreviewHtml('');
+        return;
+      }
+
+      const started = workspaceSession();
+      this.isGenerating = true;
+      try {
+        const html = await previewService.renderFile(workspace.id, path);
+        if (started !== workspaceSession()) {
+          return;
+        }
+        if (this.renderedPath !== path) {
+          this.setScrollPosition(0, 0);
+        }
+        this.renderedPath = path;
+        this.message = '';
+        this.setPreviewHtml(html);
+      } catch (error) {
+        if (started !== workspaceSession()) {
+          return;
+        }
+        this.renderedPath = path;
+        this.message =
+          error.status === 404
+            ? 'There is no preview for this file.'
+            : `Failed to render the preview: ${error.message}`;
         this.setPreviewHtml('');
       } finally {
         if (started === workspaceSession()) {
@@ -178,6 +229,11 @@ export function registerPreviewEventListeners() {
     if (event.type === EVENTS.FILE_COMMITTED) {
       return; // Commits don't change file contents, so the preview is unaffected.
     }
+    // Rendering the open file changes nothing on the server, so every viewer renders it
+    if (usePreviewStore().mode === 'file') {
+      usePreviewStore().requestPreviewRefresh();
+      return;
+    }
     if (event.source !== 'local' || !useWorkspacesStore().isOwner) {
       return; // The tab that made the change builds; its build ends in preview.generated
     }
@@ -185,6 +241,9 @@ export function registerPreviewEventListeners() {
   });
 
   on(EVENTS.PREVIEW_GENERATED, () => {
+    if (usePreviewStore().mode === 'file') {
+      return;
+    }
     usePreviewStore().requestPreviewRefresh({ fetchOnly: true });
   });
 

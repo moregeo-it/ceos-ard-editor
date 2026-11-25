@@ -6,6 +6,7 @@ import { CLIENT_ID } from '@/utils/client-id';
 import { useAuthStore } from './auth';
 import { useEditorStore } from './editor';
 import { useNotificationsStore } from './notifications';
+import { useTypesStore } from './types';
 import { useWorkspacesStore } from './workspaces';
 
 const RECONNECT_MIN_MS = 1000;
@@ -249,7 +250,7 @@ export const useRealtimeStore = defineStore('realtime', {
     },
 
     /**
-     * Full reconciliation on reconnect: reload the workspace (status, PFS selection), its PFS
+     * Full reconciliation on reconnect: reload the workspace (status, selection), its selection
      * options, the tree and the open files (unsaved edits are kept), then announce it via a single
      * `realtime.resynced` event (no per-file event storm). Cheaper than server-side event replay
      * and always converges.
@@ -260,7 +261,10 @@ export const useRealtimeStore = defineStore('realtime', {
       const workspaces = useWorkspacesStore();
       const steps = [
         () => workspaces.refreshCurrentWorkspace(),
-        () => workspaces.fetchPfs(workspaceId),
+        () =>
+          useTypesStore().currentType?.selection
+            ? workspaces.fetchSelectionOptions(workspaceId)
+            : undefined,
         () =>
           useEditorStore().refreshAfterRemoteUpdate({
             source: 'the changes made while disconnected',

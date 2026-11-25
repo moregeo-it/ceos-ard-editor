@@ -38,29 +38,29 @@
             class="mb-3"
           ></v-text-field>
 
-          <PfsSelect
-            v-if="selectedType?.pfs"
-            v-model="formData.pfs"
-            :items="pfsItems"
-            :loading="loadingPfs"
-            :no-data-text="loadingPfs ? 'Loading PFS…' : undefined"
-            label="Product Family Specification"
-            multiple
-            chips
-            :rules="rules.pfs"
-            hint="The workspace preview is generated from these PFS, for everyone with access."
+          <SelectionSelect
+            v-if="selection?.on_create"
+            v-model="formData.selection"
+            :items="selectionItems"
+            :loading="loadingOptions"
+            :no-data-text="loadingOptions ? `Loading ${selection.label}…` : undefined"
+            :label="selection.label"
+            :multiple="selection.multiple"
+            :chips="selection.multiple"
+            :rules="rules.selection"
+            hint="The workspace preview is generated from this selection, for everyone with access."
             persistent-hint
             class="mb-3"
           />
 
           <v-alert
-            v-if="selectedType?.pfs && pfsError"
+            v-if="selection?.on_create && optionsError"
             type="warning"
             variant="tonal"
             density="compact"
             class="mb-3"
           >
-            Couldn't load PFSes of this workspace, so newly added PFS are missing currently.
+            Couldn't load the {{ selection.label }} to select from: {{ optionsError }}
           </v-alert>
 
           <v-textarea
@@ -115,13 +115,13 @@ import {
   mdiShapeOutline,
   mdiText,
 } from '@mdi/js';
-import PfsSelect from '@/components/PfsSelect.vue';
+import SelectionSelect from '@/components/SelectionSelect.vue';
 
 export default {
   name: 'WorkspaceDialog',
   mixins: [DialogMixin],
   components: {
-    PfsSelect,
+    SelectionSelect,
   },
   props: {
     mode: {
@@ -153,19 +153,26 @@ export default {
       formData: {
         type: useTypesStore().availableTypes[0]?.id,
         title: '',
-        pfs: [],
+        selection: [],
         description: '',
       },
-      // The workspace's own PFS, including ones created in it but not merged upstream yet
-      workspacePfs: null,
-      loadingPfs: false,
-      pfsError: null,
+      // What the workspace can select: the upstream's options for a new workspace, the workspace's
+      // own when updating, including e.g. PFS created in it but not merged upstream yet
+      selectionOptions: [],
+      loadingOptions: false,
+      optionsError: null,
       rules: {
         title: [
           (v) => !!v || 'Title is required',
           (v) => (v && v.length >= 3) || 'Title must be at least 3 characters',
         ],
-        pfs: [(v) => v?.length > 0 || 'Select at least one PFS'],
+        selection: [
+          (v) =>
+            (Array.isArray(v) ? v.length > 0 : !!v) ||
+            (this.selection?.multiple
+              ? `Select at least one ${this.selection.label}`
+              : `Select a ${this.selection?.label}`),
+        ],
       },
     };
   },
@@ -191,40 +198,49 @@ export default {
     submitButtonText() {
       return this.isUpdateMode ? 'Update Workspace' : 'Create Workspace';
     },
-    pfsItems() {
-      if (this.loadingPfs) {
-        return [];
-      }
-      return this.workspacePfs ?? this.workspacesStore.pfsOptions;
+    selection() {
+      return this.selectedType?.selection ?? null;
+    },
+    selectionItems() {
+      return this.loadingOptions ? [] : this.selectionOptions;
+    },
+  },
+  watch: {
+    selection: {
+      immediate: true,
+      handler(selection) {
+        if (selection?.on_create) {
+          this.loadSelectionOptions(this.formData.type);
+        }
+      },
     },
   },
   created() {
     if (this.workspace) {
-      const pfsIds = Array.isArray(this.workspace.pfs)
-        ? this.workspace.pfs
-        : this.workspace.pfs
-          ? [this.workspace.pfs]
-          : [];
       this.formData = {
         type: this.workspace.type,
         title: this.workspace.title || '',
-        pfs: pfsIds,
+        selection: [...(this.workspace.selection ?? [])],
         description: this.workspace.description || '',
       };
     }
-    if (this.isUpdateMode && this.workspace && this.selectedType?.pfs) {
-      this.loadWorkspacePfs();
-    }
   },
   methods: {
-    async loadWorkspacePfs() {
-      this.loadingPfs = true;
+    async loadSelectionOptions(typeId) {
+      this.selectionOptions = [];
+      this.optionsError = null;
+      this.loadingOptions = true;
       try {
-        this.workspacePfs = await workspaceService.fetchPfs(this.workspace.id);
+        const options = this.isUpdateMode
+          ? await workspaceService.fetchSelectionOptions(this.workspace.id)
+          : await workspaceService.fetchTypeSelectionOptions(typeId);
+        if (this.formData.type === typeId) {
+          this.selectionOptions = options;
+        }
       } catch (error) {
-        this.pfsError = error.message;
+        this.optionsError = error.message;
       } finally {
-        this.loadingPfs = false;
+        this.loadingOptions = false;
       }
     },
     async handleSubmit() {
@@ -236,8 +252,10 @@ export default {
         title: this.formData.title,
         description: this.formData.description || null,
       };
-      if (this.selectedType?.pfs) {
-        payload.pfs = this.formData.pfs;
+      if (this.selection?.on_create) {
+        payload.selection = this.selection.multiple
+          ? this.formData.selection
+          : [this.formData.selection].flat();
       }
 
       // Include workspace ID for update mode

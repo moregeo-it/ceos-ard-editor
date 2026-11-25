@@ -56,7 +56,7 @@ function workspace(overrides = {}) {
     id,
     title: 'NRB review',
     user_id: USER.id,
-    pfs: ['NRB'],
+    selection: ['NRB'],
     description: 'Review of the NRB PFS',
     fork_repo_owner: 'jdoe',
     fork_repo_name: 'ceos-ard',
@@ -132,6 +132,9 @@ export class MockApi {
     this.files = new Map(Object.entries(FILES).map(([path, content]) => [path, { content }]));
     this.status = new Map();
     this.types = [CEOS_ARD_TYPE];
+    this.usage = USAGE;
+    // The actions of the workspace types, by id: `(data) => created item`, see POST .../actions/{id}
+    this.actions = { 'create-pfs': (data) => this.createPfs(data) };
     this.workspaces = [workspace()];
     this.upstream = null;
     this.previewHtml = PREVIEW_HTML;
@@ -202,13 +205,42 @@ export class MockApi {
     return results;
   }
 
-  workspacePfs() {
+  // The PFS of the workspace, as the CEOS-ARD type lists them
+  selectionOptions() {
     const ids = [...this.folders()]
       .filter((folder) => parentOf(folder) === '/pfs')
       .map((folder) => nameOf(folder));
     return {
-      pfs_types: ids.map((id) => ({ id, title: PFS_TYPES.find((t) => t.id === id)?.title ?? id })),
+      options: ids.map((id) => ({
+        id,
+        title: PFS_TYPES.find((t) => t.id === id)?.title ?? id,
+        path: `/pfs/${id}`,
+      })),
     };
+  }
+
+  // As GET .../actions/{id} returns it: the action of the workspace's type, with options of the workspace
+  actionForm(id) {
+    const type = this.types.find((t) => t.id === this.workspaces[0].type) ?? this.types[0];
+    const action = type.actions.find((a) => a.id === id);
+    if (!action) return null;
+    const schema = structuredClone(action.schema);
+    if (id === 'create-pfs') {
+      schema.properties.base.oneOf = this.selectionOptions().options.map((option) => ({
+        const: option.id,
+        title: `${option.id}: ${option.title}`,
+      }));
+    }
+    return { schema, ui_schema: action.ui_schema ?? null };
+  }
+
+  createPfs({ id, title }) {
+    const document = `/pfs/${id}/document.yaml`;
+    this.files.set(document, { content: `title: ${title}\n` });
+    this.files.set(`/pfs/${id}/requirements.yaml`, { content: 'required: []\n' });
+    this.status.set(document, 'added');
+    this.status.set(`/pfs/${id}/requirements.yaml`, 'added');
+    return { ...this.item(`/pfs/${id}`, true), open: document };
   }
 
   async install(page) {
@@ -261,9 +293,9 @@ export class MockApi {
         ? json(route, { detail: 'Not authenticated' }, 401)
         : json(route, this.sharePreviews[m[1]]);
     }
-    if (path === '/pfs') {
+    if ((m = path.match(/^\/types\/([^/]+)\/selection-options$/))) {
       // GitHub only provides the folder names of the PFS
-      return json(route, { pfs_types: PFS_TYPES.map(({ id }) => ({ id, title: null })) });
+      return json(route, { options: PFS_TYPES.map(({ id }) => ({ id, title: id, path: null })) });
     }
     if (path === '/workspaces') {
       if (method === 'POST') {
@@ -336,22 +368,46 @@ export class MockApi {
     }
     if ((m = sub.match(/^\/context\/(.+)$/))) {
       const path = `/${m[1].replace(/^\//, '')}`;
-      return json(route, { ...this.item(path, false), usage: USAGE[path] ?? null });
+      return json(route, { ...this.item(path, false), usage: this.usage[path] ?? null });
     }
     if (sub === '/search') {
-      return json(route, this.search(url.searchParams.get('query')));
+      const filters = url.searchParams.getAll('filter').map((filter) => filter.split(':')[1]);
+      const query = url.searchParams.get('query');
+      const files = query
+        ? this.search(query)
+        : [...this.files.keys()].map((path) => ({ ...this.item(path, false), type: 'filter' }));
+      return json(
+        route,
+        files.filter((file) =>
+          filters.every((tag) => this.files.get(file.path).content.includes(`  - ${tag}\n`)),
+        ),
+      );
     }
-    if (sub === '/pfs' && method === 'GET') {
-      return json(route, this.workspacePfs());
+    if ((m = sub.match(/^\/render\/(.+)$/))) {
+      const path = `/${m[1].replace(/^\//, '')}`;
+      const file = this.files.get(path);
+      if (!file) return json(route, { detail: 'There is no preview for this file' }, 404);
+      const title = file.content.match(/^title: (.+)$/m)?.[1] ?? path;
+      const links = [...this.files.keys()]
+        .filter((other) => other !== path && other.startsWith('/docs/terms/'))
+        .map((other) => `<a href="#" data-open-file="${other}">${other}</a>`)
+        .join(' ');
+      return fulfill(route, {
+        status: 200,
+        contentType: 'text/html',
+        body: `<!doctype html><html><body><h1>${title}</h1><p>${links}</p></body></html>`,
+      });
     }
-    if (sub === '/pfs' && method === 'POST') {
-      const { id, title } = JSON.parse(request.postData());
-      const document = `/pfs/${id}/document.yaml`;
-      this.files.set(document, { content: `title: ${title}\n` });
-      this.files.set(`/pfs/${id}/requirements.yaml`, { content: 'required: []\n' });
-      this.status.set(document, 'added');
-      this.status.set(`/pfs/${id}/requirements.yaml`, 'added');
-      return json(route, this.item(document, false), 201);
+    if ((m = sub.match(/^\/actions\/(.+)$/))) {
+      const id = decodeURIComponent(m[1]);
+      if (method === 'GET') {
+        const form = this.actionForm(id);
+        return form ? json(route, form) : json(route, { detail: 'Unknown action' }, 404);
+      }
+      return json(route, this.actions[id](JSON.parse(request.postData())), 201);
+    }
+    if (sub === '/selection-options') {
+      return json(route, this.selectionOptions());
     }
     if (sub === '/previews' || sub === '/previews/current') {
       return fulfill(route, { status: 200, contentType: 'text/html', body: this.previewHtml });

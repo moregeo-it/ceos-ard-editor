@@ -287,7 +287,10 @@ export default {
         return 'There is no preview to show this file in yet.';
       }
       if (!this.previewPlaces) {
-        return 'This file is not part of the selected PFS.';
+        const label = useTypesStore().currentType?.selection?.label;
+        return label
+          ? `This file is not part of the selected ${label}.`
+          : 'This file is not part of the preview.';
       }
       if (this.previewPlaces > 1) {
         return `The preview shows this file in ${this.previewPlaces} places. Click again for the next one.`;
