@@ -189,7 +189,7 @@ import {
 } from '@mdi/js';
 import { canCommentOn, openCommentDialog } from '@/utils/comments';
 import { displayPath, folderHints } from '@/utils/paths';
-import { supportVisualEditing } from '@/components/ide/editors/utils';
+import { isAsciiDoc, supportVisualEditing } from '@/components/ide/editors/utils';
 import { useTypesStore } from '@/stores/types';
 
 const supportedBrowserTypes = [
@@ -211,6 +211,7 @@ export default {
     SourceCodeEditor: defineAsyncComponent(() => import('./editors/SourceCodeEditor.vue')),
     UnsupportedViewer,
     JsonSchemaEditor: defineAsyncComponent(() => import('./editors/JsonSchemaEditor.vue')),
+    AsciiDocEditor: defineAsyncComponent(() => import('./editors/AsciiDocEditor.vue')),
   },
 
   data() {
@@ -341,6 +342,11 @@ export default {
         } else {
           return 'UnsupportedViewer';
         }
+      } else if (isAsciiDoc(file)) {
+        // The visual AsciiDoc editor can't be made read-only
+        return forceSourceCodeEditor || this.workspacesStore.isReadOnly
+          ? 'SourceCodeEditor'
+          : 'AsciiDocEditor';
       } else if (supportVisualEditing(file, data) && !forceSourceCodeEditor) {
         return 'JsonSchemaEditor';
       } else {

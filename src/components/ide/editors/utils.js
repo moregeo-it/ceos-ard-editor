@@ -8,8 +8,12 @@ export function getEditorRule(file) {
   return rules.find((rule) => matchesGlob(file.path, rule.match) && codecs[rule.codec]) ?? null;
 }
 
+export function isAsciiDoc(file) {
+  return /\.(adoc|asciidoc)$/i.test(file.path);
+}
+
 export function supportVisualEditing(file) {
-  return Boolean(getEditorRule(file)?.schema);
+  return Boolean(getEditorRule(file)?.schema) || isAsciiDoc(file);
 }
 
 export function getEditingSchema(file) {
