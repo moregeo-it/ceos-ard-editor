@@ -722,10 +722,10 @@ test.describe('Preview', () => {
     // The owner's other tab deletes the last PFS
     let refetched = false;
     await page.route(
-      (url) => url.pathname.endsWith('/workspaces/ws-1/pfs'),
+      (url) => url.pathname.endsWith('/workspaces/ws-1/selection-options'),
       (route) => {
         refetched = true;
-        return route.fulfill({ json: { pfs_types: [] } });
+        return route.fulfill({ json: { options: [] } });
       },
     );
     await expect.poll(() => socket).toBeTruthy();
@@ -1279,5 +1279,28 @@ test.describe('File preview', () => {
       }),
     );
     await expect(heading).toHaveText('after');
+  });
+
+  test('the reading mode shows the preview of the file', async ({ page, api }) => {
+    api.types = [{ ...api.types[0], preview: 'file' }];
+    await page.route(`${API}/workspaces/ws-1/render/**`, (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: '<!doctype html><html><body><h1>README</h1></body></html>',
+      }),
+    );
+    await openWorkspace(page);
+    await page.evaluate(() => (window.location.hash = '#edit=%2FREADME.md'));
+    await expect(page.frameLocator('.preview-iframe').locator('h1')).toHaveText('README');
+    await expect(page.locator('.preview-select')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Reading mode', exact: true }).click();
+    const viewport = page.viewportSize();
+    await expect
+      .poll(async () => (await page.locator('.preview-iframe').boundingBox()).width)
+      .toBeGreaterThan(viewport.width * 0.9);
+
+    await page.getByRole('button', { name: 'Exit reading mode' }).click();
+    await expect(page.getByRole('button', { name: 'Reading mode', exact: true })).toBeVisible();
   });
 });

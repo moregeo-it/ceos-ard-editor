@@ -33,7 +33,7 @@ const renderers = markRaw([
   { renderer: StringArrayRenderer, tester: stringArrayTester },
 ]);
 
-const fieldDefaults = { variant: 'outlined', density: 'compact', hideDetails: 'auto' };
+const fieldDefaults = { density: 'compact', hideDetails: 'auto' };
 
 export default {
   name: 'JsonSchemaEditor',
