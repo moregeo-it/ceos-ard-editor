@@ -124,10 +124,10 @@ export default {
 .text-subtle {
   color: rgba(0, 0, 0, 0.6);
 }
-/* Vuetify fades disabled fields to 38%, which is hard to read on light backgrounds; keep them
-   visibly inactive but legible (e.g. the propose forms of an archived workspace) */
-.readable-disabled .v-field--disabled,
-.readable-disabled .v-input--disabled .v-input__details {
+/* Vuetify fades disabled fields to 38%, which is hard to read; keep them inactive but legible.
+   One class more specific than Vuetify's rules, so it wins regardless of stylesheet order. */
+.v-input--disabled .v-field--disabled,
+.v-input.v-input--disabled .v-input__details {
   opacity: 0.6;
 }
 

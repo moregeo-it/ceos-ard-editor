@@ -24,7 +24,7 @@
         multiple
         chips
         hide-details
-        class="preview-select readable-disabled flex-grow-1"
+        class="preview-select flex-grow-1"
         @update:menu="handleMenuToggle"
       />
       <v-menu location="bottom end">

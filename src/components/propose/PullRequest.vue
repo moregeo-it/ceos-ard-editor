@@ -128,7 +128,7 @@
         </template>
       </v-alert>
 
-      <v-form class="readable-disabled" @submit.prevent="propose">
+      <v-form @submit.prevent="propose">
         <v-text-field
           v-model="title"
           required
