@@ -1,6 +1,9 @@
 <template>
   <div class="d-flex flex-column fill-height" :class="{ 'reading-mode': readingMode }">
-    <div v-if="pfsOptions.length > 0" class="pa-2 pt-3 d-flex align-center border-b-sm">
+    <div
+      v-if="pfsOptions.length > 0 || readingMode"
+      class="pa-2 pt-3 d-flex align-center border-b-sm"
+    >
       <v-tooltip :text="pfsTooltip" location="bottom" max-width="320">
         <template #activator="{ props }">
           <v-icon

@@ -655,6 +655,37 @@ test.describe('Preview', () => {
     await expect(frame.locator('h1')).toHaveText('NRB preview');
   });
 
+  test('the reading mode can be left when the workspace loses its PFS', async ({ page }) => {
+    let socket;
+    await page.routeWebSocket(WORKSPACE_EVENTS, (ws) => (socket = ws));
+    await openWorkspace(page);
+    await expect(page.frameLocator('.preview-iframe').locator('h1')).toBeVisible();
+    await page.getByRole('button', { name: 'Reading mode', exact: true }).click();
+
+    // The owner's other tab deletes the last PFS
+    let refetched = false;
+    await page.route(
+      (url) => url.pathname.endsWith('/workspaces/ws-1/pfs'),
+      (route) => {
+        refetched = true;
+        return route.fulfill({ json: { pfs_types: [] } });
+      },
+    );
+    await expect.poll(() => socket).toBeTruthy();
+    socket.send(
+      JSON.stringify({
+        type: 'file.deleted',
+        ts: new Date().toISOString(),
+        actor_user_id: 'user-1',
+        path: '/pfs/NRB',
+      }),
+    );
+    await expect.poll(() => refetched).toBe(true);
+
+    await page.getByRole('button', { name: 'Exit reading mode' }).click();
+    await expect(page.getByRole('button', { name: 'Exit reading mode' })).toHaveCount(0);
+  });
+
   test('Edit in the preview leaves the reading mode', async ({ page }) => {
     await openWorkspace(page);
     await page.getByRole('button', { name: 'Reading mode', exact: true }).click();
