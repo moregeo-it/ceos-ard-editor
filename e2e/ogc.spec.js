@@ -233,7 +233,7 @@ test.describe('OGC', () => {
     api.workspaces[0].viewer_role = 'readonly';
     await page.reload();
     await expect(page.getByText('The owner has not generated a preview yet.')).toBeVisible();
-    await expect(documentSelect(page).locator('input')).toHaveAttribute('readonly');
+    await expect(documentSelect(page).locator('input')).toBeDisabled();
     expect(api.requests.some((r) => r.method === 'PATCH')).toBe(false);
   });
 
@@ -245,7 +245,7 @@ test.describe('OGC', () => {
       page.frameLocator('.preview-iframe').getByRole('heading', { name: 'Part 1: Core' }),
     ).toBeVisible();
     await expect(documentSelect(page)).toContainText('OGC API - Records - Part 1: Core');
-    await expect(documentSelect(page).locator('input')).toHaveAttribute('readonly');
+    await expect(documentSelect(page).locator('input')).toBeDisabled();
     expect(api.requests.some((r) => r.method === 'POST' && r.path.endsWith('/previews'))).toBe(
       false,
     );
