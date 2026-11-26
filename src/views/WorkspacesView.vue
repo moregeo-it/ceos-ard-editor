@@ -244,7 +244,7 @@ export default {
     async loadData() {
       try {
         const [types] = await Promise.all([
-          useTypesStore().fetchTypes(),
+          this.typesStore.fetchTypes(),
           this.workspacesStore.fetchWorkspaces(),
         ]);
         if (types.some((type) => type.pfs)) {
@@ -267,7 +267,7 @@ export default {
     // The workspace dialog reads the types when it opens, e.g. its initial type
     async loadTypes() {
       try {
-        await useTypesStore().fetchTypes();
+        await this.typesStore.fetchTypes();
         return true;
       } catch (error) {
         this.notificationsStore.error(`Failed to load the workspace types: ${error.message}`);
@@ -323,7 +323,7 @@ export default {
 
       this.notificationsStore.success(
         forkName
-          ? `Workspace created successfully in your ${useTypesStore().byId(workspace.type)?.title} repository ${forkName}`
+          ? `Workspace created successfully in your ${this.typesStore.byId(workspace.type)?.title} repository ${forkName}`
           : 'Workspace created successfully',
       );
     },
