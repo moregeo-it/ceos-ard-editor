@@ -17,6 +17,11 @@ async function openWorkspace(page, path = '/workspaces/ws-1') {
   await expect(row(page, 'pfs')).toBeVisible();
 }
 
+async function downloadAs(page, format) {
+  await page.getByRole('button', { name: 'Download', exact: true }).click();
+  await page.locator('.v-overlay--active .v-list-item').filter({ hasText: format }).click();
+}
+
 // What the server sends while a request waits for a toolchain to be installed
 function preparing(toolchain) {
   return {
@@ -355,8 +360,7 @@ test.describe('Preview', () => {
     await openWorkspace(page);
 
     await expect(page.locator('.preview-select .v-chip')).toHaveText(['NRB']);
-    // The arrow, as the narrow select's middle is its chip
-    expect(await optionTexts(page, page.locator('.preview-select .v-select__menu-icon'))).toEqual([
+    expect(await optionTexts(page, page.locator('.preview-select'))).toEqual([
       'NRB: SAR Normalised Radar Backscatter',
       'SR: Optical Surface Reflectance',
     ]);
@@ -570,7 +574,7 @@ test.describe('Preview', () => {
     await openWorkspace(page);
     await expect(page.frameLocator('.preview-iframe').locator('h1')).toBeVisible();
 
-    await page.getByRole('button', { name: 'PDF', exact: true }).click();
+    await downloadAs(page, 'PDF');
     await expect.poll(() => socket).toBeTruthy();
     socket.send(JSON.stringify(preparing('ceos-ard-cli-0.5.9')));
     await expect(page.getByText('Setting up the tools for the download')).toBeVisible();
@@ -597,8 +601,8 @@ test.describe('Preview', () => {
     // Another user's download waits while this tab is idle, then this tab downloads
     await expect.poll(() => socket).toBeTruthy();
     socket.send(JSON.stringify(preparing('ceos-ard-cli-0.5.9')));
-    await page.getByRole('button', { name: 'PDF', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'PDF', exact: true })).toHaveClass(
+    await downloadAs(page, 'PDF');
+    await expect(page.getByRole('button', { name: 'Download', exact: true })).toHaveClass(
       /v-btn--loading/,
     );
     await expect(page.getByText('Setting up the tools')).toHaveCount(0);
@@ -609,14 +613,18 @@ test.describe('Preview', () => {
     await openWorkspace(page);
     await expect(page.frameLocator('.preview-iframe').locator('h1')).toBeVisible();
 
-    await page.getByRole('button', { name: 'PDF', exact: true }).click();
+    await downloadAs(page, 'PDF');
     await expect
       .poll(() => api.requests.find((r) => r.path === '/workspaces/ws-1/download'))
       .toBeTruthy();
     expect(api.requests.find((r) => r.path === '/workspaces/ws-1/download').search).toContain(
       'pdf',
     );
-    await expect(page.getByRole('button', { name: 'Word', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Download', exact: true })).toBeEnabled();
+    await downloadAs(page, 'Word');
+    await expect
+      .poll(() => api.requests.filter((r) => r.path === '/workspaces/ws-1/download').at(-1).search)
+      .toContain('docx');
   });
 
   test('the reading mode shows the preview on the whole window', async ({ page }) => {

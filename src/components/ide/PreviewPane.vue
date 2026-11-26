@@ -1,6 +1,17 @@
 <template>
   <div class="d-flex flex-column fill-height" :class="{ 'reading-mode': readingMode }">
     <div v-if="pfsOptions.length > 0" class="pa-2 pt-3 d-flex align-center border-b-sm">
+      <v-tooltip :text="pfsTooltip" location="bottom" max-width="320">
+        <template #activator="{ props }">
+          <v-icon
+            v-bind="props"
+            :icon="icons.info"
+            tabindex="0"
+            aria-label="About the PFS selection"
+            class="mr-2"
+          />
+        </template>
+      </v-tooltip>
       <PfsSelect
         v-model="selectedPfs"
         :items="pfsOptions"
@@ -9,52 +20,39 @@
         multiple
         chips
         hide-details
-        class="preview-select mr-2 flex-grow-1"
+        class="preview-select flex-grow-1"
         @update:menu="handleMenuToggle"
       />
-      <v-tooltip :text="pfsTooltip" location="bottom" max-width="320">
+      <v-menu location="bottom end">
         <template #activator="{ props }">
-          <v-icon
+          <v-btn
             v-bind="props"
-            :icon="icons.info"
-            tabindex="0"
-            aria-label="About the PFS selection"
-          />
+            color="primary"
+            class="ml-2"
+            :prepend-icon="icons.download"
+            :disabled="!previewHtml"
+            :loading="isAnyDownloading"
+          >
+            Download
+          </v-btn>
         </template>
-      </v-tooltip>
+        <v-list density="compact">
+          <v-list-item title="PDF" @click="downloadPreview('pdf')" />
+          <v-list-item title="Word" @click="downloadPreview('docx')" />
+        </v-list>
+      </v-menu>
       <v-btn
         color="primary"
-        class="ml-2"
-        :disabled="!previewHtml"
-        @click="downloadPreview('pdf')"
-        title="Download PDF"
-        :loading="isDownloading['pdf']"
-      >
-        <v-icon>{{ icons.download }}</v-icon>
-        PDF
-      </v-btn>
-      <v-btn
-        color="primary"
-        class="ml-2"
-        :disabled="!previewHtml"
-        @click="downloadPreview('docx')"
-        title="Download Word Document"
-        :loading="isDownloading['docx']"
-      >
-        <v-icon>{{ icons.download }}</v-icon>
-        Word
-      </v-btn>
-      <v-btn
-        :icon="readingMode ? icons.exitReadingMode : icons.readingMode"
-        variant="text"
-        size="small"
-        class="ml-1"
+        min-width="0"
+        class="ml-2 px-2"
         :disabled="!previewHtml && !readingMode"
         :title="readingMode ? 'Exit reading mode' : 'Reading mode'"
         :aria-label="readingMode ? 'Exit reading mode' : 'Reading mode'"
         :aria-pressed="readingMode"
         @click="toggleReadingMode"
-      />
+      >
+        <v-icon :icon="readingMode ? icons.exitReadingMode : icons.readingMode" />
+      </v-btn>
     </div>
 
     <div class="flex-grow-1">
