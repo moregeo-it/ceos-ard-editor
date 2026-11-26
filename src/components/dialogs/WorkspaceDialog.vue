@@ -37,7 +37,11 @@
               item-title="name"
               item-value="name"
               label="Repository"
-              :hint="`The ${selectedType.upstream.owner} repository to work on, or the link to one of its pull requests`"
+              :hint="
+                loadingRepositories
+                  ? `Loading the repositories of ${selectedType.upstream.owner}, or paste the link to a pull request…`
+                  : `The ${selectedType.upstream.owner} repository to work on, or the link to one of its pull requests`
+              "
               persistent-hint
               variant="outlined"
               :prepend-inner-icon="icons.repository"
@@ -233,7 +237,6 @@ export default {
       loadingRepositories: false,
       repositoriesError: null,
       repositorySearch: '',
-      pastedLink: null,
       // The open pull requests of the chosen repository, which a workspace can continue
       pullRequests: [],
       loadingPullRequests: false,
@@ -357,9 +360,16 @@ export default {
       this.loadPullRequests(repository);
     },
     repositorySearch(text) {
-      if (PULL_REQUEST_LINK.test(text ?? '')) {
-        this.pastedLink = text;
-        this.applyPastedLink();
+      const link = this.parsePullRequestLink(text);
+      if (!link) {
+        return;
+      }
+      // At once, also while the repositories still load: the server checks the repository
+      this.pendingPullRequest = link.number;
+      if (this.formData.repository === link.repository) {
+        this.choosePendingPullRequest();
+      } else {
+        this.formData.repository = link.repository;
       }
     },
   },
@@ -406,30 +416,18 @@ export default {
         const repositories = await workspaceService.fetchRepositories(typeId);
         if (this.formData.type === typeId) {
           this.repositories = repositories;
-          this.loadingRepositories = false;
-          this.applyPastedLink();
+          // A repository taken from a pasted link, spelled as GitHub lists it
+          const listed = repositories.find(
+            (item) => item.name.toLowerCase() === this.formData.repository?.toLowerCase(),
+          );
+          if (listed && listed.name !== this.formData.repository) {
+            this.formData.repository = listed.name;
+          }
         }
       } catch (error) {
         this.repositoriesError = error.message;
       } finally {
         this.loadingRepositories = false;
-      }
-    },
-    // A link pasted while the repositories still load is applied once they are there
-    applyPastedLink() {
-      if (!this.pastedLink || this.loadingRepositories) {
-        return;
-      }
-      const link = this.parsePullRequestLink(this.pastedLink);
-      this.pastedLink = null;
-      if (!link) {
-        return;
-      }
-      this.pendingPullRequest = link.number;
-      if (this.formData.repository === link.repository) {
-        this.choosePendingPullRequest();
-      } else {
-        this.formData.repository = link.repository;
       }
     },
     async loadPullRequests(repository) {
@@ -467,10 +465,10 @@ export default {
       if (!match || match[1].toLowerCase() !== this.selectedType?.upstream?.owner?.toLowerCase()) {
         return null;
       }
-      const repository = this.repositories.find(
+      const listed = this.repositories.find(
         (item) => item.name.toLowerCase() === match[2].toLowerCase(),
       );
-      return repository ? { repository: repository.name, number: Number(match[3]) } : null;
+      return { repository: listed?.name ?? match[2], number: Number(match[3]) };
     },
     choosePendingPullRequest() {
       if (this.pendingPullRequest === null || this.loadingPullRequests) {

@@ -124,9 +124,7 @@ test.describe('OGC', () => {
     });
   });
 
-  test('a link pasted while the repositories load is used once they are there', async ({
-    page,
-  }) => {
+  test('a link pasted while the repositories load is used at once', async ({ page }) => {
     let release;
     const released = new Promise((resolve) => (release = resolve));
     await page.route('**/types/ogc/repositories', async (route) => {
@@ -134,11 +132,16 @@ test.describe('OGC', () => {
       await route.fallback();
     });
     const dialog = await openOgcDialog(page);
+    await expect(dialog).toContainText('Loading the repositories of opengeospatial');
     const repository = dialog.locator('.v-autocomplete').filter({ hasText: 'Repository' });
     await repository.locator('input').fill('https://github.com/opengeospatial/geoparquet/pull/304');
-    await expect(page.getByText('Loading repositories…')).toBeVisible();
+    await expect(dialog).toContainText('Continues pull request #304');
 
+    // Kept when leaving the field, and once the repositories are there
+    await dialog.getByLabel('Workspace Title').click();
     release();
+    await expect(dialog).not.toContainText('Loading the repositories');
+    await expect(repository).toContainText('geoparquet');
     await expect(dialog).toContainText('Continues pull request #304');
   });
 
