@@ -47,9 +47,9 @@ test.describe('OGC', () => {
     const menuWidth = (await page.locator('.v-overlay--active .v-list').boundingBox()).width;
     expect(Math.abs(menuWidth - fieldWidth)).toBeLessThan(2);
     await page.locator('.v-overlay--active .v-list-item').filter({ hasText: 'geoparquet' }).click();
-    await expect(dialog.getByLabel('Branch (Optional)')).toHaveAttribute('placeholder', 'main');
+    await expect(dialog.getByLabel('Start from (Optional)')).toHaveAttribute('placeholder', 'main');
     await expect(dialog).toContainText('creates a copy (fork) of the geoparquet repository');
-    await dialog.getByLabel('Branch (Optional)').fill('ogc-template');
+    await dialog.getByLabel('Start from (Optional)').fill('ogc-template');
     await dialog.getByRole('button', { name: 'Create' }).click();
 
     await expect(page).toHaveURL(/\/workspaces\/ws-2$/);
@@ -61,6 +61,85 @@ test.describe('OGC', () => {
       repository: 'geoparquet',
       branch: 'ogc-template',
     });
+  });
+
+  async function openOgcDialog(page) {
+    await page.goto('/workspaces');
+    await expect(page.locator('.v-skeleton-loader')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Create Workspace' }).first().click();
+    const dialog = page.locator('.v-dialog .v-card');
+    await dialog.locator('.v-select').filter({ hasText: 'What do you want to edit?' }).click();
+    await page.locator('.v-overlay--active .v-list-item').filter({ hasText: 'OGC' }).click();
+    return dialog;
+  }
+
+  function createdWith(api) {
+    const post = api.requests.find((r) => r.method === 'POST' && r.path === '/workspaces');
+    return JSON.parse(post.body);
+  }
+
+  test('a new workspace can continue an open pull request', async ({ page, api }) => {
+    const dialog = await openOgcDialog(page);
+    const repository = dialog.locator('.v-autocomplete').filter({ hasText: 'Repository' });
+    await repository.click();
+    await page.locator('.v-overlay--active .v-list-item').filter({ hasText: 'geoparquet' }).click();
+
+    const startFrom = dialog.locator('.v-combobox').filter({ hasText: 'Start from' });
+    expect(await optionTexts(page, startFrom)).toEqual([
+      '#304 OGC Standard document for GeoParquet 2.0 (metanorma), aligned with the 2.0.0 release jatorre · jatorre:ogc-spec-alignment',
+    ]);
+    await startFrom.click();
+    await page.locator('.v-overlay--active .v-list-item').filter({ hasText: '#304' }).click();
+    await expect(dialog).toContainText(
+      'Continues pull request #304: changes are proposed to its branch jatorre:ogc-spec-alignment',
+    );
+    // The pull request's title, as long as titles may be
+    await expect(dialog.getByLabel('Workspace Title')).toHaveValue(
+      'OGC Standard document for GeoParquet 2.0 (metanorm',
+    );
+    await dialog.getByRole('button', { name: 'Create' }).click();
+
+    await expect(page).toHaveURL(/\/workspaces\/ws-2$/);
+    expect(createdWith(api)).toMatchObject({ repository: 'geoparquet', pull_request: 304 });
+    expect(createdWith(api)).not.toHaveProperty('branch');
+  });
+
+  test('a link to a pull request chooses its repository and the pull request', async ({
+    page,
+    api,
+  }) => {
+    const dialog = await openOgcDialog(page);
+    const repository = dialog.locator('.v-autocomplete').filter({ hasText: 'Repository' });
+    await repository.locator('input').fill('https://github.com/opengeospatial/geoparquet/pull/304');
+
+    await expect(dialog).toContainText('Continues pull request #304');
+    await dialog.getByLabel('Workspace Title').fill('GeoParquet 2.0 review');
+    await dialog.getByRole('button', { name: 'Create' }).click();
+
+    await expect(page).toHaveURL(/\/workspaces\/ws-2$/);
+    expect(createdWith(api)).toMatchObject({
+      title: 'GeoParquet 2.0 review',
+      repository: 'geoparquet',
+      pull_request: 304,
+    });
+  });
+
+  test('a workspace continuing a pull request counts for the fork of its repository', async ({
+    page,
+    api,
+  }) => {
+    Object.assign(api.workspaces[0], {
+      upstream_owner: 'jatorre',
+      upstream_repo: 'geoparquet',
+      upstream_branch: 'ogc-spec-alignment',
+      fork_repo_name: 'geoparquet',
+    });
+    const dialog = await openOgcDialog(page);
+    await dialog.locator('.v-autocomplete').filter({ hasText: 'Repository' }).click();
+    await page.locator('.v-overlay--active .v-list-item').filter({ hasText: 'geoparquet' }).click();
+
+    await expect(dialog.getByLabel('Start from (Optional)')).toHaveAttribute('placeholder', 'main');
+    await expect(dialog).not.toContainText('creates a copy (fork)');
   });
 
   test('the workspace names its repository', async ({ page }) => {

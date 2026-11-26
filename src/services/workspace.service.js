@@ -65,6 +65,15 @@ export default {
   },
 
   /**
+   * The open pull requests of such a repository: `[{ number, title, author, head }]`
+   */
+  async fetchPullRequests(typeId, repository) {
+    return api.get(
+      `/types/${encodeURIComponent(typeId)}/repositories/${encodeURIComponent(repository)}/pull-requests`,
+    );
+  },
+
+  /**
    * What a workspace can select for its preview, e.g. its PFS: `[{ id, title }]`
    */
   async fetchSelectionOptions(workspaceId) {

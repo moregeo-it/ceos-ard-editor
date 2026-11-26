@@ -252,7 +252,18 @@ export default {
     ownedUpstreams() {
       return this.workspacesStore.workspaces
         .filter((w) => w.viewer_role === 'owner')
-        .map((w) => `${w.upstream_owner}/${w.upstream_repo}`);
+        .flatMap((w) => this.forkedUpstreams(w));
+    },
+
+    // A workspace continuing a pull request from another fork proposes to that fork, but its own fork is of
+    // the type owner's repository, which GitHub names the fork after
+    forkedUpstreams(workspace) {
+      const upstreams = [`${workspace.upstream_owner}/${workspace.upstream_repo}`];
+      const owner = useTypesStore().byId(workspace.type)?.upstream?.owner;
+      if (owner && owner.toLowerCase() !== workspace.upstream_owner.toLowerCase()) {
+        upstreams.push(`${owner}/${workspace.fork_repo_name}`);
+      }
+      return upstreams;
     },
 
     // The workspace dialog reads the types when it opens, e.g. its initial type
@@ -284,8 +295,8 @@ export default {
           // Read before creating, which adds to the list
           const owned = this.ownedUpstreams();
           const workspace = await this.workspacesStore.createWorkspace(data);
-          const isFirstWorkspace = !owned.includes(
-            `${workspace.upstream_owner}/${workspace.upstream_repo}`,
+          const isFirstWorkspace = !this.forkedUpstreams(workspace).some((upstream) =>
+            owned.includes(upstream),
           );
           this.announceFork(workspace, isFirstWorkspace);
           this.handleViewWorkspace(workspace.id);

@@ -29,13 +29,14 @@
           <template v-if="!isUpdateMode && selectedType?.choose_repository">
             <v-autocomplete
               v-model="formData.repository"
+              v-model:search="repositorySearch"
               :items="repositories"
               :loading="loadingRepositories"
               :rules="rules.repository"
               item-title="name"
               item-value="name"
               label="Repository"
-              :hint="`The ${selectedType.upstream.owner} repository to propose changes to`"
+              :hint="`The ${selectedType.upstream.owner} repository to work on, or the link to one of its pull requests`"
               persistent-hint
               variant="outlined"
               :prepend-inner-icon="icons.repository"
@@ -58,16 +59,33 @@
             >
               Couldn't load the repositories: {{ repositoriesError }}
             </v-alert>
-            <v-text-field
-              v-model.trim="formData.branch"
-              label="Branch (Optional)"
+            <v-combobox
+              v-model="formData.startFrom"
+              :items="pullRequestItems"
+              :loading="loadingPullRequests"
+              :disabled="!formData.repository"
+              label="Start from (Optional)"
               :placeholder="selectedRepository?.default_branch"
-              hint="The branch to start from and propose changes to, the default branch if empty"
+              :hint="startFromHint"
               persistent-hint
               variant="outlined"
               :prepend-inner-icon="icons.branch"
               class="mb-3"
-            ></v-text-field>
+              @update:model-value="startFromChanged"
+            >
+              <template #item="{ props, item }">
+                <v-list-item v-bind="props" :subtitle="item.raw.subtitle" class="repository-item" />
+              </template>
+            </v-combobox>
+            <v-alert
+              v-if="pullRequestsError"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mb-3"
+            >
+              Couldn't load the pull requests: {{ pullRequestsError }}
+            </v-alert>
           </template>
 
           <v-text-field
@@ -203,13 +221,22 @@ export default {
         title: '',
         selection: [],
         repository: null,
-        branch: '',
+        // A branch name, or an item of pullRequestItems
+        startFrom: null,
         description: '',
       },
       // The repositories of the selected type's owner, for types whose workspaces choose one
       repositories: [],
       loadingRepositories: false,
       repositoriesError: null,
+      repositorySearch: '',
+      // The open pull requests of the chosen repository, which a workspace can continue
+      pullRequests: [],
+      loadingPullRequests: false,
+      pullRequestsError: null,
+      pullRequestsRequest: 0,
+      // From a pasted link, chosen once the pull requests are loaded
+      pendingPullRequest: null,
       // What the workspace can select: the upstream's options for a new workspace, the workspace's
       // own when updating, including e.g. PFS created in it but not merged upstream yet
       selectionOptions: [],
@@ -279,6 +306,24 @@ export default {
     selectionItems() {
       return this.loadingOptions ? [] : this.selectionOptions;
     },
+    pullRequestItems() {
+      return this.pullRequests.map((pullRequest) => ({
+        title: `#${pullRequest.number} ${pullRequest.title}`,
+        value: pullRequest.number,
+        subtitle: [pullRequest.author, pullRequest.head].filter(Boolean).join(' · '),
+        pullRequest,
+      }));
+    },
+    // The pull request the workspace continues, if any
+    chosenPullRequest() {
+      return this.formData.startFrom?.pullRequest ?? null;
+    },
+    startFromHint() {
+      const pullRequest = this.chosenPullRequest;
+      return pullRequest
+        ? `Continues pull request #${pullRequest.number}: changes are proposed to its branch ${pullRequest.head}`
+        : 'A branch to start from and propose changes to, or an open pull request to continue. The default branch if empty.';
+    },
   },
   watch: {
     // The options of another type don't apply
@@ -302,6 +347,21 @@ export default {
           this.loadRepositories(type.id);
         }
       },
+    },
+    'formData.repository'(repository) {
+      this.formData.startFrom = null;
+      this.loadPullRequests(repository);
+    },
+    repositorySearch(text) {
+      const link = this.parsePullRequestLink(text);
+      if (link) {
+        this.pendingPullRequest = link.number;
+        if (this.formData.repository === link.repository) {
+          this.choosePendingPullRequest();
+        } else {
+          this.formData.repository = link.repository;
+        }
+      }
     },
   },
   created() {
@@ -354,6 +414,70 @@ export default {
         this.loadingRepositories = false;
       }
     },
+    async loadPullRequests(repository) {
+      const request = ++this.pullRequestsRequest;
+      this.pullRequests = [];
+      this.pullRequestsError = null;
+      if (!repository) {
+        this.loadingPullRequests = false;
+        return;
+      }
+      this.loadingPullRequests = true;
+      try {
+        const pullRequests = await workspaceService.fetchPullRequests(
+          this.formData.type,
+          repository,
+        );
+        if (request === this.pullRequestsRequest) {
+          this.pullRequests = pullRequests;
+          this.loadingPullRequests = false;
+          this.choosePendingPullRequest();
+        }
+      } catch (error) {
+        if (request === this.pullRequestsRequest) {
+          this.pullRequestsError = error.message;
+        }
+      } finally {
+        if (request === this.pullRequestsRequest) {
+          this.loadingPullRequests = false;
+        }
+      }
+    },
+    // A link to a pull request of one of the owner's repositories, e.g. https://github.com/opengeospatial/geoparquet/pull/304
+    parsePullRequestLink(text) {
+      const match = /^\s*(?:https?:\/\/)?github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/(\d+)/i.exec(
+        text ?? '',
+      );
+      if (!match || match[1].toLowerCase() !== this.selectedType?.upstream?.owner?.toLowerCase()) {
+        return null;
+      }
+      const repository = this.repositories.find(
+        (item) => item.name.toLowerCase() === match[2].toLowerCase(),
+      );
+      return repository ? { repository: repository.name, number: Number(match[3]) } : null;
+    },
+    choosePendingPullRequest() {
+      if (this.pendingPullRequest === null || this.loadingPullRequests) {
+        return;
+      }
+      const number = this.pendingPullRequest;
+      this.pendingPullRequest = null;
+      // Not open anymore: kept as typed, so creating the workspace tells why it can't
+      const item = this.pullRequestItems.find((candidate) => candidate.value === number);
+      this.formData.startFrom = item ?? `#${number}`;
+      this.startFromChanged(this.formData.startFrom);
+    },
+    startFromChanged(value) {
+      const link = typeof value === 'string' ? this.parsePullRequestLink(value) : null;
+      if (link && link.repository === this.formData.repository) {
+        this.pendingPullRequest = link.number;
+        this.choosePendingPullRequest();
+        return;
+      }
+      if (value?.pullRequest && !this.formData.title) {
+        this.formData.title = value.pullRequest.title.slice(0, 50).trim();
+      }
+    },
     async handleSubmit() {
       const { valid } = await this.$refs.form.validate();
       if (!valid) return;
@@ -370,8 +494,15 @@ export default {
       }
       if (!this.isUpdateMode && this.selectedType?.choose_repository) {
         payload.repository = this.formData.repository;
-        if (this.formData.branch) {
-          payload.branch = this.formData.branch;
+        const startFrom = this.formData.startFrom;
+        const typedNumber =
+          typeof startFrom === 'string' ? /^#(\d+)$/.exec(startFrom.trim()) : null;
+        if (this.chosenPullRequest) {
+          payload.pull_request = this.chosenPullRequest.number;
+        } else if (typedNumber) {
+          payload.pull_request = Number(typedNumber[1]);
+        } else if (typeof startFrom === 'string' && startFrom.trim()) {
+          payload.branch = startFrom.trim();
         }
       }
 

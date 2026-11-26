@@ -78,6 +78,16 @@ export const OGC_REPOSITORIES = [
   },
 ];
 
+// The open pull requests of geoparquet
+export const OGC_PULL_REQUESTS = [
+  {
+    number: 304,
+    title: 'OGC Standard document for GeoParquet 2.0 (metanorma), aligned with the 2.0.0 release',
+    author: 'jatorre',
+    head: 'jatorre:ogc-spec-alignment',
+  },
+];
+
 export const PREVIEW_HTML =
   '<!doctype html><html><head></head><body><h1>NRB preview</h1>' +
   '<a name="/requirements/general/unused.yaml"></a>' +
@@ -362,6 +372,9 @@ export class MockApi {
     }
     if ((m = path.match(/^\/types\/([^/]+)\/repositories$/))) {
       return json(route, OGC_REPOSITORIES);
+    }
+    if ((m = path.match(/^\/types\/([^/]+)\/repositories\/([^/]+)\/pull-requests$/))) {
+      return json(route, m[2] === 'geoparquet' ? OGC_PULL_REQUESTS : []);
     }
     if ((m = path.match(/^\/types\/([^/]+)\/selection-options$/))) {
       // GitHub only provides the folder names of the PFS
