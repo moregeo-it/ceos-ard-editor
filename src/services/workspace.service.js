@@ -58,7 +58,7 @@ export default {
   },
 
   /**
-   * Fetch available PFS types (Product Format Specifications)
+   * Fetch available PFS types (Product Family Specifications)
    */
   async fetchPfs(workspaceId) {
     const endpoint = workspaceId ? `/workspaces/${workspaceId}/pfs` : '/pfs';

@@ -1,10 +1,8 @@
 <template>
   <HeaderBar title="My PFS Workspaces" :icon="icons.folderMultiple" />
 
-  <!-- Main Content -->
   <v-main>
     <v-container>
-      <!-- Toolbar -->
       <v-row class="mb-4">
         <v-col cols="12" md="6">
           <v-btn color="primary" size="large" :prepend-icon="icons.plus" @click="openCreateDialog">
@@ -46,39 +44,77 @@
         </v-col>
       </v-row>
 
-      <!-- Loading State -->
       <v-row v-if="workspacesStore.isLoading">
         <v-col v-for="n in 3" :key="n" cols="12" md="4">
           <v-skeleton-loader type="card"></v-skeleton-loader>
         </v-col>
       </v-row>
 
-      <!-- Empty State -->
-      <v-row v-else-if="filteredWorkspaces.length === 0">
+      <v-row v-else-if="!workspacesStore.loadFailed && workspacesStore.workspaces.length === 0">
         <v-col cols="12">
-          <v-card class="pa-8 text-center text-subtle" variant="outlined">
-            <v-icon :icon="icons.folderOff" size="64" class="mb-4"></v-icon>
-            <h2 class="text-h6 mb-2">No workspaces found</h2>
-            <p class="text-body-2 text-medium-emphasis mb-4">
-              {{
-                filter === 'all'
-                  ? 'Create your first workspace to get started'
-                  : `No ${filter} workspaces`
-              }}
+          <v-card class="welcome mx-auto mt-8 pa-6 pa-sm-12 text-center" variant="outlined">
+            <v-icon :icon="icons.folderPlus" size="64" class="mb-4 text-subtle"></v-icon>
+            <h2 class="text-h6 mb-2">Create your first workspace</h2>
+            <p class="text-body-2 text-medium-emphasis mb-6">
+              A workspace is your own draft copy of a specification. You can edit its files, preview
+              the result and share it with others. When you are ready, you propose your changes to
+              the maintainers for review.
             </p>
-            <v-btn
-              v-if="filter === 'all'"
-              color="primary"
-              :prepend-icon="icons.plus"
-              @click="openCreateDialog"
-            >
+
+            <div v-if="typesStore.availableTypes.length > 0" class="mb-6">
+              <p class="text-body-2 text-medium-emphasis mb-2">You can create workspaces for</p>
+              <v-sheet
+                v-for="type in typesStore.availableTypes"
+                :key="type.id"
+                border
+                rounded
+                color="transparent"
+                class="d-flex flex-wrap align-center ga-3 pa-3 mb-2 text-left"
+              >
+                <v-icon :icon="icons.folder" :color="type.color"></v-icon>
+                <div class="type-text">
+                  <div class="text-body-1">{{ type.title }}</div>
+                  <div class="text-body-2 text-medium-emphasis">{{ type.description }}</div>
+                </div>
+                <v-btn
+                  v-if="type.upstream?.url"
+                  variant="text"
+                  size="small"
+                  :append-icon="icons.openInNew"
+                  :href="type.upstream.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View repository
+                </v-btn>
+              </v-sheet>
+            </div>
+
+            <p class="text-body-2 text-medium-emphasis text-left mb-6">
+              Your first workspace also creates a copy (fork) of the repository on your GitHub
+              account. Nothing changes in the official repository until you propose your changes.
+            </p>
+
+            <v-btn color="primary" :prepend-icon="icons.plus" @click="openCreateDialog">
               Create Workspace
             </v-btn>
           </v-card>
         </v-col>
       </v-row>
 
-      <!-- Workspaces Grid -->
+      <v-row v-else-if="filteredWorkspaces.length === 0">
+        <v-col cols="12">
+          <v-card class="pa-8 text-center text-subtle" variant="outlined">
+            <v-icon :icon="icons.folderOff" size="64" class="mb-4"></v-icon>
+            <h2 class="text-h6 mb-2">{{ emptyFilterText.title }}</h2>
+            <p class="text-body-2 text-medium-emphasis mb-4">{{ emptyFilterText.hint }}</p>
+            <v-btn v-if="filter !== 'all'" variant="outlined" @click="filter = 'all'">
+              Show all workspaces
+            </v-btn>
+          </v-card>
+        </v-col>
+      </v-row>
+
       <v-row v-else>
         <v-col
           v-for="workspace in filteredWorkspaces"
@@ -110,7 +146,30 @@ import { useWorkspacesStore } from '@/stores/workspaces';
 import { useNotificationsStore } from '@/stores/notifications';
 import HeaderBar from '@/components/HeaderBar.vue';
 import WorkspaceCard from '@/components/workspace/WorkspaceCard.vue';
-import { mdiFolderMultiple, mdiPlus, mdiFolderOff } from '@mdi/js';
+import {
+  mdiFolder,
+  mdiFolderMultiple,
+  mdiFolderOff,
+  mdiFolderPlus,
+  mdiOpenInNew,
+  mdiPlus,
+} from '@mdi/js';
+
+// What an empty filter says, for users who have workspaces under other filters
+const EMPTY_FILTER_TEXTS = {
+  active: {
+    title: 'No active workspaces',
+    hint: 'Your archived workspaces and the ones shared with you are under the other filters.',
+  },
+  archived: {
+    title: 'No archived workspaces',
+    hint: 'Workspaces you archive are kept here, read-only, until you activate them again.',
+  },
+  shared: {
+    title: 'No workspaces shared with you yet',
+    hint: 'Workspaces other people share with you will show up here.',
+  },
+};
 
 export default {
   name: 'WorkspacesView',
@@ -123,9 +182,12 @@ export default {
   data() {
     return {
       icons: {
+        folder: mdiFolder,
         folderMultiple: mdiFolderMultiple,
-        plus: mdiPlus,
         folderOff: mdiFolderOff,
+        folderPlus: mdiFolderPlus,
+        openInNew: mdiOpenInNew,
+        plus: mdiPlus,
       },
       filter: 'active', // 'all', 'active', 'archived', 'shared'
     };
@@ -138,6 +200,14 @@ export default {
 
     notificationsStore() {
       return useNotificationsStore();
+    },
+
+    typesStore() {
+      return useTypesStore();
+    },
+
+    emptyFilterText() {
+      return EMPTY_FILTER_TEXTS[this.filter] ?? { title: 'No workspaces found', hint: '' };
     },
 
     filteredWorkspaces() {
@@ -168,7 +238,7 @@ export default {
     async loadData() {
       try {
         const [types] = await Promise.all([
-          useTypesStore().fetchTypes(),
+          this.typesStore.fetchTypes(),
           this.workspacesStore.fetchWorkspaces(),
         ]);
         if (types.some((type) => type.pfs)) {
@@ -191,7 +261,7 @@ export default {
     // The workspace dialog reads the types when it opens, e.g. its initial type
     async loadTypes() {
       try {
-        await useTypesStore().fetchTypes();
+        await this.typesStore.fetchTypes();
         return true;
       } catch (error) {
         this.notificationsStore.error(`Failed to load the workspace types: ${error.message}`);
@@ -247,7 +317,7 @@ export default {
 
       this.notificationsStore.success(
         forkName
-          ? `Workspace created successfully in your ${useTypesStore().byId(workspace.type)?.title} repository ${forkName}`
+          ? `Workspace created successfully in your ${this.typesStore.byId(workspace.type)?.title} repository ${forkName}`
           : 'Workspace created successfully',
       );
     },
@@ -320,3 +390,16 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+/* Narrow so the box fits its content and the text stays readable on wide screens */
+.welcome {
+  max-width: 752px;
+}
+
+/* The description wraps beside the icon; on narrow screens the button moves below */
+.type-text {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+</style>

@@ -41,6 +41,8 @@ export const useWorkspacesStore = defineStore('workspaces', {
     // List of all workspaces
     workspaces: [],
     isLoading: false,
+    // The last load of the list failed, so an empty list doesn't mean the user has no workspaces
+    loadFailed: false,
     // A single workspace being viewed/edited
     currentWorkspace: null,
     // How its branch compares with ceos-org/ceos-ard, from the owner's last sync
@@ -97,6 +99,10 @@ export const useWorkspacesStore = defineStore('workspaces', {
         await queueListTask(async () => {
           this.workspaces = await workspaceService.fetchWorkspaces();
         });
+        this.loadFailed = false;
+      } catch (error) {
+        this.loadFailed = true;
+        throw error;
       } finally {
         this.isLoading = false;
       }
@@ -161,6 +167,8 @@ export const useWorkspacesStore = defineStore('workspaces', {
         await queueListTask(async () => {
           this.workspaces = await workspaceService.fetchWorkspaces();
         });
+        // A failed refresh keeps the last list, so only a successful one changes the flag
+        this.loadFailed = false;
       } catch (error) {
         console.error('Error refreshing the workspaces:', error);
       }

@@ -16,7 +16,7 @@ async function openCreateDialog(page) {
 }
 
 async function selectPfs(page, dialog, id) {
-  await dialog.locator('.v-select').filter({ hasText: 'Product Format Specification' }).click();
+  await dialog.locator('.v-select').filter({ hasText: 'Product Family Specification' }).click();
   await page
     .locator('.v-overlay .v-list-item')
     .filter({ hasText: new RegExp(`^${id}$`) })
@@ -76,7 +76,7 @@ test.describe('Workspaces', () => {
   test('offers the PFS of CEOS-ARD', async ({ page }) => {
     const dialog = await openCreateDialog(page);
 
-    const select = dialog.locator('.v-select').filter({ hasText: 'Product Format Specification' });
+    const select = dialog.locator('.v-select').filter({ hasText: 'Product Family Specification' });
     expect(await optionTexts(page, select)).toEqual(['NRB', 'SR', 'AR']);
   });
 
@@ -126,6 +126,21 @@ test.describe('Workspaces', () => {
 
     await expect(dialog).not.toContainText('creates a copy (fork)');
   });
+
+  test('a failed load does not welcome the user as new', async ({ page }) => {
+    const failing = (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({ detail: 'Database unavailable' }),
+      });
+    await page.route('http://localhost:8099/workspaces', failing);
+    await openWorkspaces(page);
+
+    await expect(page.getByText('No active workspaces')).toBeVisible();
+    await expect(page.getByText('Create your first workspace')).toHaveCount(0);
+  });
 });
 
 test.describe('Workspace types', () => {
@@ -164,7 +179,7 @@ test.describe('Workspace types', () => {
     const dialog = await openCreateDialog(page);
 
     await expect(dialog.getByLabel('What do you want to edit?')).toHaveCount(0);
-    await expect(dialog).toContainText('Product Format Specification');
+    await expect(dialog).toContainText('Product Family Specification');
     await expect(page.locator('.v-card').filter({ hasText: 'Old review' })).toBeVisible();
   });
 
@@ -213,7 +228,7 @@ test.describe('Workspace types', () => {
     await typeSelect.click();
     await page.locator('.v-overlay--active .v-list-item').filter({ hasText: 'Other' }).click();
 
-    await expect(dialog.getByText('Product Format Specification')).toHaveCount(0);
+    await expect(dialog.getByText('Product Family Specification')).toHaveCount(0);
     await expect(dialog).toContainText(
       'creates a copy (fork) of the Other Specification repository',
     );

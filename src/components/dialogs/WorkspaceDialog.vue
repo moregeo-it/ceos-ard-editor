@@ -44,7 +44,7 @@
             :items="pfsItems"
             :loading="loadingPfs"
             :no-data-text="loadingPfs ? 'Loading PFS…' : undefined"
-            label="Product Format Specification"
+            label="Product Family Specification"
             multiple
             chips
             :rules="rules.pfs"
