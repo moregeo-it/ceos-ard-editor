@@ -1,5 +1,5 @@
 <template>
-  <div class="d-flex flex-column fill-height">
+  <div class="d-flex flex-column fill-height" :class="{ 'reading-mode': readingMode }">
     <div v-if="pfsOptions.length > 0" class="pa-2 pt-3 d-flex align-center border-b-sm">
       <PfsSelect
         v-model="selectedPfs"
@@ -44,6 +44,17 @@
         <v-icon>{{ icons.download }}</v-icon>
         Word
       </v-btn>
+      <v-btn
+        :icon="readingMode ? icons.exitReadingMode : icons.readingMode"
+        variant="text"
+        size="small"
+        class="ml-1"
+        :disabled="!previewHtml && !readingMode"
+        :title="readingMode ? 'Exit reading mode' : 'Reading mode'"
+        :aria-label="readingMode ? 'Exit reading mode' : 'Reading mode'"
+        :aria-pressed="readingMode"
+        @click="toggleReadingMode"
+      />
     </div>
 
     <div class="flex-grow-1">
@@ -94,7 +105,7 @@ import { useEditorStore } from '@/stores/editor';
 import { usePreviewStore } from '@/stores/preview';
 import previewService from '@/services/preview.service';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import { mdiDownload, mdiInformationOutline } from '@mdi/js';
+import { mdiDownload, mdiFullscreen, mdiFullscreenExit, mdiInformationOutline } from '@mdi/js';
 import { useCommentsStore } from '@/stores/comments';
 import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
@@ -133,11 +144,14 @@ export default {
         docx: false,
       },
       pfsMenuOpen: false,
+      readingMode: false,
       // The owner's edits while the menu is open; null shows the workspace's saved list
       draftPfs: null,
       icons: {
         download: mdiDownload,
         info: mdiInformationOutline,
+        readingMode: mdiFullscreen,
+        exitReadingMode: mdiFullscreenExit,
       },
     };
   },
@@ -200,6 +214,7 @@ export default {
     }
   },
   async mounted() {
+    document.addEventListener('fullscreenchange', this.onFullscreenChange);
     // Update iframe content if preview already exists (e.g., returning from Propose view)
     if (this.previewHtml) {
       this.updateIframeContent();
@@ -209,6 +224,8 @@ export default {
     }
   },
   beforeUnmount() {
+    document.removeEventListener('fullscreenchange', this.onFullscreenChange);
+    this.exitReadingMode();
     // While generating, the iframe is hidden and reads as unscrolled
     if (!this.isGenerating) {
       this.saveScrollPosition();
@@ -232,6 +249,8 @@ export default {
         const { path: routePath, query } = this.$route;
         this.$router.replace({ path: routePath, query, hash: '' });
         if (link.path.startsWith('/')) {
+          // The actions show the file in the editor
+          this.exitReadingMode();
           this.runHashAction(link.action, link.path);
         }
       },
@@ -255,6 +274,27 @@ export default {
     },
   },
   methods: {
+    toggleReadingMode() {
+      if (this.readingMode) {
+        this.exitReadingMode();
+      } else {
+        this.readingMode = true;
+        // The pane covers the window anyway, e.g. where browsers don't allow full screen
+        document.documentElement.requestFullscreen?.().catch(() => {});
+      }
+    },
+    exitReadingMode() {
+      this.readingMode = false;
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+    },
+    // Leaving full screen, e.g. with Escape, also leaves the reading mode
+    onFullscreenChange() {
+      if (!document.fullscreenElement) {
+        this.readingMode = false;
+      }
+    },
     runHashAction(action, path) {
       if (action === 'edit') {
         this.editorStore
@@ -389,3 +429,13 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+/* Above the app bar and drawers, below menus and dialogs */
+.reading-mode {
+  position: fixed;
+  inset: 0;
+  z-index: 1010;
+  background: rgb(var(--v-theme-surface));
+}
+</style>

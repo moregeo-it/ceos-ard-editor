@@ -355,7 +355,8 @@ test.describe('Preview', () => {
     await openWorkspace(page);
 
     await expect(page.locator('.preview-select .v-chip')).toHaveText(['NRB']);
-    expect(await optionTexts(page, page.locator('.preview-select'))).toEqual([
+    // The arrow, as the narrow select's middle is its chip
+    expect(await optionTexts(page, page.locator('.preview-select .v-select__menu-icon'))).toEqual([
       'NRB: SAR Normalised Radar Backscatter',
       'SR: Optical Surface Reflectance',
     ]);
@@ -616,6 +617,43 @@ test.describe('Preview', () => {
       'pdf',
     );
     await expect(page.getByRole('button', { name: 'Word', exact: true })).toBeEnabled();
+  });
+
+  test('the reading mode shows the preview on the whole window', async ({ page }) => {
+    await openWorkspace(page);
+    const frame = page.frameLocator('.preview-iframe');
+    await expect(frame.locator('h1')).toBeVisible();
+    const iframe = page.locator('.preview-iframe');
+    const viewport = page.viewportSize();
+
+    await page.getByRole('button', { name: 'Reading mode', exact: true }).click();
+    await expect
+      .poll(async () => (await iframe.boundingBox()).width)
+      .toBeGreaterThan(viewport.width * 0.9);
+    // Covers the header and the file tree
+    const coveredByPreview = (x, y) =>
+      page.evaluate(
+        ([px, py]) => !!document.elementFromPoint(px, py)?.closest('.reading-mode'),
+        [x, y],
+      );
+    expect(await coveredByPreview(5, 5)).toBe(true);
+    expect(await coveredByPreview(5, viewport.height - 5)).toBe(true);
+    await expect(page.locator('.preview-select')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Exit reading mode' }).click();
+    await expect
+      .poll(async () => (await iframe.boundingBox()).width)
+      .toBeLessThan(viewport.width * 0.5);
+    await expect(frame.locator('h1')).toHaveText('NRB preview');
+  });
+
+  test('Edit in the preview leaves the reading mode', async ({ page }) => {
+    await openWorkspace(page);
+    await page.getByRole('button', { name: 'Reading mode', exact: true }).click();
+
+    await page.frameLocator('.preview-iframe').getByRole('link', { name: 'Edit' }).click();
+    await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText('unused.yaml');
+    await expect(page.getByRole('button', { name: 'Reading mode', exact: true })).toBeVisible();
   });
 
   test('asks to select a PFS when there is none', async ({ page, api }) => {
