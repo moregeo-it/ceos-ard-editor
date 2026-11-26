@@ -108,7 +108,7 @@
         </v-col>
       </v-row>
 
-      <!-- Empty State:the selected filter matches none of the user's workspaces -->
+      <!-- Empty State: the selected filter matches none of the user's workspaces -->
       <v-row v-else-if="filteredWorkspaces.length === 0">
         <v-col cols="12">
           <v-card class="pa-8 text-center text-subtle" variant="outlined">

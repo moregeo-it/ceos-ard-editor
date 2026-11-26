@@ -167,6 +167,8 @@ export const useWorkspacesStore = defineStore('workspaces', {
         await queueListTask(async () => {
           this.workspaces = await workspaceService.fetchWorkspaces();
         });
+        // A failed refresh keeps the last list, so only a successful one changes the flag
+        this.loadFailed = false;
       } catch (error) {
         console.error('Error refreshing the workspaces:', error);
       }
