@@ -1,6 +1,20 @@
 <template>
-  <div class="d-flex flex-column fill-height">
-    <div v-if="pfsOptions.length > 0" class="pa-2 pt-3 d-flex align-center border-b-sm">
+  <div class="d-flex flex-column fill-height" :class="{ 'reading-mode': readingMode }">
+    <div
+      v-if="pfsOptions.length > 0 || readingMode"
+      class="pa-2 pt-3 d-flex align-center border-b-sm"
+    >
+      <v-tooltip :text="pfsTooltip" location="bottom" max-width="320">
+        <template #activator="{ props }">
+          <v-icon
+            v-bind="props"
+            :icon="icons.info"
+            tabindex="0"
+            aria-label="About the PFS selection"
+            class="mr-2"
+          />
+        </template>
+      </v-tooltip>
       <PfsSelect
         v-model="selectedPfs"
         :items="pfsOptions"
@@ -9,40 +23,38 @@
         multiple
         chips
         hide-details
-        class="preview-select mr-2 flex-grow-1"
+        class="preview-select flex-grow-1"
         @update:menu="handleMenuToggle"
       />
-      <v-tooltip :text="pfsTooltip" location="bottom" max-width="320">
+      <v-menu location="bottom end">
         <template #activator="{ props }">
-          <v-icon
+          <v-btn
             v-bind="props"
-            :icon="icons.info"
-            tabindex="0"
-            aria-label="About the PFS selection"
-          />
+            color="primary"
+            class="ml-2"
+            :prepend-icon="icons.download"
+            :disabled="!previewHtml"
+            :loading="isAnyDownloading"
+          >
+            Download
+          </v-btn>
         </template>
-      </v-tooltip>
+        <v-list density="compact">
+          <v-list-item title="PDF" @click="downloadPreview('pdf')" />
+          <v-list-item title="Word" @click="downloadPreview('docx')" />
+        </v-list>
+      </v-menu>
       <v-btn
         color="primary"
-        class="ml-2"
-        :disabled="!previewHtml"
-        @click="downloadPreview('pdf')"
-        title="Download PDF"
-        :loading="isDownloading['pdf']"
+        min-width="0"
+        class="ml-2 px-2"
+        :disabled="!previewHtml && !readingMode"
+        :title="readingMode ? 'Exit reading mode' : 'Reading mode'"
+        :aria-label="readingMode ? 'Exit reading mode' : 'Reading mode'"
+        :aria-pressed="readingMode"
+        @click="toggleReadingMode"
       >
-        <v-icon>{{ icons.download }}</v-icon>
-        PDF
-      </v-btn>
-      <v-btn
-        color="primary"
-        class="ml-2"
-        :disabled="!previewHtml"
-        @click="downloadPreview('docx')"
-        title="Download Word Document"
-        :loading="isDownloading['docx']"
-      >
-        <v-icon>{{ icons.download }}</v-icon>
-        Word
+        <v-icon :icon="readingMode ? icons.exitReadingMode : icons.readingMode" />
       </v-btn>
     </div>
 
@@ -94,7 +106,7 @@ import { useEditorStore } from '@/stores/editor';
 import { usePreviewStore } from '@/stores/preview';
 import previewService from '@/services/preview.service';
 import { useWorkspacesStore } from '@/stores/workspaces';
-import { mdiDownload, mdiInformationOutline } from '@mdi/js';
+import { mdiDownload, mdiFullscreen, mdiFullscreenExit, mdiInformationOutline } from '@mdi/js';
 import { useCommentsStore } from '@/stores/comments';
 import { useFilesStore } from '@/stores/files';
 import { useNotificationsStore } from '@/stores/notifications';
@@ -133,11 +145,14 @@ export default {
         docx: false,
       },
       pfsMenuOpen: false,
+      readingMode: false,
       // The owner's edits while the menu is open; null shows the workspace's saved list
       draftPfs: null,
       icons: {
         download: mdiDownload,
         info: mdiInformationOutline,
+        readingMode: mdiFullscreen,
+        exitReadingMode: mdiFullscreenExit,
       },
     };
   },
@@ -200,6 +215,7 @@ export default {
     }
   },
   async mounted() {
+    document.addEventListener('fullscreenchange', this.onFullscreenChange);
     // Update iframe content if preview already exists (e.g., returning from Propose view)
     if (this.previewHtml) {
       this.updateIframeContent();
@@ -209,6 +225,8 @@ export default {
     }
   },
   beforeUnmount() {
+    document.removeEventListener('fullscreenchange', this.onFullscreenChange);
+    this.exitReadingMode();
     // While generating, the iframe is hidden and reads as unscrolled
     if (!this.isGenerating) {
       this.saveScrollPosition();
@@ -232,6 +250,8 @@ export default {
         const { path: routePath, query } = this.$route;
         this.$router.replace({ path: routePath, query, hash: '' });
         if (link.path.startsWith('/')) {
+          // The actions show the file in the editor
+          this.exitReadingMode();
           this.runHashAction(link.action, link.path);
         }
       },
@@ -255,6 +275,27 @@ export default {
     },
   },
   methods: {
+    toggleReadingMode() {
+      if (this.readingMode) {
+        this.exitReadingMode();
+      } else {
+        this.readingMode = true;
+        // The pane covers the window anyway, e.g. where browsers don't allow full screen
+        document.documentElement.requestFullscreen?.().catch(() => {});
+      }
+    },
+    exitReadingMode() {
+      this.readingMode = false;
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+    },
+    // Leaving full screen, e.g. with Escape, also leaves the reading mode
+    onFullscreenChange() {
+      if (!document.fullscreenElement) {
+        this.readingMode = false;
+      }
+    },
     runHashAction(action, path) {
       if (action === 'edit') {
         this.editorStore
@@ -389,3 +430,13 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+/* Above the app bar and drawers, below menus and dialogs */
+.reading-mode {
+  position: fixed;
+  inset: 0;
+  z-index: 1010;
+  background: rgb(var(--v-theme-surface));
+}
+</style>

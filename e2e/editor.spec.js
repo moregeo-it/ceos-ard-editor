@@ -17,6 +17,11 @@ async function openWorkspace(page, path = '/workspaces/ws-1') {
   await expect(row(page, 'pfs')).toBeVisible();
 }
 
+async function downloadAs(page, format) {
+  await page.getByRole('button', { name: 'Download', exact: true }).click();
+  await page.locator('.v-overlay--active .v-list-item').filter({ hasText: format }).click();
+}
+
 // What the server sends while a request waits for a toolchain to be installed
 function preparing(toolchain) {
   return {
@@ -569,7 +574,7 @@ test.describe('Preview', () => {
     await openWorkspace(page);
     await expect(page.frameLocator('.preview-iframe').locator('h1')).toBeVisible();
 
-    await page.getByRole('button', { name: 'PDF', exact: true }).click();
+    await downloadAs(page, 'PDF');
     await expect.poll(() => socket).toBeTruthy();
     socket.send(JSON.stringify(preparing('ceos-ard-cli-0.5.9')));
     await expect(page.getByText('Setting up the tools for the download')).toBeVisible();
@@ -596,8 +601,8 @@ test.describe('Preview', () => {
     // Another user's download waits while this tab is idle, then this tab downloads
     await expect.poll(() => socket).toBeTruthy();
     socket.send(JSON.stringify(preparing('ceos-ard-cli-0.5.9')));
-    await page.getByRole('button', { name: 'PDF', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'PDF', exact: true })).toHaveClass(
+    await downloadAs(page, 'PDF');
+    await expect(page.getByRole('button', { name: 'Download', exact: true })).toHaveClass(
       /v-btn--loading/,
     );
     await expect(page.getByText('Setting up the tools')).toHaveCount(0);
@@ -608,14 +613,86 @@ test.describe('Preview', () => {
     await openWorkspace(page);
     await expect(page.frameLocator('.preview-iframe').locator('h1')).toBeVisible();
 
-    await page.getByRole('button', { name: 'PDF', exact: true }).click();
+    await downloadAs(page, 'PDF');
     await expect
       .poll(() => api.requests.find((r) => r.path === '/workspaces/ws-1/download'))
       .toBeTruthy();
     expect(api.requests.find((r) => r.path === '/workspaces/ws-1/download').search).toContain(
       'pdf',
     );
-    await expect(page.getByRole('button', { name: 'Word', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Download', exact: true })).toBeEnabled();
+    await downloadAs(page, 'Word');
+    await expect
+      .poll(() => api.requests.filter((r) => r.path === '/workspaces/ws-1/download').at(-1).search)
+      .toContain('docx');
+  });
+
+  test('the reading mode shows the preview on the whole window', async ({ page }) => {
+    await openWorkspace(page);
+    const frame = page.frameLocator('.preview-iframe');
+    await expect(frame.locator('h1')).toBeVisible();
+    const iframe = page.locator('.preview-iframe');
+    const viewport = page.viewportSize();
+
+    await page.getByRole('button', { name: 'Reading mode', exact: true }).click();
+    await expect
+      .poll(async () => (await iframe.boundingBox()).width)
+      .toBeGreaterThan(viewport.width * 0.9);
+    // Covers the header and the file tree
+    const coveredByPreview = (x, y) =>
+      page.evaluate(
+        ([px, py]) => !!document.elementFromPoint(px, py)?.closest('.reading-mode'),
+        [x, y],
+      );
+    expect(await coveredByPreview(5, 5)).toBe(true);
+    expect(await coveredByPreview(5, viewport.height - 5)).toBe(true);
+    await expect(page.locator('.preview-select')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Exit reading mode' }).click();
+    await expect
+      .poll(async () => (await iframe.boundingBox()).width)
+      .toBeLessThan(viewport.width * 0.5);
+    await expect(frame.locator('h1')).toHaveText('NRB preview');
+  });
+
+  test('the reading mode can be left when the workspace loses its PFS', async ({ page }) => {
+    let socket;
+    await page.routeWebSocket(WORKSPACE_EVENTS, (ws) => (socket = ws));
+    await openWorkspace(page);
+    await expect(page.frameLocator('.preview-iframe').locator('h1')).toBeVisible();
+    await page.getByRole('button', { name: 'Reading mode', exact: true }).click();
+
+    // The owner's other tab deletes the last PFS
+    let refetched = false;
+    await page.route(
+      (url) => url.pathname.endsWith('/workspaces/ws-1/pfs'),
+      (route) => {
+        refetched = true;
+        return route.fulfill({ json: { pfs_types: [] } });
+      },
+    );
+    await expect.poll(() => socket).toBeTruthy();
+    socket.send(
+      JSON.stringify({
+        type: 'file.deleted',
+        ts: new Date().toISOString(),
+        actor_user_id: 'user-1',
+        path: '/pfs/NRB',
+      }),
+    );
+    await expect.poll(() => refetched).toBe(true);
+
+    await page.getByRole('button', { name: 'Exit reading mode' }).click();
+    await expect(page.getByRole('button', { name: 'Exit reading mode' })).toHaveCount(0);
+  });
+
+  test('Edit in the preview leaves the reading mode', async ({ page }) => {
+    await openWorkspace(page);
+    await page.getByRole('button', { name: 'Reading mode', exact: true }).click();
+
+    await page.frameLocator('.preview-iframe').getByRole('link', { name: 'Edit' }).click();
+    await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText('unused.yaml');
+    await expect(page.getByRole('button', { name: 'Reading mode', exact: true })).toBeVisible();
   });
 
   test('asks to select a PFS when there is none', async ({ page, api }) => {
