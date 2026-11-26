@@ -15,15 +15,16 @@
           />
         </template>
       </v-tooltip>
+      <!-- Only the owner picks the PFS, also in an archived workspace, as it changes no files -->
       <PfsSelect
         v-model="selectedPfs"
         :items="pfsOptions"
-        :readonly="!workspacesStore.isOwner"
+        :disabled="!workspacesStore.isOwner"
         label="Select PFS for Preview"
         multiple
         chips
         hide-details
-        class="preview-select flex-grow-1"
+        class="preview-select readable-disabled flex-grow-1"
         @update:menu="handleMenuToggle"
       />
       <v-menu location="bottom end">
