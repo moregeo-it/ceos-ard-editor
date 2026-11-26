@@ -53,8 +53,9 @@
         </v-col>
       </v-row>
 
-      <!-- First-time State: the user has no workspaces at all, whichever filter is selected -->
-      <v-row v-else-if="workspacesStore.workspaces.length === 0">
+      <!-- First-time State: the user has no workspaces at all, whichever filter is selected.
+           Only after a successful load, as a failed one leaves the list empty too. -->
+      <v-row v-else-if="!workspacesStore.loadFailed && workspacesStore.workspaces.length === 0">
         <v-col cols="12">
           <!-- Narrow so the box fits its content and the text stays readable on wide screens -->
           <v-card class="welcome mx-auto mt-8 pa-6 pa-sm-12 text-center" variant="outlined">

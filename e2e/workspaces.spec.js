@@ -126,6 +126,21 @@ test.describe('Workspaces', () => {
 
     await expect(dialog).not.toContainText('creates a copy (fork)');
   });
+
+  test('a failed load does not welcome the user as new', async ({ page }) => {
+    const failing = (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({ detail: 'Database unavailable' }),
+      });
+    await page.route('http://localhost:8099/workspaces', failing);
+    await openWorkspaces(page);
+
+    await expect(page.getByText('No active workspaces')).toBeVisible();
+    await expect(page.getByText('Create your first workspace')).toHaveCount(0);
+  });
 });
 
 test.describe('Workspace types', () => {
