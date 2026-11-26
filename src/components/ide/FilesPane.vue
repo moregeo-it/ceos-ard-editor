@@ -205,7 +205,7 @@ export default {
 
     async clearSearch() {
       this.filesStore.searchQuery = '';
-      this.filesStore.searchResults = null;
+      this.filesStore.clearSearchResults();
     },
   },
 };

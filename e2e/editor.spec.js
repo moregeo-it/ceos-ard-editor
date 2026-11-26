@@ -302,6 +302,33 @@ test.describe('Editor', () => {
     await expect(row(page, 'metadata-machine-readable.yaml')).toHaveCount(0);
   });
 
+  test('only the latest search shows its results', async ({ page }) => {
+    let release;
+    const released = new Promise((resolve) => (release = resolve));
+    await page.route(`${API}/workspaces/ws-1/search?*`, async (route) => {
+      if (route.request().url().includes('machine')) {
+        await released;
+      }
+      await route.fallback();
+    });
+    await openWorkspace(page);
+    const search = page.getByRole('textbox', { name: 'Search files and folders...' });
+
+    const results = page.locator('.file-tree-row').filter({ hasText: 'document.yaml' });
+    const slow = page.waitForRequest((request) => request.url().includes('machine'));
+    await search.fill('machine readable');
+    await slow;
+    await search.fill('document');
+    await expect(results).toHaveCount(2);
+
+    // The older search answers last
+    const answered = page.waitForResponse((response) => response.url().includes('machine'));
+    release();
+    await answered;
+    await expect(row(page, 'metadata-machine-readable.yaml')).toHaveCount(0);
+    await expect(results).toHaveCount(2);
+  });
+
   test('the header buttons are as tall as the view switch', async ({ page }) => {
     await openWorkspace(page);
     const height = async (locator) => (await locator.boundingBox()).height;

@@ -212,23 +212,33 @@ export const useFilesStore = defineStore('files', {
       query = typeof query === 'string' ? query.trim() : '';
       if (query.length < 3) {
         // Too short to search: the full tree again, not the results of a longer query
-        this.searchResults = null;
+        this.clearSearchResults();
         await this.loadFiles();
         return;
       }
 
+      // Only the latest search may show its results; answers can arrive out of order
+      const request = ++searchRequest;
       const started = workspaceSession();
+      const isLatest = () => request === searchRequest && started === workspaceSession();
       this.isSearchLoading = true;
       try {
         const files = await fileService.searchFiles(getWorkspaceId(), query);
-        if (started === workspaceSession()) {
+        if (isLatest()) {
           this.searchResults = files.map(toFileTreeObject);
         }
       } finally {
-        if (started === workspaceSession()) {
+        if (isLatest()) {
           this.isSearchLoading = false;
         }
       }
+    },
+
+    /** Show the tree again, also when a search is still running. */
+    clearSearchResults() {
+      searchRequest++;
+      this.searchResults = null;
+      this.isSearchLoading = false;
     },
 
     updateFile(file) {
@@ -454,6 +464,9 @@ export const useFilesStore = defineStore('files', {
     },
   },
 });
+
+// The latest search, see searchFiles()
+let searchRequest = 0;
 
 let listenersRegistered = false;
 
