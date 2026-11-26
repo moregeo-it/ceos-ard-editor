@@ -110,6 +110,15 @@ export default {
       type: String,
       required: true,
     },
+    // A subset of FILE_FORMATS
+    formats: {
+      type: Array,
+      default: () => FILE_FORMATS,
+    },
+    onUploaded: {
+      type: Function,
+      default: null,
+    },
   },
   data() {
     return {
@@ -119,8 +128,8 @@ export default {
       uploading: false,
       loadingFolder: true,
       folderError: null,
-      extensions: FILE_FORMATS.map((format) => `.${format}`).join(','),
-      formatList: FILE_FORMATS.join(', '),
+      extensions: this.formats.map((format) => `.${format}`).join(','),
+      formatList: this.formats.join(', '),
       maxSizeMb: MAX_SIZE_MB,
       icons: {
         remove: mdiClose,
@@ -180,6 +189,8 @@ export default {
       const errors = [];
       if (!isAllowedFormat(name)) {
         errors.push(FORMAT_ERROR);
+      } else if (!this.formats.includes(fileFormat(name))) {
+        errors.push(`Only ${this.formatList} files can be uploaded here`);
       } else if (name.length < 2 || name.length > 100) {
         errors.push('The name must have 2 to 100 characters');
       } else if (!pattern.test(name) || name.includes('..')) {
@@ -262,6 +273,7 @@ export default {
         return;
       }
       if (uploaded.length) {
+        this.onUploaded?.(uploaded);
         this.filesStore.openedFolders = [
           ...new Set([...this.filesStore.openedFolders, this.folder]),
         ];

@@ -35,6 +35,19 @@
             "minLength": 2,
             "contentMediaType": "text/markdown",
             "description": "Markdown is supported for formatting."
+          },
+          "references": {
+            "type": "array",
+            "title": "References",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "deprecated": {
+            "type": "boolean",
+            "title": "Deprecated",
+            "default": false
           }
         }
       },
@@ -55,12 +68,32 @@
               "clearable": false,
               "multi": true
             }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/references",
+            "options": {
+              "files": {
+                "folder": "/references",
+                "extension": "bib"
+              }
+            }
+          },
+          {
+            "type": "Control",
+            "scope": "#/properties/deprecated"
           }
         ]
       }
     }
   ],
-  "search_filters": [],
+  "search_filters": [
+    {
+      "id": "type",
+      "title": "Type",
+      "values": ["Requirement", "Section", "Glossary term", "Reference", "PFS"]
+    }
+  ],
   "actions": [
     {
       "id": "create-pfs",

@@ -79,7 +79,8 @@ in the ceos-ard-server README). The editor loads the types from `GET /types` int
 - `src/components/ide/editors/utils.js` picks the form editor of a file from the type's `editors`. Its
   `codec`, one of `src/codecs/index.js`, turns the file into the form data and back, changing only what was
   edited; files with a codec the editor doesn't have open in the source editor. The forms use the renderers
-  in `src/components/ide/editors/renderers/`, e.g. chips for enums.
+  in `src/components/ide/editors/renderers/`, e.g. chips for enums, and a choice of the files in a folder
+  with an upload for lists of ids named after files (UI schema option `files`, e.g. references).
 - The preview builds a document from the workspace's selection (`preview: build`), e.g. the PFS chosen with
   the type's `selection` label, or shows the open file as the server renders it (`preview: file`). The
   type's `downloads` are offered next to it.
