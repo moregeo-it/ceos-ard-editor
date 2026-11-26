@@ -290,7 +290,15 @@ export default {
 
     async requestDelete() {
       const started = workspaceSession();
-      const selected = await this.selectedOptionAt(this.item.path).catch(() => null);
+      let selected;
+      try {
+        selected = await this.selectedOptionAt(this.item.path);
+      } catch (error) {
+        if (started === workspaceSession()) {
+          this.notificationsStore.error(`Couldn't check the preview selection: ${error.message}`);
+        }
+        return;
+      }
       if (started !== workspaceSession()) {
         return;
       }

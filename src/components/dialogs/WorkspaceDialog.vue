@@ -161,6 +161,7 @@ export default {
       selectionOptions: [],
       loadingOptions: false,
       optionsError: null,
+      optionsRequest: 0,
       rules: {
         title: [
           (v) => !!v || 'Title is required',
@@ -227,6 +228,8 @@ export default {
   },
   methods: {
     async loadSelectionOptions(typeId) {
+      // Switching types can leave an older request running
+      const request = ++this.optionsRequest;
       this.selectionOptions = [];
       this.optionsError = null;
       this.loadingOptions = true;
@@ -234,13 +237,17 @@ export default {
         const options = this.isUpdateMode
           ? await workspaceService.fetchSelectionOptions(this.workspace.id)
           : await workspaceService.fetchTypeSelectionOptions(typeId);
-        if (this.formData.type === typeId) {
+        if (request === this.optionsRequest) {
           this.selectionOptions = options;
         }
       } catch (error) {
-        this.optionsError = error.message;
+        if (request === this.optionsRequest) {
+          this.optionsError = error.message;
+        }
       } finally {
-        this.loadingOptions = false;
+        if (request === this.optionsRequest) {
+          this.loadingOptions = false;
+        }
       }
     },
     async handleSubmit() {

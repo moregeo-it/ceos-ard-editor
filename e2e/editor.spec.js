@@ -157,6 +157,17 @@ test.describe('File tree', () => {
     await expect(dialog).toContainText('unused.yaml');
     await expect(dialog).not.toContainText('Used in');
   });
+
+  test('does not offer deleting while the preview selection is unknown', async ({ page }) => {
+    await page.route(`${API}/workspaces/ws-1/selection-options`, (route) =>
+      route.fulfill({ status: 500, json: { detail: 'Server error' } }),
+    );
+    await openWorkspace(page);
+
+    await chooseMenuEntry(page, 'requirements', 'Delete');
+    await expect(page.locator('.v-snackbar')).toContainText("Couldn't check the preview selection");
+    await expect(page.locator('.v-dialog .v-card')).toHaveCount(0);
+  });
 });
 
 test.describe('Upload', () => {

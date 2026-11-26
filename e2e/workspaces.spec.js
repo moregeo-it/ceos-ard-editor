@@ -246,6 +246,37 @@ test.describe('Workspace types', () => {
       description: null,
     });
   });
+
+  test('a failure for the previous type does not show for the chosen one', async ({
+    page,
+    api,
+  }) => {
+    api.types.push({
+      ...OTHER_TYPE,
+      selection: { label: 'Part', multiple: false, on_create: true },
+    });
+    let fail;
+    const failing = new Promise((resolve) => (fail = resolve));
+    await page.route('http://localhost:8099/types/ceos-ard/selection-options', async (route) => {
+      await failing;
+      await route.fulfill({ status: 500, json: { detail: 'Server error' } });
+    });
+    const answered = page.waitForResponse((response) =>
+      response.url().endsWith('/types/ceos-ard/selection-options'),
+    );
+    const dialog = await openCreateDialog(page);
+
+    const typeSelect = dialog.locator('.v-select').filter({ hasText: 'What do you want to edit?' });
+    await typeSelect.click();
+    await page.locator('.v-overlay--active .v-list-item').filter({ hasText: 'Other' }).click();
+    const select = dialog.locator('.v-select').filter({ hasText: 'Part' });
+    expect(await optionTexts(page, select)).toEqual(['NRB', 'SR', 'AR']);
+
+    fail();
+    await answered;
+    await expect(dialog.getByText("Couldn't load the Part")).toHaveCount(0);
+    expect(await optionTexts(page, select)).toEqual(['NRB', 'SR', 'AR']);
+  });
 });
 
 test.describe('Live updates', () => {
