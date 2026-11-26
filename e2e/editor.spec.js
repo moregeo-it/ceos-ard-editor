@@ -193,7 +193,7 @@ test.describe('Upload', () => {
     await expand(page, 'glossary', 'empty.yaml');
 
     const form = page.locator('.v-window-item--active .json-schema-editor');
-    await expect(form.locator('input')).toHaveCount(2);
+    await expect(form.locator('input, textarea:not([aria-hidden])')).toHaveCount(2);
   });
 
   test('a running action can neither be cancelled nor sent twice', async ({ page, api }) => {
@@ -319,7 +319,9 @@ test.describe('Editor', () => {
     await expect(form).toBeVisible();
     expect(await fieldLabels(form)).toEqual(['Term', 'Description']);
     await expect(form.locator('input').first()).toHaveValue('Accuracy');
-    await expect(form.locator('input').nth(1)).toHaveValue('Closeness of agreement.');
+    await expect(form.locator('textarea:not([aria-hidden])')).toHaveValue(
+      'Closeness of agreement.',
+    );
   });
 
   test('other YAML files open in the source code editor', async ({ page }) => {

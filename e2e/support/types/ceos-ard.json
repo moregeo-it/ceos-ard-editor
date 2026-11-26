@@ -33,6 +33,7 @@
           "description": {
             "type": "string",
             "minLength": 2,
+            "contentMediaType": "text/markdown",
             "description": "Markdown is supported for formatting."
           }
         }
@@ -51,7 +52,8 @@
             "type": "Control",
             "scope": "#/properties/description",
             "options": {
-              "clearable": false
+              "clearable": false,
+              "multi": true
             }
           }
         ]
