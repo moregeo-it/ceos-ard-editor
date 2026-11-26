@@ -1,10 +1,8 @@
 <template>
   <HeaderBar title="My PFS Workspaces" :icon="icons.folderMultiple" />
 
-  <!-- Main Content -->
   <v-main>
     <v-container>
-      <!-- Toolbar -->
       <v-row class="mb-4">
         <v-col cols="12" md="6">
           <v-btn color="primary" size="large" :prepend-icon="icons.plus" @click="openCreateDialog">
@@ -46,18 +44,14 @@
         </v-col>
       </v-row>
 
-      <!-- Loading State -->
       <v-row v-if="workspacesStore.isLoading">
         <v-col v-for="n in 3" :key="n" cols="12" md="4">
           <v-skeleton-loader type="card"></v-skeleton-loader>
         </v-col>
       </v-row>
 
-      <!-- First-time State: the user has no workspaces at all, whichever filter is selected.
-           Only after a successful load, as a failed one leaves the list empty too. -->
       <v-row v-else-if="!workspacesStore.loadFailed && workspacesStore.workspaces.length === 0">
         <v-col cols="12">
-          <!-- Narrow so the box fits its content and the text stays readable on wide screens -->
           <v-card class="welcome mx-auto mt-8 pa-6 pa-sm-12 text-center" variant="outlined">
             <v-icon :icon="icons.folderPlus" size="64" class="mb-4 text-subtle"></v-icon>
             <h2 class="text-h6 mb-2">Create your first workspace</h2>
@@ -108,19 +102,19 @@
         </v-col>
       </v-row>
 
-      <!-- Empty State: the selected filter matches none of the user's workspaces -->
       <v-row v-else-if="filteredWorkspaces.length === 0">
         <v-col cols="12">
           <v-card class="pa-8 text-center text-subtle" variant="outlined">
             <v-icon :icon="icons.folderOff" size="64" class="mb-4"></v-icon>
             <h2 class="text-h6 mb-2">{{ emptyFilterText.title }}</h2>
             <p class="text-body-2 text-medium-emphasis mb-4">{{ emptyFilterText.hint }}</p>
-            <v-btn variant="outlined" @click="filter = 'all'">Show all workspaces</v-btn>
+            <v-btn v-if="filter !== 'all'" variant="outlined" @click="filter = 'all'">
+              Show all workspaces
+            </v-btn>
           </v-card>
         </v-col>
       </v-row>
 
-      <!-- Workspaces Grid -->
       <v-row v-else>
         <v-col
           v-for="workspace in filteredWorkspaces"
@@ -398,6 +392,7 @@ export default {
 </script>
 
 <style scoped>
+/* Narrow so the box fits its content and the text stays readable on wide screens */
 .welcome {
   max-width: 752px;
 }
