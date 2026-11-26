@@ -298,7 +298,8 @@ export default {
           const isFirstWorkspace = !this.forkedUpstreams(workspace).some((upstream) =>
             owned.includes(upstream),
           );
-          this.announceFork(workspace, isFirstWorkspace);
+          // A workspace on the user's own pull request uses the fork it already had
+          this.announceFork(workspace, isFirstWorkspace && !workspace.pull_request_number);
           this.handleViewWorkspace(workspace.id);
         } else {
           await this.workspacesStore.updateWorkspace(data.id, {

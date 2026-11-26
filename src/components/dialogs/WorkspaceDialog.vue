@@ -174,6 +174,7 @@ import DialogMixin from '@/components/DialogMixin';
 import workspaceService from '@/services/workspace.service';
 import { useWorkspacesStore } from '@/stores/workspaces';
 import { useTypesStore } from '@/stores/types';
+import { useAuthStore } from '@/stores/auth';
 import {
   mdiFolderPlus,
   mdiFolderEdit,
@@ -327,9 +328,15 @@ export default {
     },
     startFromHint() {
       const pullRequest = this.chosenPullRequest;
-      return pullRequest
-        ? `Continues pull request #${pullRequest.number}: changes are proposed to its branch ${pullRequest.head}`
-        : 'A branch to start from and propose changes to, or an open pull request to continue. The default branch if empty.';
+      if (!pullRequest) {
+        return 'A branch to start from and propose changes to, or an open pull request to continue. The default branch if empty.';
+      }
+      // The server works on the branch of the user's own pull request directly
+      const headOwner = pullRequest.head?.split(':')[0]?.toLowerCase();
+      if (headOwner && headOwner === useAuthStore().username?.toLowerCase()) {
+        return `Continues your pull request #${pullRequest.number}: changes are pushed to its branch ${pullRequest.head}`;
+      }
+      return `Continues pull request #${pullRequest.number}: changes are proposed to its branch ${pullRequest.head}`;
     },
   },
   watch: {

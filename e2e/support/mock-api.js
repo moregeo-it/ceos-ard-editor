@@ -86,6 +86,12 @@ export const OGC_PULL_REQUESTS = [
     author: 'jatorre',
     head: 'jatorre:ogc-spec-alignment',
   },
+  {
+    number: 310,
+    title: 'Clarify the bbox covering',
+    author: 'jdoe',
+    head: 'jdoe:bbox-covering',
+  },
 ];
 
 export const PREVIEW_HTML =
@@ -382,7 +388,7 @@ export class MockApi {
     }
     if (path === '/workspaces') {
       if (method === 'POST') {
-        const { repository, branch, ...data } = JSON.parse(request.postData());
+        const { repository, branch, pull_request, ...data } = JSON.parse(request.postData());
         const type = this.types.find((t) => t.id === (data.type ?? this.types[0].id));
         const upstream = type.choose_repository
           ? {
@@ -393,10 +399,19 @@ export class MockApi {
               selection: null,
             }
           : { upstream_owner: type.upstream.owner, upstream_repo: type.upstream.repo };
+        // The server links a workspace to the user's own pull request and works on its branch
+        const own = OGC_PULL_REQUESTS.find(
+          (p) => p.number === pull_request && p.author === USER.username,
+        );
         const created = workspace({
           id: `ws-${this.workspaces.length + 1}`,
           fork_repo_name: upstream.upstream_repo,
           ...upstream,
+          ...(own && {
+            branch_name: own.head.split(':')[1],
+            pull_request_number: String(own.number),
+            pull_request_status: 'open',
+          }),
           ...data,
         });
         this.workspaces.push(created);

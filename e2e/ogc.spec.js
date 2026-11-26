@@ -87,6 +87,7 @@ test.describe('OGC', () => {
     const startFrom = dialog.locator('.v-combobox').filter({ hasText: 'Start from' });
     expect(await optionTexts(page, startFrom)).toEqual([
       '#304 OGC Standard document for GeoParquet 2.0 (metanorma), aligned with the 2.0.0 release jatorre · jatorre:ogc-spec-alignment',
+      '#310 Clarify the bbox covering jdoe · jdoe:bbox-covering',
     ]);
     await startFrom.click();
     await page.locator('.v-overlay--active .v-list-item').filter({ hasText: '#304' }).click();
@@ -102,6 +103,22 @@ test.describe('OGC', () => {
     await expect(page).toHaveURL(/\/workspaces\/ws-2$/);
     expect(createdWith(api)).toMatchObject({ repository: 'geoparquet', pull_request: 304 });
     expect(createdWith(api)).not.toHaveProperty('branch');
+  });
+
+  test('a workspace on an own pull request pushes to its branch', async ({ page, api }) => {
+    const dialog = await openOgcDialog(page);
+    const repository = dialog.locator('.v-autocomplete').filter({ hasText: 'Repository' });
+    await repository.locator('input').fill('https://github.com/opengeospatial/geoparquet/pull/310');
+
+    await expect(dialog).toContainText(
+      'Continues your pull request #310: changes are pushed to its branch jdoe:bbox-covering',
+    );
+    await dialog.getByRole('button', { name: 'Create' }).click();
+
+    await expect(page).toHaveURL(/\/workspaces\/ws-2$/);
+    expect(createdWith(api)).toMatchObject({ repository: 'geoparquet', pull_request: 310 });
+    // The fork existed before, so it isn't announced as new
+    await expect(page.getByText('was created on your GitHub account')).toHaveCount(0);
   });
 
   test('a link to a pull request chooses its repository and the pull request', async ({
