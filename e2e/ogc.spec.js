@@ -124,6 +124,24 @@ test.describe('OGC', () => {
     });
   });
 
+  test('a link pasted while the repositories load is used once they are there', async ({
+    page,
+  }) => {
+    let release;
+    const released = new Promise((resolve) => (release = resolve));
+    await page.route('**/types/ogc/repositories', async (route) => {
+      await released;
+      await route.fallback();
+    });
+    const dialog = await openOgcDialog(page);
+    const repository = dialog.locator('.v-autocomplete').filter({ hasText: 'Repository' });
+    await repository.locator('input').fill('https://github.com/opengeospatial/geoparquet/pull/304');
+    await expect(page.getByText('Loading repositories…')).toBeVisible();
+
+    release();
+    await expect(dialog).toContainText('Continues pull request #304');
+  });
+
   test('a workspace continuing a pull request counts for the fork of its repository', async ({
     page,
     api,

@@ -32,6 +32,7 @@
               v-model:search="repositorySearch"
               :items="repositories"
               :loading="loadingRepositories"
+              :no-data-text="loadingRepositories ? 'Loading repositories…' : undefined"
               :rules="rules.repository"
               item-title="name"
               item-value="name"
@@ -181,6 +182,8 @@ import {
 } from '@mdi/js';
 import SelectionSelect from '@/components/SelectionSelect.vue';
 
+const PULL_REQUEST_LINK = /^\s*(?:https?:\/\/)?github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/(\d+)/i;
+
 export default {
   name: 'WorkspaceDialog',
   mixins: [DialogMixin],
@@ -230,6 +233,7 @@ export default {
       loadingRepositories: false,
       repositoriesError: null,
       repositorySearch: '',
+      pastedLink: null,
       // The open pull requests of the chosen repository, which a workspace can continue
       pullRequests: [],
       loadingPullRequests: false,
@@ -353,14 +357,9 @@ export default {
       this.loadPullRequests(repository);
     },
     repositorySearch(text) {
-      const link = this.parsePullRequestLink(text);
-      if (link) {
-        this.pendingPullRequest = link.number;
-        if (this.formData.repository === link.repository) {
-          this.choosePendingPullRequest();
-        } else {
-          this.formData.repository = link.repository;
-        }
+      if (PULL_REQUEST_LINK.test(text ?? '')) {
+        this.pastedLink = text;
+        this.applyPastedLink();
       }
     },
   },
@@ -407,11 +406,30 @@ export default {
         const repositories = await workspaceService.fetchRepositories(typeId);
         if (this.formData.type === typeId) {
           this.repositories = repositories;
+          this.loadingRepositories = false;
+          this.applyPastedLink();
         }
       } catch (error) {
         this.repositoriesError = error.message;
       } finally {
         this.loadingRepositories = false;
+      }
+    },
+    // A link pasted while the repositories still load is applied once they are there
+    applyPastedLink() {
+      if (!this.pastedLink || this.loadingRepositories) {
+        return;
+      }
+      const link = this.parsePullRequestLink(this.pastedLink);
+      this.pastedLink = null;
+      if (!link) {
+        return;
+      }
+      this.pendingPullRequest = link.number;
+      if (this.formData.repository === link.repository) {
+        this.choosePendingPullRequest();
+      } else {
+        this.formData.repository = link.repository;
       }
     },
     async loadPullRequests(repository) {
@@ -445,9 +463,7 @@ export default {
     },
     // A link to a pull request of one of the owner's repositories, e.g. https://github.com/opengeospatial/geoparquet/pull/304
     parsePullRequestLink(text) {
-      const match = /^\s*(?:https?:\/\/)?github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/(\d+)/i.exec(
-        text ?? '',
-      );
+      const match = PULL_REQUEST_LINK.exec(text ?? '');
       if (!match || match[1].toLowerCase() !== this.selectedType?.upstream?.owner?.toLowerCase()) {
         return null;
       }
