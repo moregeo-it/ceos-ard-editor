@@ -257,4 +257,11 @@ export function registerPreviewEventListeners() {
   on(EVENTS.REALTIME_RESYNCED, () => {
     usePreviewStore().requestPreviewRefresh();
   });
+
+  // Files changed beyond single-file events; only the owner rebuilds a built preview
+  on(EVENTS.WORKSPACE_SYNCED, () => {
+    if (usePreviewStore().mode === 'file') {
+      usePreviewStore().requestPreviewRefresh();
+    }
+  });
 }

@@ -82,6 +82,7 @@ import { useNotificationsStore } from '@/stores/notifications';
 import FileContextMenu from './FileContextMenu.vue';
 import FileTree from './FileTree.vue';
 import { useTypesStore } from '@/stores/types';
+import { workspaceSession } from '@/services/events';
 import { mdiFilterVariant, mdiFolderOutline, mdiMagnify } from '@mdi/js';
 
 export default {
@@ -158,19 +159,25 @@ export default {
 
   async created() {
     this.debouncedSearch = useDebounceFn(this.search, 300);
+    const started = workspaceSession();
     await this.loadFiles();
-    await this.openDefaultFolders();
+    if (started === workspaceSession()) {
+      await this.openDefaultFolders(started);
+    }
   },
 
   methods: {
     // Only when entering the workspace, not when coming back with folders opened
-    async openDefaultFolders() {
+    async openDefaultFolders(started) {
       const folders = useTypesStore().currentType?.expanded_folders ?? [];
       if (folders.length === 0 || this.openedFolders.length > 0) {
         return;
       }
       for (const folder of folders) {
         await this.loadFiles(folder);
+        if (started !== workspaceSession()) {
+          return;
+        }
       }
       this.openedFolders = [...new Set([...this.openedFolders, ...folders])];
     },

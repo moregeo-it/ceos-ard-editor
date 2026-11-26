@@ -1235,4 +1235,36 @@ test.describe('File preview', () => {
 
     await expect(heading).toHaveText('/pfs/NRB/document.yaml');
   });
+
+  test('shows the open file again after another tab synced the workspace', async ({
+    page,
+    api,
+  }) => {
+    api.types = [{ ...api.types[0], preview: 'file' }];
+    let socket;
+    await page.routeWebSocket(WORKSPACE_EVENTS, (ws) => (socket = ws));
+    let version = 'before';
+    await page.route(`${API}/workspaces/ws-1/render/**`, (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: `<!doctype html><html><body><h1>${version}</h1></body></html>`,
+      }),
+    );
+    await openWorkspace(page);
+    await page.evaluate(() => (window.location.hash = '#edit=%2FREADME.md'));
+    const heading = page.frameLocator('.preview-iframe').locator('h1');
+    await expect(heading).toHaveText('before');
+
+    version = 'after';
+    await expect.poll(() => socket).toBeTruthy();
+    socket.send(
+      JSON.stringify({
+        type: 'workspace.synced',
+        ts: new Date().toISOString(),
+        actor_user_id: 'user-1',
+        status: 'updated',
+      }),
+    );
+    await expect(heading).toHaveText('after');
+  });
 });

@@ -289,7 +289,11 @@ export default {
     },
 
     async requestDelete() {
+      const started = workspaceSession();
       const selected = await this.selectedOptionAt(this.item.path).catch(() => null);
+      if (started !== workspaceSession()) {
+        return;
+      }
       if (selected) {
         const label = useTypesStore().currentType?.selection?.label ?? 'file';
         this.notificationsStore.warning(
