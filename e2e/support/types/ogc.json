@@ -79,19 +79,22 @@
           },
           "statement": {
             "type": "string",
+            "contentMediaType": "text/asciidoc",
             "title": "Statement"
           },
           "part": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "contentMediaType": "text/asciidoc"
             },
             "title": "Parts"
           },
           "condition": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "contentMediaType": "text/asciidoc"
             },
             "title": "Conditions"
           },
