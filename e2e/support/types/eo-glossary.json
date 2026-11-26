@@ -70,19 +70,23 @@
               "properties": {
                 "definition": {
                   "type": "string",
+                  "contentMediaType": "text/markdown",
                   "title": "Definition",
                   "description": "Must be substitutable for the term in a sentence."
                 },
                 "notes": {
                   "type": "string",
+                  "contentMediaType": "text/markdown",
                   "title": "Notes"
                 },
                 "examples": {
                   "type": "string",
+                  "contentMediaType": "text/markdown",
                   "title": "Examples"
                 },
                 "sources": {
                   "type": "string",
+                  "contentMediaType": "text/markdown",
                   "title": "Sources"
                 }
               }
