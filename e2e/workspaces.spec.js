@@ -73,6 +73,21 @@ test.describe('Workspaces', () => {
     );
   });
 
+  test('a workspace opens from the keyboard and by clicking its card', async ({ page, api }) => {
+    await openWorkspaces(page);
+    const id = api.workspaces[0].id;
+    const title = page.getByRole('link', { name: 'NRB review' });
+    await expect(title).toHaveAttribute('href', `/workspaces/${id}`);
+
+    await title.focus();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(`/workspaces/${id}`);
+
+    await openWorkspaces(page);
+    await page.locator('.v-card').filter({ hasText: 'NRB review' }).getByText('Created:').click();
+    await expect(page).toHaveURL(`/workspaces/${id}`);
+  });
+
   test('offers the PFS of CEOS-ARD', async ({ page }) => {
     const dialog = await openCreateDialog(page);
 

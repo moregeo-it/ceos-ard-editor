@@ -2,7 +2,13 @@
   <v-card hover :link="false" class="workspace-card h-100 d-flex flex-column" @click="handleView">
     <v-card-title class="d-flex align-center">
       <v-icon :icon="icons.folder" start></v-icon>
-      {{ workspace.title }}
+      <router-link
+        :to="{ name: 'editor', params: { id: workspace.id } }"
+        class="text-truncate text-high-emphasis text-decoration-none"
+        @click.stop
+      >
+        {{ workspace.title }}
+      </router-link>
       <v-spacer></v-spacer>
       <ShareModeChip v-if="!isOwner" :mode="workspace.viewer_role" class="mr-2" />
       <v-chip :color="statusColor" size="small" variant="flat">
