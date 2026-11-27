@@ -8,7 +8,7 @@ export const APP_SUBTITLE =
 export const APP_NOTICE =
   env.VITE_APP_NOTICE ||
   `This is a prototype version of the ${APP_TITLE}. Functionality may be limited and data may be reset periodically.`;
-// A URL, "none" for no logo, or empty for the CEOS-ARD logo
+// A path on the editor (the CSP blocks other hosts), "none" for no logo, or empty for the CEOS-ARD logo
 export const APP_LOGO = env.VITE_APP_LOGO || '';
 // "Title|URL" pairs separated by ";", shown before moreGeo and the imprint
 export const APP_LINKS = (
