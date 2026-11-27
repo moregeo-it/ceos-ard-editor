@@ -89,13 +89,13 @@ export const useEditorStore = defineStore('editor', {
       if (!file?.tracks_usage || current?.loading || (current && !current.stale && !force)) {
         return;
       }
-      const started = workspaceSession();
       this.usage[path] = {
         items: current?.items ?? null,
         loading: true,
         failed: false,
         stale: false,
       };
+      const pending = this.usage[path];
       let entry;
       try {
         const { usage } = await fileService.loadFileUsage(
@@ -106,11 +106,12 @@ export const useEditorStore = defineStore('editor', {
       } catch {
         entry = { items: null, loading: false, failed: true, stale: false };
       }
-      if (started !== workspaceSession() || !this.opened.some((f) => f.path === path)) {
+      // Not if the tab was closed, reopened, renamed or the workspace left meanwhile
+      if (this.usage[path] !== pending) {
         return;
       }
       // A change while it loaded leaves it stale
-      entry.stale = this.usage[path]?.stale ?? false;
+      entry.stale = pending.stale;
       this.usage[path] = entry;
     },
     /** The workspace changed: the usage of every open file may have, reloaded when it's shown again. */
@@ -359,7 +360,11 @@ export const useEditorStore = defineStore('editor', {
       const started = workspaceSession();
       let context;
       try {
-        context = await useFilesStore().loadFileContext(path);
+        // Not through the files store, which would write a late response over a later rename or delete
+        context = await fileService.loadFileContext(
+          useWorkspacesStore().currentWorkspace?.id,
+          path,
+        );
       } catch {
         return;
       }
