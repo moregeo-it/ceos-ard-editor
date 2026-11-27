@@ -56,5 +56,7 @@ export default {
   background-color: currentColor;
   opacity: var(--v-medium-emphasis-opacity);
   mask: v-bind(chevron) center / 1.1em no-repeat;
+  vertical-align: middle;
+  line-height: 0;
 }
 </style>
