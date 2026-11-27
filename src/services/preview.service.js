@@ -2,23 +2,30 @@ import { api } from '@/utils/api';
 
 export default {
   /**
-   * Build the preview for the workspace's saved PFS list (owner only; publishes `preview.generated`)
+   * Build the preview for the workspace's saved selection (owner only; publishes `preview.generated`)
    */
   async generatePreview(workspaceId) {
     return api.post(`/workspaces/${workspaceId}/previews`);
   },
 
   /**
-   * The owner's last generated preview for the workspace's PFS list; 404 until one exists
+   * The owner's last generated preview for the workspace's selection; 404 until one exists
    */
   async fetchCurrentPreview(workspaceId) {
     return api.getText(`/workspaces/${workspaceId}/previews/current`);
   },
 
-  async downloadPreviewFile(workspaceId, pfs, documentType) {
+  /**
+   * Render a single file, for workspace types that preview the open file
+   */
+  async renderFile(workspaceId, path) {
+    return api.getText(`/workspaces/${workspaceId}/render/${encodeURIComponent(path)}`);
+  },
+
+  async downloadPreviewFile(workspaceId, selection, documentType) {
     const query = new URLSearchParams();
     query.append('format', documentType);
-    pfs.forEach((p) => query.append('pfs', p));
+    selection.forEach((item) => query.append('selection', item));
     return api.getBlob(`/workspaces/${workspaceId}/download?${query}`);
   },
 };

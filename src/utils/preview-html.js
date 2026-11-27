@@ -57,8 +57,15 @@ function removeUnsafeElements(doc) {
 // Only the action links may navigate the editor, and only fragments stay in the preview, as a page
 // loaded there keeps the sandbox's permissions. Others open in a new tab, javascript: etc. are
 // dropped
-function retargetLinks(doc) {
+function retargetLinks(doc, pageUrl) {
   doc.querySelectorAll('a, area').forEach((link) => {
+    // Links to other files of the workspace, e.g. between glossary terms, open them like edit links
+    const file = link.getAttribute('data-open-file');
+    if (file?.startsWith('/')) {
+      link.setAttribute('href', `${pageUrl}#edit=${encodeURIComponent(file)}`);
+      link.setAttribute('target', '_top');
+      return;
+    }
     const href = link.getAttribute('href') ?? link.getAttributeNS(XLINK_NS, 'href');
     if (href === null || href.startsWith('#')) {
       link.setAttribute('target', '_self');
@@ -141,7 +148,7 @@ function addActionLinks(doc, pageUrl) {
  */
 export function enhancePreviewHtml(doc, { assetUrl, pageUrl }) {
   removeUnsafeElements(doc);
-  retargetLinks(doc);
+  retargetLinks(doc, pageUrl);
   rewriteAssets(doc, assetUrl);
   addActionLinks(doc, pageUrl);
 }

@@ -1,50 +1,58 @@
 <template>
   <div class="d-flex flex-column fill-height" :class="{ 'reading-mode': readingMode }">
     <div
-      v-if="pfsOptions.length > 0 || readingMode"
+      v-if="hasSelectionBar || previewStore.mode === 'file' || readingMode"
       class="pa-2 pt-3 d-flex align-center border-b-sm"
     >
-      <v-tooltip :text="pfsTooltip" location="bottom" max-width="320">
-        <template #activator="{ props }">
-          <v-icon
-            v-bind="props"
-            :icon="icons.info"
-            tabindex="0"
-            aria-label="About the PFS selection"
-            class="mr-2"
-          />
-        </template>
-      </v-tooltip>
-      <!-- Only the owner picks the PFS, also in an archived workspace, as it changes no files -->
-      <PfsSelect
-        v-model="selectedPfs"
-        :items="pfsOptions"
-        :disabled="!workspacesStore.isOwner"
-        label="Select PFS for Preview"
-        multiple
-        chips
-        hide-details
-        class="preview-select flex-grow-1"
-        @update:menu="handleMenuToggle"
-      />
-      <v-menu location="bottom end">
-        <template #activator="{ props }">
-          <v-btn
-            v-bind="props"
-            color="primary"
-            class="ml-2"
-            :prepend-icon="icons.download"
-            :disabled="!previewHtml"
-            :loading="isAnyDownloading"
-          >
-            Download
-          </v-btn>
-        </template>
-        <v-list density="compact">
-          <v-list-item title="PDF" @click="downloadPreview('pdf')" />
-          <v-list-item title="Word" @click="downloadPreview('docx')" />
-        </v-list>
-      </v-menu>
+      <template v-if="hasSelectionBar">
+        <v-tooltip :text="selectionTooltip" location="bottom" max-width="320">
+          <template #activator="{ props }">
+            <v-icon
+              v-bind="props"
+              :icon="icons.info"
+              tabindex="0"
+              :aria-label="`About the ${selection.label} selection`"
+              class="mr-2"
+            />
+          </template>
+        </v-tooltip>
+        <!-- Only the owner picks the selection, also in an archived workspace, as it changes no files -->
+        <SelectionSelect
+          :model-value="selectValue"
+          :items="selectionOptions"
+          :disabled="!workspacesStore.isOwner"
+          :label="`Select ${selection.multiple ? '' : 'a '}${selection.label} for the preview`"
+          :multiple="selection.multiple"
+          :chips="selection.multiple"
+          hide-details
+          class="preview-select flex-grow-1"
+          @update:model-value="handleSelect"
+          @update:menu="handleMenuToggle"
+        />
+        <v-menu v-if="downloads.length > 0" location="bottom end">
+          <template #activator="{ props }">
+            <v-btn
+              v-bind="props"
+              color="primary"
+              class="ml-2"
+              :prepend-icon="icons.download"
+              :disabled="!previewHtml"
+              :loading="isAnyDownloading"
+            >
+              Download
+            </v-btn>
+          </template>
+          <v-list density="compact">
+            <v-list-item
+              v-for="format in downloads"
+              :key="format"
+              :title="DOWNLOADS[format].label"
+              @click="downloadPreview(format)"
+            />
+          </v-list>
+        </v-menu>
+      </template>
+      <v-spacer v-else />
       <v-btn
         color="primary"
         min-width="0"
@@ -76,11 +84,13 @@
       </div>
 
       <v-alert v-else-if="!previewHtml" type="info" variant="tonal" class="ma-4">
-        <template v-if="!workspacesStore.isOwner"
+        <template v-if="previewStore.mode === 'file'">{{ previewStore.message }}</template>
+        <template v-else-if="!workspacesStore.isOwner"
           >The owner has not generated a preview yet.</template
         >
-        <template v-else-if="!previewStore.hasSelectedPfs">
-          Select at least one PFS from the list above to create a preview.
+        <template v-else-if="!previewStore.hasSelection">
+          Select {{ selection?.multiple ? 'at least one' : 'a' }} {{ selection?.label }} from the
+          list above to create a preview.
         </template>
         <template v-else>No preview generated. Please try again.</template>
       </v-alert>
@@ -91,7 +101,7 @@
           ref="iframe"
           :key="previewGeneration"
           class="preview-iframe"
-          :style="pfsMenuOpen ? { pointerEvents: 'none' } : null"
+          :style="menuOpen ? { pointerEvents: 'none' } : null"
           frameborder="0"
           width="100%"
           height="100%"
@@ -125,7 +135,8 @@ import {
   showFile,
   syncCommentMarks,
 } from '@/utils/preview-html';
-import PfsSelect from '@/components/PfsSelect.vue';
+import SelectionSelect from '@/components/SelectionSelect.vue';
+import { useTypesStore } from '@/stores/types';
 import { workspaceSession } from '@/services/events';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -134,21 +145,27 @@ function sameList(a, b) {
   return a.length === b.length && a.every((item, i) => item === b[i]);
 }
 
+const DOWNLOADS = Object.freeze({
+  pdf: { label: 'PDF' },
+  docx: { label: 'Word' },
+});
+
 export default {
   name: 'PreviewPane',
   components: {
-    PfsSelect,
+    SelectionSelect,
   },
   data() {
     return {
+      DOWNLOADS,
       isDownloading: {
         pdf: false,
         docx: false,
       },
-      pfsMenuOpen: false,
+      menuOpen: false,
       readingMode: false,
-      // The owner's edits while the menu is open; null shows the workspace's saved list
-      draftPfs: null,
+      // The owner's edits of a multiple selection while the menu is open; null shows the saved one
+      draftSelection: null,
       icons: {
         download: mdiDownload,
         info: mdiInformationOutline,
@@ -173,22 +190,35 @@ export default {
     currentWorkspace() {
       return this.workspacesStore?.currentWorkspace;
     },
-    pfsOptions() {
-      return this.workspacesStore?.workspacePfsOptions || [];
+    currentType() {
+      return useTypesStore().currentType;
     },
-    // The workspace's PFS list is the preview selection (saved by the owner, followed by everyone)
-    selectedPfs: {
-      get() {
-        return this.draftPfs ?? this.currentWorkspace?.pfs ?? [];
-      },
-      set(value) {
-        this.draftPfs = value;
-      },
+    // What the preview is built from, e.g. PFS (saved by the owner, followed by everyone)
+    selection() {
+      return this.currentType?.selection ?? null;
     },
-    pfsTooltip() {
+    hasSelectionBar() {
+      return (
+        this.previewStore.mode === 'build' && this.selection && this.selectionOptions.length > 0
+      );
+    },
+    selectionOptions() {
+      return this.workspacesStore?.selectionOptions || [];
+    },
+    selectedItems() {
+      return this.draftSelection ?? this.currentWorkspace?.selection ?? [];
+    },
+    selectValue() {
+      return this.selection?.multiple ? this.selectedItems : (this.selectedItems[0] ?? null);
+    },
+    downloads() {
+      return (this.currentType?.downloads ?? []).filter((format) => DOWNLOADS[format]);
+    },
+    selectionTooltip() {
+      const label = this.selection?.label;
       return this.workspacesStore.isOwner
-        ? "Changing the selection updates the workspace's PFS, as in its settings, so everyone with access sees the same preview."
-        : 'The workspace owner chooses which PFS the preview shows.';
+        ? `Changing the selection updates the workspace's ${label}, so everyone with access sees the same preview.`
+        : `The workspace owner chooses which ${label} the preview shows.`;
     },
     previewHtml() {
       return this.previewStore.previewHtml;
@@ -209,10 +239,13 @@ export default {
       const open = useCommentsStore().openThreads.map((thread) => thread.path);
       return JSON.stringify([this.workspacesStore.canComment, open, deleted]);
     },
+    activePath() {
+      return this.editorStore.active?.path ?? null;
+    },
   },
   async created() {
-    if (this.workspaceId) {
-      await this.workspacesStore.fetchPfs(this.workspaceId);
+    if (this.workspaceId && this.previewStore.mode === 'build' && this.selection) {
+      await this.workspacesStore.fetchSelectionOptions(this.workspaceId);
     }
   },
   async mounted() {
@@ -263,6 +296,14 @@ export default {
     'previewStore.showRequest'(request) {
       if (request) {
         this.showFile(request);
+      }
+    },
+    async activePath(path) {
+      if (
+        this.previewStore.mode === 'file' &&
+        (path !== this.previewStore.renderedPath || this.previewStore.isGenerating)
+      ) {
+        await this.previewStore.requestPreviewRefresh();
       }
     },
     // The iframe is keyed by previewGeneration so each regeneration gets a fresh
@@ -380,46 +421,66 @@ export default {
         });
       }
     },
-    // Save and regenerate once the menu closes, not on every toggled item of the multi-select
+    handleSelect(value) {
+      if (this.selection?.multiple) {
+        this.draftSelection = value;
+      } else if (value) {
+        this.saveSelection([value]);
+      }
+    },
+    // A multiple selection is saved once the menu closes, not on every toggled item
     async handleMenuToggle(open) {
-      this.pfsMenuOpen = open;
+      this.menuOpen = open;
+      if (!this.selection?.multiple) {
+        return;
+      }
       if (open) {
-        this.draftPfs = [...this.selectedPfs];
+        this.draftSelection = [...this.selectedItems];
         return;
       }
-      const before = this.currentWorkspace?.pfs ?? [];
-      const after = this.draftPfs ?? before;
+      // On failure the chips fall back to the saved selection
+      try {
+        if (this.draftSelection) {
+          await this.saveSelection(this.draftSelection);
+        }
+      } finally {
+        this.draftSelection = null;
+      }
+    },
+    // Saved on the workspace so viewers and the owner's other tabs show the same preview
+    async saveSelection(after) {
+      const before = this.currentWorkspace?.selection ?? [];
       if (sameList(before, after)) {
-        this.draftPfs = null;
         return;
       }
-      // Saved on the workspace so viewers and the owner's other tabs show the same preview; on
-      // failure the chips fall back to the saved list
       const started = workspaceSession();
       try {
-        await this.workspacesStore.updateWorkspacePfs(this.workspaceId, after);
+        await this.workspacesStore.updateWorkspaceSelection(this.workspaceId, after);
       } catch (error) {
-        useNotificationsStore().error(`Failed to save the PFS selection: ${error.message}`);
+        useNotificationsStore().error(`Failed to save the selection: ${error.message}`);
         return;
-      } finally {
-        this.draftPfs = null;
       }
       if (started === workspaceSession()) {
+        if (!this.selection?.multiple) {
+          this.previewStore.setScrollPosition(0, 0);
+        }
         await this.previewStore.requestPreviewRefresh();
       }
     },
 
     async downloadPreview(documentType) {
-      if (!this.selectedPfs || this.selectedPfs.length === 0) {
+      const selection = this.currentWorkspace?.selection ?? [];
+      if (selection.length === 0) {
         return;
       }
       this.isDownloading[documentType] = true;
       try {
         const response = await this.previewStore.track(() =>
-          previewService.downloadPreviewFile(this.workspaceId, this.selectedPfs, documentType),
+          previewService.downloadPreviewFile(this.workspaceId, selection, documentType),
         );
         const blob = new Blob([response], { type: response.type });
-        const filename = `CEOS-ARD-${this.selectedPfs.join('-')}.${documentType}`;
+        const name = [this.currentType?.title, ...selection].filter(Boolean).join('-');
+        const filename = `${name.replace(/[^\w.-]+/g, '-')}.${documentType}`;
         downloadBlob(blob, filename);
       } catch (error) {
         const notification = useNotificationsStore();

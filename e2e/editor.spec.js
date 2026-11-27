@@ -115,22 +115,29 @@ test.describe('File tree', () => {
     await chooseMenuEntry(page, 'pfs', 'Add New PFS');
 
     const dialog = page.locator('.v-dialog .v-card');
-    expect(await fieldLabels(dialog)).toEqual(['ID', 'Title', 'Type', 'Applies To', 'Base PFS']);
-    expect(
-      await optionTexts(page, dialog.locator('.v-select').filter({ hasText: 'Type' }).first()),
-    ).toEqual(['SAR', 'Optical']);
-    expect(
-      await optionTexts(page, dialog.locator('.v-select').filter({ hasText: 'Base PFS' })),
-    ).toEqual(['NRB: SAR Normalised Radar Backscatter', 'SR: Optical Surface Reflectance']);
-    await dialog.getByLabel('ID').fill('ST');
-    await dialog.getByLabel('Title').fill('Surface Temperature');
-    await dialog.locator('.v-select').filter({ hasText: 'Type' }).first().click();
+    // Required fields are marked
+    expect(await fieldLabels(dialog)).toEqual(['ID*', 'Title*', 'Type*', 'Applies To', 'Base PFS']);
+    const type = dialog.getByRole('combobox', { name: 'Type*' });
+    expect(await optionTexts(page, type)).toEqual(['SAR', 'Optical']);
+    expect(await optionTexts(page, dialog.getByRole('combobox', { name: 'Base PFS' }))).toEqual([
+      'NRB: SAR Normalised Radar Backscatter',
+      'SR: Optical Surface Reflectance',
+    ]);
+    await dialog.getByRole('textbox', { name: 'ID*' }).fill('ST');
+    await dialog.getByRole('textbox', { name: 'Title*' }).fill('Surface Temperature');
+    await type.click();
     await page.locator('.v-overlay--active .v-list-item').filter({ hasText: 'Optical' }).click();
     await dialog.getByRole('button', { name: 'Create' }).click();
 
     await expect(dialog).toBeHidden();
-    const post = api.requests.find((r) => r.method === 'POST' && r.path === '/workspaces/ws-1/pfs');
-    expect(JSON.parse(post.body)).toMatchObject({ id: 'ST', title: 'Surface Temperature' });
+    const post = api.requests.find(
+      (r) => r.method === 'POST' && r.path === '/workspaces/ws-1/actions/create-pfs',
+    );
+    expect(JSON.parse(post.body)).toMatchObject({
+      id: 'ST',
+      title: 'Surface Temperature',
+      type: 'Optical',
+    });
 
     // The new PFS document opens, which reveals it in the tree
     await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText('document.yaml');
@@ -150,6 +157,17 @@ test.describe('File tree', () => {
     await expect(dialog).toContainText('unused.yaml');
     await expect(dialog).not.toContainText('Used in');
   });
+
+  test('does not offer deleting while the preview selection is unknown', async ({ page }) => {
+    await page.route(`${API}/workspaces/ws-1/selection-options`, (route) =>
+      route.fulfill({ status: 500, json: { detail: 'Server error' } }),
+    );
+    await openWorkspace(page);
+
+    await chooseMenuEntry(page, 'requirements', 'Delete');
+    await expect(page.locator('.v-snackbar')).toContainText("Couldn't check the preview selection");
+    await expect(page.locator('.v-dialog .v-card')).toHaveCount(0);
+  });
 });
 
 test.describe('Upload', () => {
@@ -167,6 +185,43 @@ test.describe('Upload', () => {
     await expect(dialog).toBeHidden();
     expect(api.files.has('/glossary/new.yaml')).toBe(true);
     await expect(row(page, 'new.yaml')).toBeVisible();
+  });
+
+  test('an empty file opens with the fields of its form', async ({ page, api }) => {
+    api.files.set('/glossary/empty.yaml', { content: '' });
+    await openWorkspace(page);
+    await expand(page, 'glossary', 'empty.yaml');
+
+    const form = page.locator('.v-window-item--active .json-schema-editor');
+    await expect(form.locator('input, textarea:not([aria-hidden])')).toHaveCount(2);
+  });
+
+  test('a running action can neither be cancelled nor sent twice', async ({ page, api }) => {
+    let release;
+    const released = new Promise((resolve) => (release = resolve));
+    await page.route(`${API}/workspaces/ws-1/actions/create-pfs`, async (route) => {
+      if (route.request().method() === 'POST') {
+        await released;
+      }
+      await route.fallback();
+    });
+    await openWorkspace(page);
+    await chooseMenuEntry(page, 'pfs', 'Add New PFS');
+    const dialog = page.locator('.v-dialog .v-card');
+    await dialog.getByRole('textbox', { name: 'ID*' }).fill('ST');
+    await dialog.getByRole('textbox', { name: 'Title*' }).fill('Surface Temperature');
+    await dialog.getByRole('combobox', { name: 'Type*' }).click();
+    await page.locator('.v-overlay--active .v-list-item').filter({ hasText: 'Optical' }).click();
+    await dialog.getByRole('button', { name: 'Create' }).click();
+
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    await dialog.getByRole('textbox', { name: 'Title*' }).press('Enter');
+    release();
+    await expect(dialog).toBeHidden();
+    const posts = api.requests.filter(
+      (r) => r.method === 'POST' && r.path === '/workspaces/ws-1/actions/create-pfs',
+    );
+    expect(posts).toHaveLength(1);
   });
 
   test('warns when a replaced file has unsaved changes', async ({ page }) => {
@@ -264,7 +319,9 @@ test.describe('Editor', () => {
     await expect(form).toBeVisible();
     expect(await fieldLabels(form)).toEqual(['Term', 'Description']);
     await expect(form.locator('input').first()).toHaveValue('Accuracy');
-    await expect(form.locator('input').nth(1)).toHaveValue('Closeness of agreement.');
+    await expect(form.locator('textarea:not([aria-hidden])')).toHaveValue(
+      'Closeness of agreement.',
+    );
   });
 
   test('other YAML files open in the source code editor', async ({ page }) => {
@@ -479,7 +536,7 @@ test.describe('Preview', () => {
         type: 'preview.generated',
         ts: new Date().toISOString(),
         actor_user_id: 'user-1',
-        pfs: ['NRB'],
+        selection: ['NRB'],
       }),
     );
 
@@ -509,7 +566,7 @@ test.describe('Preview', () => {
           type: 'preview.generated',
           ts: new Date().toISOString(),
           actor_user_id: 'user-1',
-          pfs: ['NRB'],
+          selection: ['NRB'],
         }),
       );
     api.previewHtml = tallPreview('First build');
@@ -665,10 +722,10 @@ test.describe('Preview', () => {
     // The owner's other tab deletes the last PFS
     let refetched = false;
     await page.route(
-      (url) => url.pathname.endsWith('/workspaces/ws-1/pfs'),
+      (url) => url.pathname.endsWith('/workspaces/ws-1/selection-options'),
       (route) => {
         refetched = true;
-        return route.fulfill({ json: { pfs_types: [] } });
+        return route.fulfill({ json: { options: [] } });
       },
     );
     await expect.poll(() => socket).toBeTruthy();
@@ -696,7 +753,7 @@ test.describe('Preview', () => {
   });
 
   test('asks to select a PFS when there is none', async ({ page, api }) => {
-    api.workspaces[0].pfs = [];
+    api.workspaces[0].selection = [];
     await openWorkspace(page);
 
     await expect(
@@ -1157,5 +1214,93 @@ test.describe('Show in preview', () => {
     await expect(highlighted(page)).toHaveText(/What are CEOS-ARD products\?$/);
     expect(await page.evaluate(() => Number(localStorage.previewPanelSize))).toBe(35);
     expect(await page.evaluate(() => Number(localStorage.editorPanelSize))).toBe(45);
+  });
+});
+
+test.describe('File preview', () => {
+  test('shows the open file when switching back during a render', async ({ page, api }) => {
+    api.types = [{ ...api.types[0], preview: 'file' }];
+    let releaseSr;
+    const srReleased = new Promise((resolve) => (releaseSr = resolve));
+    await page.route(`${API}/workspaces/ws-1/render/**`, async (route) => {
+      const path = decodeURIComponent(route.request().url().split('/render/')[1]);
+      if (path.includes('SR')) {
+        await srReleased;
+      }
+      await route.fulfill({
+        contentType: 'text/html',
+        body: `<!doctype html><html><body><h1>${path}</h1></body></html>`,
+      });
+    });
+    const open = (path) =>
+      page.evaluate((hash) => (window.location.hash = hash), `#edit=${encodeURIComponent(path)}`);
+    await openWorkspace(page);
+    await open('/pfs/NRB/document.yaml');
+    const heading = page.frameLocator('.preview-iframe').locator('h1');
+    await expect(heading).toHaveText('/pfs/NRB/document.yaml');
+
+    // SR renders slowly; NRB is open again before it is done
+    await open('/pfs/SR/document.yaml');
+    await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText('SR');
+    await open('/pfs/NRB/document.yaml');
+    await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText('NRB');
+    releaseSr();
+
+    await expect(heading).toHaveText('/pfs/NRB/document.yaml');
+  });
+
+  test('shows the open file again after another tab synced the workspace', async ({
+    page,
+    api,
+  }) => {
+    api.types = [{ ...api.types[0], preview: 'file' }];
+    let socket;
+    await page.routeWebSocket(WORKSPACE_EVENTS, (ws) => (socket = ws));
+    let version = 'before';
+    await page.route(`${API}/workspaces/ws-1/render/**`, (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: `<!doctype html><html><body><h1>${version}</h1></body></html>`,
+      }),
+    );
+    await openWorkspace(page);
+    await page.evaluate(() => (window.location.hash = '#edit=%2FREADME.md'));
+    const heading = page.frameLocator('.preview-iframe').locator('h1');
+    await expect(heading).toHaveText('before');
+
+    version = 'after';
+    await expect.poll(() => socket).toBeTruthy();
+    socket.send(
+      JSON.stringify({
+        type: 'workspace.synced',
+        ts: new Date().toISOString(),
+        actor_user_id: 'user-1',
+        status: 'updated',
+      }),
+    );
+    await expect(heading).toHaveText('after');
+  });
+
+  test('the reading mode shows the preview of the file', async ({ page, api }) => {
+    api.types = [{ ...api.types[0], preview: 'file' }];
+    await page.route(`${API}/workspaces/ws-1/render/**`, (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: '<!doctype html><html><body><h1>README</h1></body></html>',
+      }),
+    );
+    await openWorkspace(page);
+    await page.evaluate(() => (window.location.hash = '#edit=%2FREADME.md'));
+    await expect(page.frameLocator('.preview-iframe').locator('h1')).toHaveText('README');
+    await expect(page.locator('.preview-select')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Reading mode', exact: true }).click();
+    const viewport = page.viewportSize();
+    await expect
+      .poll(async () => (await page.locator('.preview-iframe').boundingBox()).width)
+      .toBeGreaterThan(viewport.width * 0.9);
+
+    await page.getByRole('button', { name: 'Exit reading mode' }).click();
+    await expect(page.getByRole('button', { name: 'Reading mode', exact: true })).toBeVisible();
   });
 });

@@ -17,7 +17,7 @@
           density="compact"
           class="mb-3"
         >
-          {{ usageLabel }} {{ usage.map((item) => item.label).join(', ') }}.
+          {{ usageLabel }} {{ usageNames }}.
         </v-alert>
         <v-alert v-if="isFolder" type="warning" variant="tonal" density="compact">
           This will delete the folder and all files inside it. If under version control, the
@@ -78,6 +78,13 @@ export default {
     },
     usageLabel() {
       return useTypesStore().currentType?.labels?.usage ?? 'Used in';
+    },
+    // A glossary term can be linked from hundreds of terms
+    usageNames() {
+      const names = this.usage.slice(0, 5).map((item) => item.label);
+      return this.usage.length > 5
+        ? `${names.join(', ')} and ${this.usage.length - 5} more`
+        : names.join(', ');
     },
   },
   async created() {

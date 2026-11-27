@@ -11,8 +11,15 @@ export default {
   /**
    * Search files and folders
    */
-  async searchFiles(workspaceId, query) {
-    return api.get(`/workspaces/${workspaceId}/search?query=${encodeURIComponent(query)}`);
+  async searchFiles(workspaceId, query, filters = {}) {
+    const params = new URLSearchParams();
+    if (query) {
+      params.append('query', query);
+    }
+    for (const [key, values] of Object.entries(filters)) {
+      values.forEach((value) => params.append('filter', `${key}:${value}`));
+    }
+    return api.get(`/workspaces/${workspaceId}/search?${params}`);
   },
 
   /**
@@ -82,7 +89,17 @@ export default {
     });
   },
 
-  async createNewPFS(workspaceId, content) {
-    return api.post(`/workspaces/${workspaceId}/pfs`, content);
+  /**
+   * The form of an action of the workspace type: `{ schema, ui_schema }`, e.g. with options from the workspace
+   */
+  async fetchActionForm(workspaceId, action) {
+    return api.get(`/workspaces/${workspaceId}/actions/${encodeURIComponent(action)}`);
+  },
+
+  /**
+   * Run an action of the workspace type that creates a file or folder, e.g. a new PFS
+   */
+  async runAction(workspaceId, action, data) {
+    return api.post(`/workspaces/${workspaceId}/actions/${encodeURIComponent(action)}`, data);
   },
 };

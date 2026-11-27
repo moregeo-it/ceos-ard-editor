@@ -10,6 +10,7 @@ import { usePreviewStore } from './preview';
 import { useProposalStore } from './proposal';
 import { useRealtimeStore } from './realtime';
 import { useShareStore } from './share';
+import { useTypesStore } from './types';
 
 import { EVENTS, on, startWorkspaceSession, workspaceSession } from '@/services/events';
 import workspaceService from '@/services/workspace.service';
@@ -36,8 +37,8 @@ function queueListTask(task) {
 
 export const useWorkspacesStore = defineStore('workspaces', {
   state: () => ({
-    pfsOptions: [],
-    workspacePfsOptions: [],
+    // What the current workspace can select for its preview, e.g. its PFS
+    selectionOptions: [],
     // List of all workspaces
     workspaces: [],
     isLoading: false,
@@ -136,9 +137,9 @@ export const useWorkspacesStore = defineStore('workspaces', {
     // The loading flag unmounts the editor panes, so the in-editor updates below don't set it
     // (toggleWorkspaceStatus is the exception: reactivating via the ArchivedDialog remounts).
 
-    /** Save the owner's preview selection as the workspace's PFS list; viewers follow it. */
-    async updateWorkspacePfs(workspaceId, pfs) {
-      const updatedWorkspace = await workspaceService.updateWorkspace(workspaceId, { pfs });
+    /** Save the owner's preview selection, e.g. PFS; viewers follow it. */
+    async updateWorkspaceSelection(workspaceId, selection) {
+      const updatedWorkspace = await workspaceService.updateWorkspace(workspaceId, { selection });
       this.applyWorkspace(updatedWorkspace);
       return updatedWorkspace;
     },
@@ -285,13 +286,11 @@ export const useWorkspacesStore = defineStore('workspaces', {
       }
     },
 
-    async fetchPfs(workspaceId) {
-      const pfs = await workspaceService.fetchPfs(workspaceId);
-      if (!workspaceId) {
-        this.pfsOptions = pfs;
-      } else if (this.currentWorkspace?.id === workspaceId) {
-        // A late answer must not land in the workspace opened meanwhile
-        this.workspacePfsOptions = pfs;
+    async fetchSelectionOptions(workspaceId) {
+      const options = await workspaceService.fetchSelectionOptions(workspaceId);
+      // A late answer must not land in the workspace opened meanwhile
+      if (this.currentWorkspace?.id === workspaceId) {
+        this.selectionOptions = options;
       }
     },
 
@@ -343,6 +342,7 @@ export const useWorkspacesStore = defineStore('workspaces', {
       startWorkspaceSession();
       this.currentWorkspace = null;
       this.upstream = null;
+      this.selectionOptions = [];
     },
 
     /** Drop every per-workspace store and return to the workspace list. */
@@ -362,24 +362,19 @@ export const useWorkspacesStore = defineStore('workspaces', {
   },
 });
 
-// Events after which the PFS options may have changed (a save doesn't add/remove PFS folders).
-const PFS_AFFECTING_EVENTS = new Set([
+// Events after which the selection options may have changed, e.g. a new PFS folder
+const OPTIONS_AFFECTING_EVENTS = new Set([
   EVENTS.FILE_CREATED,
   EVENTS.FILE_RENAMED,
   EVENTS.FILE_DELETED,
   EVENTS.FILE_REVERTED,
 ]);
 
-function affectsPfs(event) {
-  const paths = [event.path, event.old_path, event.file?.path];
-  return paths.some((path) => typeof path === 'string' && path.startsWith('/pfs/'));
-}
-
 let listenersRegistered = false;
 
 /**
- * React to workspace events: refresh the PFS options when files under /pfs/ change, refetch the
- * workspace when the owner changed it, and leave the workspace when access is lost.
+ * React to workspace events: refresh the selection options when files are added or removed, refetch
+ * the workspace when the owner changed it, and leave the workspace when access is lost.
  */
 export function registerWorkspacesEventListeners() {
   if (listenersRegistered) {
@@ -388,13 +383,13 @@ export function registerWorkspacesEventListeners() {
   listenersRegistered = true;
 
   on('file.*', async (event) => {
-    if (!PFS_AFFECTING_EVENTS.has(event.type) || !affectsPfs(event)) {
+    if (!OPTIONS_AFFECTING_EVENTS.has(event.type) || !useTypesStore().currentType?.selection) {
       return;
     }
     const workspaces = useWorkspacesStore();
     const workspaceId = workspaces.currentWorkspace?.id;
     if (workspaceId) {
-      await workspaces.fetchPfs(workspaceId);
+      await workspaces.fetchSelectionOptions(workspaceId);
     }
   });
 
@@ -402,11 +397,11 @@ export function registerWorkspacesEventListeners() {
     await useWorkspacesStore().refreshCurrentWorkspace();
   });
 
-  // Title, description, PFS list or status changed by the owner; a changed PFS list is the
-  // owner's preview selection, which every viewer (and the owner's other tabs) follows.
+  // Title, description, selection or status changed by the owner; the selection is the owner's
+  // preview, which every viewer (and the owner's other tabs) follows.
   on(EVENTS.WORKSPACE_UPDATED, async (event) => {
     const workspace = await useWorkspacesStore().refreshCurrentWorkspace();
-    if (workspace && event.fields?.includes('pfs')) {
+    if (workspace && event.fields?.includes('selection')) {
       usePreviewStore().requestPreviewRefresh({ fetchOnly: true });
     }
   });
