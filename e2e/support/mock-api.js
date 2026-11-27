@@ -368,7 +368,14 @@ export class MockApi {
     }
     if ((m = sub.match(/^\/context\/(.+)$/))) {
       const path = `/${m[1].replace(/^\//, '')}`;
-      return json(route, { ...this.item(path, false), usage: this.usage[path] ?? null });
+      return json(route, { ...this.item(path, false), tracks_usage: path in this.usage });
+    }
+    if ((m = sub.match(/^\/usage\/(.+)$/))) {
+      const path = `/${m[1].replace(/^\//, '')}`;
+      if (!(path in this.usage)) {
+        return json(route, { detail: 'The usage of this file is not tracked' }, 404);
+      }
+      return json(route, { usage: this.usage[path] });
     }
     if (sub === '/search') {
       const filters = url.searchParams.getAll('filter').map((filter) => filter.split(':')[1]);

@@ -58,6 +58,13 @@ export default {
   },
 
   /**
+   * Load the files that use a file whose context has `tracks_usage`
+   */
+  async loadFileUsage(workspaceId, filePath) {
+    return api.get(`/workspaces/${workspaceId}/usage/${encodeURIComponent(filePath)}`);
+  },
+
+  /**
    * Load the file content of a file
    */
   async loadFile(workspaceId, filePath) {
