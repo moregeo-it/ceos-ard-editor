@@ -100,6 +100,11 @@ const NAME_PATTERN = /^[\p{L}\p{N}_][\p{L}\p{N}_.-]*[\p{L}\p{N}_]$/u;
 const PDF_NAME_PATTERN = /^[\p{L}\p{N}_][\p{L}\p{N}_. -]*[\p{L}\p{N}_]$/u;
 const IMAGE_FORMATS = ['jpg', 'jpeg', 'png'];
 
+function withLowercaseExtension(name) {
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? name.slice(0, dot) + name.slice(dot).toLowerCase() : name;
+}
+
 let nextRowId = 0;
 
 export default {
@@ -118,6 +123,11 @@ export default {
     onUploaded: {
       type: Function,
       default: null,
+    },
+    // For files that are looked up by a lowercase extension, e.g. references/<id>.bib
+    lowercaseExtension: {
+      type: Boolean,
+      default: false,
     },
   },
   data() {
@@ -162,7 +172,7 @@ export default {
         this.rows.push({
           id: nextRowId++,
           file,
-          name: file.name,
+          name: this.lowercaseExtension ? withLowercaseExtension(file.name) : file.name,
           replace: false,
           uploading: false,
           error: null,

@@ -347,19 +347,20 @@ test.describe('Editor', () => {
     await expect(dialog.locator('input[type=file]')).toHaveAttribute('accept', '.bib');
     await dialog.locator('input[type=file]').setInputFiles([
       {
-        name: 'bell2023.bib',
+        name: 'Bell2023.BIB',
         mimeType: 'text/plain',
-        buffer: Buffer.from('@article{bell2023,\n}\n'),
+        buffer: Buffer.from('@article{Bell2023,\n}\n'),
       },
     ]);
+    await expect(dialog.getByLabel('Name', { exact: true })).toHaveValue('Bell2023.bib');
     await dialog.getByRole('button', { name: 'Upload 1 file' }).click();
     await expect(dialog).toBeHidden();
-    await expect(references.locator('.v-chip')).toHaveText(['small2011', 'bell2023']);
+    await expect(references.locator('.v-chip')).toHaveText(['small2011', 'Bell2023']);
 
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect
       .poll(() => api.files.get('/glossary/accuracy.yaml').content)
-      .toContain('references:\n  - small2011\n  - bell2023\n');
+      .toContain('references:\n  - small2011\n  - Bell2023\n');
   });
 
   test('other YAML files open in the source code editor', async ({ page }) => {

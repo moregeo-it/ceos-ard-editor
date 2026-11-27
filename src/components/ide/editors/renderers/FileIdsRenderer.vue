@@ -101,6 +101,7 @@ const FileIdsRenderer = {
       this.$root.openDialog('UploadFilesDialog', {
         folder: this.folder,
         formats: [this.suffix.slice(1)],
+        lowercaseExtension: true,
         onUploaded: (paths) => {
           const ids = paths.map((path) => this.idOf(path)).filter(Boolean);
           this.onChange([...(this.control.data ?? []), ...ids]);
