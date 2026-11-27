@@ -141,6 +141,15 @@ test.describe('CEOS EO Glossary', () => {
     await linkedFrom.click();
     await page.locator('.v-overlay--active .v-list-item').filter({ hasText: 'Precision' }).click();
     await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText('precision.md');
+    await expect(linkedFrom).toHaveText(/Linked from\s*0/);
+  });
+
+  test('pages other than terms have no "Linked from"', async ({ page }) => {
+    await page.goto('/workspaces/ws-1');
+    await row(page, 'intro.md').click();
+
+    await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText('intro.md');
+    await expect(page.getByRole('button', { name: /Linked from/ })).toHaveCount(0);
   });
 
   test('creates new terms', async ({ page, api }) => {
