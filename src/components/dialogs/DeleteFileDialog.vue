@@ -94,7 +94,10 @@ export default {
     try {
       // Not through the files store, which would write a late response over a deleted or renamed file
       const workspaceId = useWorkspacesStore().currentWorkspace?.id;
-      this.usage = (await fileService.loadFileContext(workspaceId, this.path))?.usage ?? [];
+      const context = await fileService.loadFileContext(workspaceId, this.path);
+      if (context?.tracks_usage) {
+        this.usage = (await fileService.loadFileUsage(workspaceId, this.path)).usage;
+      }
     } catch {
       // The usage is only a hint, deleting works without it
     }

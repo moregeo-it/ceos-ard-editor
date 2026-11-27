@@ -78,16 +78,35 @@
         </template>
         -->
 
-        <v-menu v-if="activeFile?.usage?.length" location="top">
+        <v-menu
+          v-if="activeFile?.tracks_usage"
+          location="top"
+          @update:model-value="(open) => open && editorStore.loadUsage(activeFile.path)"
+        >
           <template #activator="{ props }">
             <v-btn v-bind="props" :append-icon="icons.usage">
               {{ usageLabel }}
-              <v-chip size="x-small" class="ml-2">{{ activeFile.usage.length }}</v-chip>
+              <v-chip size="x-small" class="ml-2" :aria-busy="usage.loading">
+                <v-progress-circular v-if="usage.loading" indeterminate size="10" width="2" />
+                <v-icon
+                  v-else-if="usage.failed"
+                  :icon="icons.usageFailed"
+                  aria-label="The usage could not be loaded"
+                />
+                <template v-else>{{ usage.items?.length ?? 0 }}</template>
+              </v-chip>
             </v-btn>
           </template>
           <v-list density="compact" max-height="300">
+            <v-list-item v-if="usage.loading && !usage.items" title="Loading…" disabled />
             <v-list-item
-              v-for="item in activeFile.usage"
+              v-else-if="usage.failed"
+              title="The usage could not be loaded. Try again"
+              @click="editorStore.loadUsage(activeFile.path, { force: true })"
+            />
+            <v-list-item v-else-if="!usage.items?.length" title="Not used" disabled />
+            <v-list-item
+              v-for="item in usage.items ?? []"
               :key="item.path"
               :title="item.label"
               @click="editorStore.show(item.path)"
@@ -180,6 +199,7 @@ import UnsupportedViewer from './editors/UnsupportedViewer.vue';
 import {
   mdiClose,
   mdiCommentMultipleOutline,
+  mdiAlertOutline,
   mdiCommentPlusOutline,
   mdiContentSave,
   mdiContentSaveAll,
@@ -223,6 +243,7 @@ export default {
         preview: mdiEyeOutline,
         save: mdiContentSave,
         usage: mdiMenuUp,
+        usageFailed: mdiAlertOutline,
         saveAll: mdiContentSaveAll,
       },
     };
@@ -242,6 +263,9 @@ export default {
     },
     usageLabel() {
       return useTypesStore().currentType?.labels?.usage ?? 'Used in';
+    },
+    usage() {
+      return this.editorStore.usage[this.activeFile?.path] ?? { items: null, loading: true };
     },
     model: {
       get() {
@@ -331,6 +355,17 @@ export default {
     },
     isAnySaving() {
       return Object.values(this.editorStore.saving).some((isSaving) => isSaving);
+    },
+  },
+  watch: {
+    // Also when closing a tab activates another one
+    'activeFile.path': {
+      immediate: true,
+      handler(path) {
+        if (path) {
+          this.editorStore.loadUsage(path);
+        }
+      },
     },
   },
   methods: {

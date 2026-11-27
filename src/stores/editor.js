@@ -6,6 +6,8 @@ import { useNotificationsStore } from './notifications';
 import { supportVisualEditing } from '@/components/ide/editors/utils';
 
 import { EVENTS, on, workspaceSession } from '@/services/events';
+import fileService from '@/services/file.service';
+import { useWorkspacesStore } from '@/stores/workspaces';
 import { displayPath } from '@/utils/paths';
 
 // The latest save per file path, which the next save of that file waits for
@@ -18,6 +20,8 @@ const getDefaults = () => ({
   changed: {}, // Changed status per file path
   saving: {}, // Saving status per file path
   active: null, // Currently active file
+  // Files that use an open file, per path: {items, loading, failed, stale}
+  usage: {},
 });
 
 export const useEditorStore = defineStore('editor', {
@@ -72,8 +76,48 @@ export const useEditorStore = defineStore('editor', {
         this.opened[index] = file;
       }
       this.active = file;
+      // Not awaited: the usage can take a while, the tab shows it once loaded
+      this.loadUsage(path);
       if (this.original[path] === undefined) {
         await this.sync(path);
+      }
+    },
+    /** Load the usage of an open file that tracks it, unless it is loaded and still current. */
+    async loadUsage(path, { force = false } = {}) {
+      const file = this.opened.find((f) => f.path === path);
+      const current = this.usage[path];
+      if (!file?.tracks_usage || current?.loading || (current && !current.stale && !force)) {
+        return;
+      }
+      this.usage[path] = {
+        items: current?.items ?? null,
+        loading: true,
+        failed: false,
+        stale: false,
+      };
+      const pending = this.usage[path];
+      let entry;
+      try {
+        const { usage } = await fileService.loadFileUsage(
+          useWorkspacesStore().currentWorkspace?.id,
+          path,
+        );
+        entry = { items: usage, loading: false, failed: false, stale: false };
+      } catch {
+        entry = { items: null, loading: false, failed: true, stale: false };
+      }
+      // Not if the tab was closed, reopened, renamed or the workspace left meanwhile
+      if (this.usage[path] !== pending) {
+        return;
+      }
+      // A change while it loaded leaves it stale
+      entry.stale = pending.stale;
+      this.usage[path] = entry;
+    },
+    /** The workspace changed: the usage of every open file may have, reloaded when it's shown again. */
+    invalidateUsage() {
+      for (const entry of Object.values(this.usage)) {
+        entry.stale = true;
       }
     },
     /** Load an open file from the server, unless the tab was closed or typed into meanwhile. */
@@ -149,6 +193,7 @@ export const useEditorStore = defineStore('editor', {
         delete this.original[path];
         delete this.data[path];
         delete this.changed[path];
+        delete this.usage[path];
       }
       if (this.active && this.active.path === path) {
         // Open the tab on the right, or the last one if there is none
@@ -168,6 +213,7 @@ export const useEditorStore = defineStore('editor', {
      * about (naming `source` as what they missed), and their paths returned.
      */
     async refreshAfterRemoteUpdate({ source = 'the changes from GitHub' } = {}) {
+      this.invalidateUsage();
       const started = workspaceSession();
       await useFilesStore().reloadTree();
       if (started !== workspaceSession()) {
@@ -299,10 +345,37 @@ export const useEditorStore = defineStore('editor', {
         this.saving[newPath] = this.saving[oldPath];
         delete this.saving[oldPath];
       }
+      delete this.usage[oldPath];
 
       // Update active file reference if needed
       if (this.active && this.active.path === oldPath) {
         this.active = newFile;
+      }
+
+      // Not awaited, so that it doesn't hold up the next events
+      this.loadTracksUsage(newPath);
+    },
+    /** Whether the usage is tracked depends on the path, which the event's snapshot doesn't say. */
+    async loadTracksUsage(path) {
+      const started = workspaceSession();
+      let context;
+      try {
+        // Not through the files store, which would write a late response over a later rename or delete
+        context = await fileService.loadFileContext(
+          useWorkspacesStore().currentWorkspace?.id,
+          path,
+        );
+      } catch {
+        return;
+      }
+      const index = this.opened.findIndex((f) => f.path === path);
+      if (started !== workspaceSession() || index === -1 || !context) {
+        return;
+      }
+      this.opened[index] = { ...this.opened[index], tracks_usage: context.tracks_usage };
+      if (this.active?.path === path) {
+        this.active = this.opened[index];
+        this.loadUsage(path);
       }
     },
 
@@ -321,6 +394,7 @@ export const useEditorStore = defineStore('editor', {
       if (revertedFile.path !== oldPath) {
         await this.onFileRenamed(oldPath, revertedFile);
       } else {
+        revertedFile = { ...revertedFile, tracks_usage: this.opened[index].tracks_usage };
         this.opened[index] = revertedFile;
         // Update active file reference if needed
         if (this.active && this.active.path === path) {
@@ -354,6 +428,19 @@ export function registerEditorEventListeners() {
     return;
   }
   listenersRegistered = true;
+
+  // Changes of files, including this tab's own, and events that may have been missed
+  for (const type of [
+    EVENTS.FILE_SAVED,
+    EVENTS.FILE_CREATED,
+    EVENTS.FILE_DELETED,
+    EVENTS.FILE_RENAMED,
+    EVENTS.FILE_REVERTED,
+    EVENTS.WORKSPACE_SYNCED,
+    EVENTS.REALTIME_RESYNCED,
+  ]) {
+    on(type, () => useEditorStore().invalidateUsage());
+  }
 
   on(EVENTS.FILE_CREATED, async (event) => {
     // Only open a tab for files this user created - viewers shouldn't get tabs opened by others.

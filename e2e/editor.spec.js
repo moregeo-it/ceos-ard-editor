@@ -304,12 +304,64 @@ test.describe('Editor', () => {
     );
   });
 
-  test('files without usage have no "Used in"', async ({ page }) => {
+  test('unused requirements are used in 0 files', async ({ page }) => {
     await openWorkspace(page);
     await expand(page, 'requirements', 'general', 'unused.yaml');
 
     await expect(page.locator('.v-window-item--active .cm-content')).toContainText('Unused');
+    const usedIn = page.getByRole('button', { name: /Used in/ });
+    await expect(usedIn).toHaveText(/Used in\s*0/);
+    await usedIn.click();
+    await expect(page.locator('.v-overlay--active .v-list-item')).toHaveText(['Not used']);
+  });
+
+  test('files whose usage is not tracked have no "Used in"', async ({ page }) => {
+    await openWorkspace(page);
+    await expand(page, 'sections', 'introduction', 'what-are-ceos-ard-products.md');
+
+    await expect(page.locator('.v-window-item--active .cm-content')).toContainText(
+      'What are CEOS-ARD products?',
+    );
     await expect(page.getByRole('button', { name: /Used in/ })).toHaveCount(0);
+  });
+
+  test('the tab opens while the usage loads', async ({ page }) => {
+    let release;
+    const loaded = new Promise((resolve) => (release = resolve));
+    await page.route('**/usage/**', async (route) => {
+      await loaded;
+      await route.fallback();
+    });
+    await openWorkspace(page);
+    await expand(page, 'requirements', 'general', 'metadata-machine-readable.yaml');
+
+    const usedIn = page.getByRole('button', { name: /Used in/ });
+    await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText(
+      'metadata-machine-readable.yaml',
+    );
+    await expect(usedIn.locator('.v-progress-circular')).toBeVisible();
+    release();
+    await expect(usedIn).toHaveText(/Used in\s*2/);
+  });
+
+  test('a failed usage can be loaded again', async ({ page }) => {
+    let fail = true;
+    await page.route('**/usage/**', async (route) => {
+      if (fail) {
+        fail = false;
+        await route.fulfill({ status: 500, contentType: 'application/json', body: '{}' });
+      } else {
+        await route.fallback();
+      }
+    });
+    await openWorkspace(page);
+    await expand(page, 'requirements', 'general', 'metadata-machine-readable.yaml');
+
+    const usedIn = page.getByRole('button', { name: /Used in/ });
+    await expect(usedIn.getByLabel('The usage could not be loaded')).toBeVisible();
+    await usedIn.click();
+    await page.locator('.v-overlay--active .v-list-item').click();
+    await expect(usedIn).toHaveText(/Used in\s*2/);
   });
 
   test('glossary entries open in the form editor', async ({ page }) => {
