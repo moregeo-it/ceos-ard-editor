@@ -193,7 +193,8 @@ test.describe('Upload', () => {
     await expand(page, 'glossary', 'empty.yaml');
 
     const form = page.locator('.v-window-item--active .json-schema-editor');
-    await expect(form.locator('input, textarea:not([aria-hidden])')).toHaveCount(2);
+    expect(await fieldLabels(form)).toEqual(['Term', 'Description', 'References']);
+    await expect(form.getByLabel('Deprecated')).toBeVisible();
   });
 
   test('a running action can neither be cancelled nor sent twice', async ({ page, api }) => {
@@ -317,11 +318,49 @@ test.describe('Editor', () => {
 
     const form = page.locator('.v-window-item--active .json-schema-editor');
     await expect(form).toBeVisible();
-    expect(await fieldLabels(form)).toEqual(['Term', 'Description']);
+    expect(await fieldLabels(form)).toEqual(['Term', 'Description', 'References']);
     await expect(form.locator('input').first()).toHaveValue('Accuracy');
     await expect(form.locator('textarea:not([aria-hidden])')).toHaveValue(
       'Closeness of agreement.',
     );
+    await expect(form.getByLabel('Deprecated')).not.toBeChecked();
+  });
+
+  test('glossary references are chosen from the reference files or uploaded', async ({
+    page,
+    api,
+  }) => {
+    api.files.set('/references/small2011.bib', { content: '@article{small2011,\n}\n' });
+    api.files.set('/references/notes.txt', { content: 'Not a reference\n' });
+    await openWorkspace(page);
+    await expand(page, 'glossary', 'accuracy.yaml');
+
+    const form = page.locator('.v-window-item--active .json-schema-editor');
+    const references = form.locator('.v-autocomplete');
+    expect(await optionTexts(page, references)).toEqual(['small2011']);
+    await references.click();
+    await page.locator('.v-overlay--active .v-list-item').filter({ hasText: 'small2011' }).click();
+    await page.keyboard.press('Escape');
+
+    await form.getByRole('button', { name: 'Upload to /references' }).click();
+    const dialog = page.locator('.v-dialog .v-card');
+    await expect(dialog.locator('input[type=file]')).toHaveAttribute('accept', '.bib');
+    await dialog.locator('input[type=file]').setInputFiles([
+      {
+        name: 'Bell2023.BIB',
+        mimeType: 'text/plain',
+        buffer: Buffer.from('@article{Bell2023,\n}\n'),
+      },
+    ]);
+    await expect(dialog.getByLabel('Name', { exact: true })).toHaveValue('Bell2023.bib');
+    await dialog.getByRole('button', { name: 'Upload 1 file' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(references.locator('.v-chip')).toHaveText(['small2011', 'Bell2023']);
+
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect
+      .poll(() => api.files.get('/glossary/accuracy.yaml').content)
+      .toContain('references:\n  - small2011\n  - Bell2023\n');
   });
 
   test('other YAML files open in the source code editor', async ({ page }) => {

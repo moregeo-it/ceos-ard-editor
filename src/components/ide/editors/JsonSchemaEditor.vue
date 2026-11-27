@@ -25,12 +25,14 @@ import EnumChipsRenderer, { tester as enumChipsTester } from './renderers/EnumCh
 import StringArrayRenderer, {
   tester as stringArrayTester,
 } from './renderers/StringArrayRenderer.vue';
+import FileIdsRenderer, { tester as fileIdsTester } from './renderers/FileIdsRenderer.vue';
 
 // The components themselves must be imported: the production build drops the template of an unused default export
 const renderers = markRaw([
   ...extendedVuetifyRenderers,
   { renderer: EnumChipsRenderer, tester: enumChipsTester },
   { renderer: StringArrayRenderer, tester: stringArrayTester },
+  { renderer: FileIdsRenderer, tester: fileIdsTester },
 ]);
 
 const fieldDefaults = { density: 'compact', hideDetails: 'auto' };

@@ -100,6 +100,11 @@ const NAME_PATTERN = /^[\p{L}\p{N}_][\p{L}\p{N}_.-]*[\p{L}\p{N}_]$/u;
 const PDF_NAME_PATTERN = /^[\p{L}\p{N}_][\p{L}\p{N}_. -]*[\p{L}\p{N}_]$/u;
 const IMAGE_FORMATS = ['jpg', 'jpeg', 'png'];
 
+function withLowercaseExtension(name) {
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? name.slice(0, dot) + name.slice(dot).toLowerCase() : name;
+}
+
 let nextRowId = 0;
 
 export default {
@@ -110,6 +115,20 @@ export default {
       type: String,
       required: true,
     },
+    // A subset of FILE_FORMATS
+    formats: {
+      type: Array,
+      default: () => FILE_FORMATS,
+    },
+    onUploaded: {
+      type: Function,
+      default: null,
+    },
+    // For files that are looked up by a lowercase extension, e.g. references/<id>.bib
+    lowercaseExtension: {
+      type: Boolean,
+      default: false,
+    },
   },
   data() {
     return {
@@ -119,8 +138,8 @@ export default {
       uploading: false,
       loadingFolder: true,
       folderError: null,
-      extensions: FILE_FORMATS.map((format) => `.${format}`).join(','),
-      formatList: FILE_FORMATS.join(', '),
+      extensions: this.formats.map((format) => `.${format}`).join(','),
+      formatList: this.formats.join(', '),
       maxSizeMb: MAX_SIZE_MB,
       icons: {
         remove: mdiClose,
@@ -153,7 +172,7 @@ export default {
         this.rows.push({
           id: nextRowId++,
           file,
-          name: file.name,
+          name: this.lowercaseExtension ? withLowercaseExtension(file.name) : file.name,
           replace: false,
           uploading: false,
           error: null,
@@ -180,6 +199,8 @@ export default {
       const errors = [];
       if (!isAllowedFormat(name)) {
         errors.push(FORMAT_ERROR);
+      } else if (!this.formats.includes(fileFormat(name))) {
+        errors.push(`Only ${this.formatList} files can be uploaded here`);
       } else if (name.length < 2 || name.length > 100) {
         errors.push('The name must have 2 to 100 characters');
       } else if (!pattern.test(name) || name.includes('..')) {
@@ -262,6 +283,7 @@ export default {
         return;
       }
       if (uploaded.length) {
+        this.onUploaded?.(uploaded);
         this.filesStore.openedFolders = [
           ...new Set([...this.filesStore.openedFolders, this.folder]),
         ];
