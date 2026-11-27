@@ -247,6 +247,29 @@ test.describe('Workspace types', () => {
     });
   });
 
+  test('switching the type clears the selection of the previous type', async ({ page, api }) => {
+    api.types.push({
+      ...OTHER_TYPE,
+      preview: 'build',
+      selection: { label: 'Part', multiple: false, on_create: true },
+    });
+    await page.route('http://localhost:8099/types/other/selection-options', (route) =>
+      route.fulfill({ json: { options: [{ id: 'P1', title: 'Part 1', path: null }] } }),
+    );
+    const dialog = await openCreateDialog(page);
+    await dialog.getByLabel('Workspace Title').fill('Other review');
+    await selectPfs(page, dialog, 'NRB');
+
+    const typeSelect = dialog.locator('.v-select').filter({ hasText: 'What do you want to edit?' });
+    await typeSelect.click();
+    await page.locator('.v-overlay--active .v-list-item').filter({ hasText: 'Other' }).click();
+    await expect(dialog.locator('.v-select').filter({ hasText: 'Part' })).not.toContainText('NRB');
+
+    await dialog.getByRole('button', { name: 'Create Workspace' }).click();
+    await expect(dialog).toContainText('Select a Part');
+    expect(api.requests.some((r) => r.method === 'POST' && r.path === '/workspaces')).toBe(false);
+  });
+
   test('a failure for the previous type does not show for the chosen one', async ({
     page,
     api,

@@ -207,6 +207,12 @@ export default {
     },
   },
   watch: {
+    // The options of another type don't apply
+    'formData.type'() {
+      if (!this.isUpdateMode) {
+        this.formData.selection = [];
+      }
+    },
     selection: {
       immediate: true,
       handler(selection) {
