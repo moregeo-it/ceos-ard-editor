@@ -139,7 +139,7 @@
           </v-list>
         </v-menu>
 
-        <v-tooltip location="top" max-width="320">
+        <v-tooltip v-if="previewStore.mode !== 'file'" location="top" max-width="320">
           <template #activator="{ props }">
             <span v-bind="props">
               <v-btn

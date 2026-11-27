@@ -124,6 +124,8 @@ test.describe('CEOS EO Glossary', () => {
     const frame = page.frameLocator('.preview-iframe');
     await expect(frame.locator('h1')).toHaveText('Accuracy');
     await expect(page.getByText('Select PFS for Preview')).toHaveCount(0);
+    // The preview is the open term, so there is nothing to scroll to
+    await expect(page.getByRole('button', { name: 'In preview' })).toHaveCount(0);
 
     await frame.locator('a[data-open-file="/docs/terms/precision.md"]').click();
     await expect(page.locator('.editor-tabs .v-tab--selected')).toContainText('precision.md');
