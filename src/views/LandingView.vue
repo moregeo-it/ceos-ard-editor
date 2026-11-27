@@ -3,10 +3,7 @@
     <v-container fluid class="fill-height flex-column">
       <v-row justify="center" class="flex-grow-0">
         <v-col>
-          <v-alert type="warning">
-            This is a prototype version of the {{ appTitle }}. Functionality may be limited and data
-            may be reset periodically.
-          </v-alert>
+          <v-alert type="warning">{{ notice }}</v-alert>
         </v-col>
       </v-row>
       <v-row justify="center" align="center" class="flex-grow-1 w-100">
@@ -15,10 +12,9 @@
             <v-row align="center">
               <!-- Left side - Logo and branding -->
               <v-col cols="12" md="6" class="text-center">
-                <!-- CEOS Logo -->
-                <img :src="ceosLogo" alt="CEOS Analysis Ready Data" class="logo" />
+                <img v-if="logo" :src="logo" :alt="appTitle" class="logo mb-6" />
 
-                <h1 class="text-h4 font-weight-bold mt-6 mb-3">{{ appTitle }}</h1>
+                <h1 class="text-h4 font-weight-bold mb-3">{{ appTitle }}</h1>
 
                 <p class="text-body-1 text-medium-emphasis">{{ appSubtitle }}</p>
               </v-col>
@@ -35,31 +31,20 @@
           <!-- Footer -->
           <div class="text-center mt-8">
             <div class="d-flex justify-center align-center flex-wrap gap-2 mb-2">
-              <v-btn
-                variant="text"
-                size="small"
-                :prepend-icon="icons.web"
-                href="https://ceos.org/ard/"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                CEOS-ARD Website
-              </v-btn>
+              <template v-for="link in links" :key="link.url">
+                <v-btn
+                  variant="text"
+                  size="small"
+                  :prepend-icon="link.url.includes('github.com') ? icons.github : icons.web"
+                  :href="link.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {{ link.title }}
+                </v-btn>
 
-              <v-divider vertical class="mx-2"></v-divider>
-
-              <v-btn
-                variant="text"
-                size="small"
-                :prepend-icon="icons.github"
-                href="https://github.com/ceos-org"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                CEOS GitHub Organization
-              </v-btn>
-
-              <v-divider vertical class="mx-2"></v-divider>
+                <v-divider vertical class="mx-2"></v-divider>
+              </template>
 
               <v-btn
                 variant="text"
@@ -96,7 +81,7 @@
 import { useAuthStore } from '@/stores/auth';
 import LoginButton from '@/components/landing/LoginButton.vue';
 import ceosLogo from '@/assets/ceos-ard-logo.png';
-import { APP_SUBTITLE, APP_TITLE } from '@/utils/branding';
+import { APP_LINKS, APP_LOGO, APP_NOTICE, APP_SUBTITLE, APP_TITLE } from '@/utils/branding';
 import { mdiGithub, mdiWeb, mdiFileDocument } from '@mdi/js';
 
 export default {
@@ -110,7 +95,9 @@ export default {
     return {
       appTitle: APP_TITLE,
       appSubtitle: APP_SUBTITLE,
-      ceosLogo,
+      notice: APP_NOTICE,
+      logo: APP_LOGO === 'none' ? null : APP_LOGO || ceosLogo,
+      links: APP_LINKS,
       icons: {
         github: mdiGithub,
         web: mdiWeb,

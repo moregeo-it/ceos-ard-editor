@@ -50,7 +50,9 @@ in development both on `localhost` (use `localhost` for both, not `127.0.0.1` fo
 Developing in Safari over plain HTTP needs `SESSION_COOKIE_SECURE=false` on the server.
 
 `VITE_APP_TITLE` and `VITE_APP_SUBTITLE` set the name and tagline of a deployment, shown on the landing
-page and as the page title.
+page and as the page title. `VITE_APP_NOTICE`, `VITE_APP_LOGO` and `VITE_APP_LINKS` replace the notice, the
+CEOS-ARD logo and the CEOS links of the landing page, see [.env.example](.env.example). The logo must be
+served by the editor, e.g. from `public/`, as the Content-Security-Policy blocks images from other hosts.
 
 ### Content Security Policy
 
